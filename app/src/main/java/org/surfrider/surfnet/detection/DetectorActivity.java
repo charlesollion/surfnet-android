@@ -36,9 +36,9 @@ import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.surfrider.surfnet.detection.tflite.Classifier;
+import org.surfrider.surfnet.detection.tflite.Detector;
 import org.surfrider.surfnet.detection.tflite.DetectorFactory;
-import org.surfrider.surfnet.detection.tflite.YoloV5Classifier;
+import org.surfrider.surfnet.detection.tflite.YoloV5Detector;
 import org.surfrider.surfnet.detection.tracking.MultiBoxTracker;
 import org.surfrider.surfnet.detection.customview.OverlayView;
 import org.surfrider.surfnet.detection.customview.OverlayView.DrawCallback;
@@ -62,7 +62,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     OverlayView trackingOverlay;
     private Integer sensorOrientation;
 
-    private YoloV5Classifier detector;
+    private YoloV5Detector detector;
 
     private long lastProcessingTimeMs;
     private Bitmap rgbFrameBitmap = null;
@@ -243,7 +243,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                     public void run() {
                         LOGGER.i("Running detection on image " + currTimestamp);
                         final long startTime = SystemClock.uptimeMillis();
-                        final List<Classifier.Recognition> results = detector.recognizeImage(croppedBitmap);
+                        final List<Detector.Recognition> results = detector.recognizeImage(croppedBitmap);
                         lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
 
                         Log.e("CHECK", "run: " + results.size());
@@ -262,10 +262,10 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
                                 break;
                         }
 
-                        final List<Classifier.Recognition> mappedRecognitions =
-                                new LinkedList<Classifier.Recognition>();
+                        final List<Detector.Recognition> mappedRecognitions =
+                                new LinkedList<Detector.Recognition>();
 
-                        for (final Classifier.Recognition result : results) {
+                        for (final Detector.Recognition result : results) {
                             final RectF location = result.getLocation();
                             if (location != null && result.getConfidence() >= minimumConfidence) {
                                 canvas.drawRect(location, paint);

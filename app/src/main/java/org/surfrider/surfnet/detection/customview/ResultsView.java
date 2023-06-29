@@ -17,8 +17,8 @@ package org.surfrider.surfnet.detection.customview;
 
 import java.util.List;
 
-import org.surfrider.surfnet.detection.tflite.Classifier;
+import org.surfrider.surfnet.detection.tflite.Detector;
 
 public interface ResultsView {
-  public void setResults(final List<Classifier.Recognition> results);
+  public void setResults(final List<Detector.Recognition> results);
 }

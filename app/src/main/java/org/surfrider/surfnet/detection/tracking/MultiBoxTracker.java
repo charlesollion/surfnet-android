@@ -33,7 +33,7 @@ import java.util.Queue;
 import org.surfrider.surfnet.detection.env.BorderedText;
 import org.surfrider.surfnet.detection.env.ImageUtils;
 import org.surfrider.surfnet.detection.env.Logger;
-import org.surfrider.surfnet.detection.tflite.Classifier.Recognition;
+import org.surfrider.surfnet.detection.tflite.Detector.Recognition;
 
 /** A tracker that handles non-max suppression and matches existing objects to new detections. */
 public class MultiBoxTracker {
