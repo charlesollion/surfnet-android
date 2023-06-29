@@ -23,7 +23,7 @@ import org.surfrider.surfnet.detection.env.ImageUtils;
 import org.surfrider.surfnet.detection.env.Logger;
 import org.surfrider.surfnet.detection.env.Utils;
 import org.surfrider.surfnet.detection.tflite.Detector;
-import org.surfrider.surfnet.detection.tflite.YoloV5Detector;
+import org.surfrider.surfnet.detection.tflite.YoloDetector;
 import org.surfrider.surfnet.detection.tracking.MultiBoxTracker;
 
 import java.io.IOException;
@@ -126,15 +126,16 @@ public class MainActivity extends AppCompatActivity {
         try {
             LOGGER.i("==================== filename: %s", TF_OD_API_MODEL_FILE);
             detector =
-                    YoloV5Detector.create(
+                    YoloDetector.create(
                             getAssets(),
                             TF_OD_API_MODEL_FILE,
                             TF_OD_API_LABELS_FILE,
                             TF_OD_API_IS_QUANTIZED,
+                            false,
                             TF_OD_API_INPUT_SIZE);
         } catch (final IOException e) {
             e.printStackTrace();
-            LOGGER.e(e, "Exception initializing classifier!");
+            LOGGER.e(e, "Exception initializing detector!");
             Toast toast =
                     Toast.makeText(
                             getApplicationContext(), "Classifier could not be initialized", Toast.LENGTH_SHORT);

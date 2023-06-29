@@ -38,7 +38,7 @@ import java.util.List;
 
 import org.surfrider.surfnet.detection.tflite.Detector;
 import org.surfrider.surfnet.detection.tflite.DetectorFactory;
-import org.surfrider.surfnet.detection.tflite.YoloV5Detector;
+import org.surfrider.surfnet.detection.tflite.YoloDetector;
 import org.surfrider.surfnet.detection.tracking.MultiBoxTracker;
 import org.surfrider.surfnet.detection.customview.OverlayView;
 import org.surfrider.surfnet.detection.customview.OverlayView.DrawCallback;
@@ -62,7 +62,7 @@ public class DetectorActivity extends CameraActivity implements OnImageAvailable
     OverlayView trackingOverlay;
     private Integer sensorOrientation;
 
-    private YoloV5Detector detector;
+    private YoloDetector detector;
 
     private long lastProcessingTimeMs;
     private Bitmap rgbFrameBitmap = null;

@@ -37,6 +37,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
@@ -53,7 +54,7 @@ import java.util.Vector;
  * - https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md
  * - https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/running_on_mobile_tensorflowlite.md#running-our-model-on-android
  */
-public class YoloV5Detector implements Detector {
+public class YoloDetector implements Detector {
 
     /**
      * Initializes a native TensorFlow session for classifying images.
@@ -63,14 +64,15 @@ public class YoloV5Detector implements Detector {
      * @param labelFilename The filepath of label file for classes.
      * @param isQuantized   Boolean representing model is quantized or not
      */
-    public static YoloV5Detector create(
+    public static YoloDetector create(
             final AssetManager assetManager,
             final String modelFilename,
             final String labelFilename,
             final boolean isQuantized,
+            final boolean isV8,
             final int inputSize)
             throws IOException {
-        final YoloV5Detector d = new YoloV5Detector();
+        final YoloDetector d = new YoloDetector();
 
         String actualFilename = labelFilename.split("file:///android_asset/")[1];
         InputStream labelsInput = assetManager.open(actualFilename);
@@ -114,6 +116,7 @@ public class YoloV5Detector implements Detector {
         }
 
         d.isModelQuantized = isQuantized;
+        d.isV8 = isV8;
         // Pre-allocate buffers.
         int numBytesPerChannel;
         if (isQuantized) {
@@ -126,8 +129,13 @@ public class YoloV5Detector implements Detector {
         d.imgData.order(ByteOrder.nativeOrder());
         d.intValues = new int[d.INPUT_SIZE * d.INPUT_SIZE];
 
-        d.output_box = (int) ((Math.pow((inputSize / 32), 2) + Math.pow((inputSize / 16), 2) + Math.pow((inputSize / 8), 2)) * 3);
-
+        if(!isV8) {
+            // yolov5 case (20² + 40² + 80²)*3 = 25200
+            d.output_box = (int) ((Math.pow((inputSize / 32), 2) + Math.pow((inputSize / 16), 2) + Math.pow((inputSize / 8), 2)) * 3);
+        } else {
+            // yolov8 case (20² + 40² + 80²) = 8400
+            d.output_box = (int) (Math.pow((inputSize / 32), 2) + Math.pow((inputSize / 16), 2) + Math.pow((inputSize / 8), 2));
+        }
         if (d.isModelQuantized){
             Tensor inpten = d.tfLite.getInputTensor(0);
             d.inp_scale = inpten.quantizationParams().getScale();
@@ -138,9 +146,19 @@ public class YoloV5Detector implements Detector {
         }
 
         int[] shape = d.tfLite.getOutputTensor(0).shape();
-        int numClass = shape[shape.length - 1] - 5;
+        LOGGER.i("out shape ==== "+Arrays.toString(shape));
+        int numClass = 0;
+        if(!isV8) {
+            // yolov5 case: (1, num_anchors, num_class+5)
+            numClass = shape[shape.length - 1] - 5;
+            d.outData = ByteBuffer.allocateDirect(d.output_box * (numClass + 5) * numBytesPerChannel);
+        } else {
+            // yolov8 case: (1, num_class+4, num_anchors)
+            numClass = shape[shape.length - 2] - 4;
+            d.outData = ByteBuffer.allocateDirect(d.output_box * (numClass + 4) * numBytesPerChannel);
+        }
         d.numClass = numClass;
-        d.outData = ByteBuffer.allocateDirect(d.output_box * (numClass + 5) * numBytesPerChannel);
+
         d.outData.order(ByteOrder.nativeOrder());
         return d;
     }
@@ -233,6 +251,8 @@ public class YoloV5Detector implements Detector {
 
     private boolean isModelQuantized;
 
+    private boolean isV8;
+
     /** holds a gpu delegate */
     GpuDelegate gpuDelegate = null;
     /** holds an nnapi delegate */
@@ -259,7 +279,7 @@ public class YoloV5Detector implements Detector {
     private float oup_scale;
     private int oup_zero_point;
     private int numClass;
-    private YoloV5Detector() {
+    private YoloDetector() {
     }
 
     //non maximum suppression
@@ -375,7 +395,7 @@ public class YoloV5Detector implements Detector {
 
         outData.rewind();
         outputMap.put(0, outData);
-        Log.d("YoloV5Classifier", "mObjThresh: " + getObjThresh());
+        Log.d("YoloDetector", "mObjThresh: " + getObjThresh());
 
         Object[] inputArray = {imgData};
         tfLite.runForMultipleInputsOutputs(inputArray, outputMap);
@@ -386,30 +406,52 @@ public class YoloV5Detector implements Detector {
         ArrayList<Recognition> detections = new ArrayList<Recognition>();
 
         float[][][] out = new float[1][output_box][numClass + 5];
-        Log.d("YoloV5Classifier", "out[0] detect start");
-        for (int i = 0; i < output_box; ++i) {
-            for (int j = 0; j < numClass + 5; ++j) {
-                if (isModelQuantized){
-                    out[0][i][j] = oup_scale * (((int) byteBuffer.get() & 0xFF) - oup_zero_point);
+        if(!isV8) {
+            Log.d("YoloDetector", "out[0] detect start");
+            for (int i = 0; i < output_box; ++i) {
+                for (int j = 0; j < numClass + 5; ++j) {
+                    if (isModelQuantized) {
+                        out[0][i][j] = oup_scale * (((int) byteBuffer.get() & 0xFF) - oup_zero_point);
+                    } else {
+                        out[0][i][j] = byteBuffer.getFloat();
+                    }
                 }
-                else {
-                    out[0][i][j] = byteBuffer.getFloat();
+                // Denormalize xywh
+                for (int j = 0; j < 4; ++j) {
+                    out[0][i][j] *= getInputSize();
                 }
             }
-            // Denormalize xywh
-            for (int j = 0; j < 4; ++j) {
-                out[0][i][j] *= getInputSize();
+        } else {
+            // switch the way we span through the bytebuffer
+            Log.d("YoloDetector V8", "out[0] detect start");
+            for (int j = 0; j < numClass + 4; ++j) {
+                for (int i = 0; i < output_box; ++i) {
+                    if (isModelQuantized) {
+                        out[0][i][j] = oup_scale * (((int) byteBuffer.get() & 0xFF) - oup_zero_point);
+                    } else {
+                        out[0][i][j] = byteBuffer.getFloat();
+                    }
+                }
             }
+            // no need to denormalize for yolov8
         }
-        for (int i = 0; i < output_box; ++i){
+        for (int i = 0; i < output_box; ++i) {
             final int offset = 0;
-            final float confidence = out[0][i][4];
+            float confidence = 1.0f;
+            if(!isV8) {
+                // confidence only valid for yolov5
+                confidence = out[0][i][4];
+            }
             int detectedClass = -1;
             float maxClass = 0;
 
             final float[] classes = new float[labels.size()];
             for (int c = 0; c < labels.size(); ++c) {
-                classes[c] = out[0][i][5 + c];
+                if(!isV8) {
+                    classes[c] = out[0][i][5 + c];
+                } else {
+                    classes[c] = out[0][i][4 + c];
+                }
             }
 
             for (int c = 0; c < labels.size(); ++c) {
@@ -426,7 +468,7 @@ public class YoloV5Detector implements Detector {
 
                 final float w = out[0][i][2];
                 final float h = out[0][i][3];
-                Log.d("YoloV5Classifier",
+                Log.d("YoloDetector",
                         Float.toString(xPos) + ',' + yPos + ',' + w + ',' + h);
 
                 final RectF rect =
@@ -439,8 +481,8 @@ public class YoloV5Detector implements Detector {
                         confidenceInClass, rect, detectedClass));
             }
         }
+        Log.d("YoloDetector", "detect end");
 
-        Log.d("YoloV5Classifier", "detect end");
         final ArrayList<Recognition> recognitions = nms(detections);
         return recognitions;
     }
