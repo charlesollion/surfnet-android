@@ -68,10 +68,7 @@ public class YoloV5Detector implements Detector {
             final String modelFilename,
             final String labelFilename,
             final boolean isQuantized,
-            final int inputSize
-            /*final int[] output_width,
-            final int[][] masks,
-            final int[] anchors*/)
+            final int inputSize)
             throws IOException {
         final YoloV5Detector d = new YoloV5Detector();
 
@@ -130,9 +127,7 @@ public class YoloV5Detector implements Detector {
         d.intValues = new int[d.INPUT_SIZE * d.INPUT_SIZE];
 
         d.output_box = (int) ((Math.pow((inputSize / 32), 2) + Math.pow((inputSize / 16), 2) + Math.pow((inputSize / 8), 2)) * 3);
-//        d.OUTPUT_WIDTH = output_width;
-//        d.MASKS = masks;
-//        d.ANCHORS = anchors;
+
         if (d.isModelQuantized){
             Tensor inpten = d.tfLite.getInputTensor(0);
             d.inp_scale = inpten.quantizationParams().getScale();
@@ -225,9 +220,6 @@ public class YoloV5Detector implements Detector {
     //config yolo
     private int INPUT_SIZE = -1;
 
-//    private int[] OUTPUT_WIDTH;
-//    private int[][] MASKS;
-//    private int[] ANCHORS;
     private  int output_box;
 
     private static final float[] XYSCALE = new float[]{1.2f, 1.1f, 1.05f};
@@ -353,9 +345,7 @@ public class YoloV5Detector implements Detector {
      * Writes Image data into a {@code ByteBuffer}.
      */
     protected ByteBuffer convertBitmapToByteBuffer(Bitmap bitmap) {
-//        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(4 * BATCH_SIZE * INPUT_SIZE * INPUT_SIZE * PIXEL_SIZE);
-//        byteBuffer.order(ByteOrder.nativeOrder());
-//        int[] intValues = new int[INPUT_SIZE * INPUT_SIZE];
+
         bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
         int pixel = 0;
 
@@ -383,7 +373,6 @@ public class YoloV5Detector implements Detector {
 
         Map<Integer, Object> outputMap = new HashMap<>();
 
-//        float[][][] outbuf = new float[1][output_box][labels.size() + 5];
         outData.rewind();
         outputMap.put(0, outData);
         Log.d("YoloV5Classifier", "mObjThresh: " + getObjThresh());
@@ -453,7 +442,6 @@ public class YoloV5Detector implements Detector {
 
         Log.d("YoloV5Classifier", "detect end");
         final ArrayList<Recognition> recognitions = nms(detections);
-//        final ArrayList<Recognition> recognitions = detections;
         return recognitions;
     }
 
