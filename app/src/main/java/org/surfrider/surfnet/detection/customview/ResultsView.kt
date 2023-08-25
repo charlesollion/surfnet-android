@@ -12,13 +12,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
+package org.surfrider.surfnet.detection.customview
 
-package org.surfrider.surfnet.detection.customview;
+import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 
-import java.util.List;
-
-import org.surfrider.surfnet.detection.tflite.Detector;
-
-public interface ResultsView {
-  public void setResults(final List<Detector.Recognition> results);
+interface ResultsView {
+    fun setResults(results: List<Recognition?>?)
 }
