@@ -16,11 +16,8 @@
 package org.surfrider.surfnet.detection
 
 import android.Manifest
-import android.app.Fragment
 import android.content.pm.PackageManager
 import android.content.res.AssetManager
-import android.hardware.Camera
-import android.hardware.Camera.PreviewCallback
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -46,12 +43,11 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
-import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420SPToARGB8888
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
 import org.surfrider.surfnet.detection.env.Logger
 import java.io.IOException
 
-abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener, PreviewCallback,
+abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
     View.OnClickListener {
 
     lateinit var binding: TfeOdActivityCameraBinding
@@ -66,7 +62,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener, P
     @JvmField
     protected var handler: Handler? = null
     private var handlerThread: HandlerThread? = null
-    private var useCamera2API = false
     private var isProcessingFrame = false
     private val yuvBytes = arrayOfNulls<ByteArray>(3)
     private var rgbBytes: IntArray? = null
@@ -117,8 +112,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener, P
         sheetBehavior = BottomSheetBehavior.from(bottomSheetLayout.bottomSheetLayout)
         modelStrings = getModelStrings(assets, ASSET_PATH)
         currentModel = defaultModelIndex
-        currentNumThreads =
-            bottomSheetLayout.threads.text.toString().trim { it <= ' ' }.toInt()
+        currentNumThreads = bottomSheetLayout.threads.text.toString().trim { it <= ' ' }.toInt()
         val deviceAdapter = ArrayAdapter(
             this@CameraActivity, R.layout.deviceview_row, R.id.deviceview_row_text, deviceStrings
         )
@@ -126,39 +120,37 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener, P
             this@CameraActivity, R.layout.listview_row, R.id.listview_row_text, modelStrings
         )
         val vto = bottomSheetLayout.gestureLayout.viewTreeObserver
-        vto.addOnGlobalLayoutListener(
-            object : OnGlobalLayoutListener {
-                override fun onGlobalLayout() {
-                    bottomSheetLayout.gestureLayout.viewTreeObserver.removeOnGlobalLayoutListener(
-                        this
-                    )
-                    val height = bottomSheetLayout.gestureLayout.measuredHeight
-                    sheetBehavior!!.peekHeight = height
-                }
-            })
+        vto.addOnGlobalLayoutListener(object : OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                bottomSheetLayout.gestureLayout.viewTreeObserver.removeOnGlobalLayoutListener(
+                    this
+                )
+                val height = bottomSheetLayout.gestureLayout.measuredHeight
+                sheetBehavior!!.peekHeight = height
+            }
+        })
         sheetBehavior?.isHideable = false
-        sheetBehavior?.addBottomSheetCallback(
-            object : BottomSheetCallback() {
-                override fun onStateChanged(bottomSheet: View, newState: Int) {
-                    when (newState) {
-                        BottomSheetBehavior.STATE_HIDDEN -> {}
-                        BottomSheetBehavior.STATE_EXPANDED -> {
-                            bottomSheetLayout.bottomSheetArrow.setImageResource(R.drawable.icn_chevron_down)
-                        }
-
-                        BottomSheetBehavior.STATE_COLLAPSED -> {
-                            bottomSheetLayout.bottomSheetArrow.setImageResource(R.drawable.icn_chevron_up)
-                        }
-
-                        BottomSheetBehavior.STATE_DRAGGING -> {}
-                        BottomSheetBehavior.STATE_SETTLING -> bottomSheetLayout.bottomSheetArrow.setImageResource(
-                            R.drawable.icn_chevron_up
-                        )
+        sheetBehavior?.addBottomSheetCallback(object : BottomSheetCallback() {
+            override fun onStateChanged(bottomSheet: View, newState: Int) {
+                when (newState) {
+                    BottomSheetBehavior.STATE_HIDDEN -> {}
+                    BottomSheetBehavior.STATE_EXPANDED -> {
+                        bottomSheetLayout.bottomSheetArrow.setImageResource(R.drawable.icn_chevron_down)
                     }
-                }
 
-                override fun onSlide(bottomSheet: View, slideOffset: Float) {}
-            })
+                    BottomSheetBehavior.STATE_COLLAPSED -> {
+                        bottomSheetLayout.bottomSheetArrow.setImageResource(R.drawable.icn_chevron_up)
+                    }
+
+                    BottomSheetBehavior.STATE_DRAGGING -> {}
+                    BottomSheetBehavior.STATE_SETTLING -> bottomSheetLayout.bottomSheetArrow.setImageResource(
+                        R.drawable.icn_chevron_up
+                    )
+                }
+            }
+
+            override fun onSlide(bottomSheet: View, slideOffset: Float) {}
+        })
 
         with(bottomSheetLayout.deviceList) {
             choiceMode = ListView.CHOICE_MODE_SINGLE
@@ -212,40 +204,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener, P
     protected fun getRgbBytes(): IntArray? {
         imageConverter?.run()
         return rgbBytes
-    }
-
-    protected val luminance: ByteArray?
-        get() = yuvBytes[0]
-
-    /** Callback for android.hardware.Camera API  */
-    override fun onPreviewFrame(bytes: ByteArray, camera: Camera) {
-        if (isProcessingFrame) {
-            LOGGER.w("Dropping frame!")
-            return
-        }
-        try {
-            // Initialize the storage bitmaps once when the resolution is known.
-            if (rgbBytes == null) {
-                val previewSize = camera.parameters.previewSize
-                previewHeight = previewSize.height
-                previewWidth = previewSize.width
-                rgbBytes = IntArray(previewWidth * previewHeight)
-                onPreviewSizeChosen(Size(previewSize.width, previewSize.height), 90)
-            }
-        } catch (e: Exception) {
-            LOGGER.e(e, "Exception!")
-            return
-        }
-        isProcessingFrame = true
-        yuvBytes[0] = bytes
-        luminanceStride = previewWidth
-        imageConverter =
-            Runnable { convertYUV420SPToARGB8888(bytes, previewWidth, previewHeight, rgbBytes!!) }
-        postInferenceCallback = Runnable {
-            camera.addCallbackBuffer(bytes)
-            isProcessingFrame = false
-        }
-        processImage()
     }
 
     /** Callback for Camera2 API  */
@@ -372,22 +330,10 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener, P
                     this@CameraActivity,
                     "Camera permission is required for this demo",
                     Toast.LENGTH_LONG
-                )
-                    .show()
+                ).show()
             }
             requestPermissions(arrayOf(PERMISSION_CAMERA), PERMISSIONS_REQUEST)
         }
-    }
-
-    // Returns true if the device supports the required hardware level, or better.
-    private fun isHardwareLevelSupported(
-        characteristics: CameraCharacteristics, requiredLevel: Int
-    ): Boolean {
-        val deviceLevel = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL)!!
-        return if (deviceLevel == CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY) {
-            requiredLevel == deviceLevel
-        } else requiredLevel <= deviceLevel
-        // deviceLevel is not LEGACY, can use numerical sort
     }
 
     private fun chooseCamera(): String? {
@@ -401,17 +347,9 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener, P
                 if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
                     continue
                 }
-                val map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
                     ?: continue
 
-                // Fallback to camera1 API for internal cameras that don't have full support.
-                // This should help with legacy situations where using the camera2 API causes
-                // distorted or otherwise broken previews.
-                useCamera2API = (facing == CameraCharacteristics.LENS_FACING_EXTERNAL
-                        || isHardwareLevelSupported(
-                    characteristics, CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_FULL
-                ))
-                LOGGER.i("Camera API lv2?: %s", useCamera2API)
                 return cameraId
             }
         } catch (e: CameraAccessException) {
@@ -422,24 +360,16 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener, P
 
     private fun setFragment() {
         val cameraId = chooseCamera()
-        val fragment: Fragment
-        if (useCamera2API) {
-            val camera2Fragment = CameraConnectionFragment.newInstance(
-                { size, rotation ->
-                    previewHeight = size.height
-                    previewWidth = size.width
-                    onPreviewSizeChosen(size, rotation)
-                },
-                this,
-                layoutId,
-                desiredPreviewFrameSize
-            )
-            camera2Fragment.setCamera(cameraId)
-            fragment = camera2Fragment
-        } else {
-            fragment = LegacyCameraConnectionFragment(this, layoutId, desiredPreviewFrameSize)
-        }
-        fragmentManager.beginTransaction().replace(R.id.container, fragment).commit()
+        val camera2Fragment = CameraConnectionFragment.newInstance(
+            { size, rotation ->
+                previewHeight = size.height
+                previewWidth = size.width
+                onPreviewSizeChosen(size, rotation)
+            }, this, layoutId, desiredPreviewFrameSize
+        )
+        camera2Fragment.setCamera(cameraId)
+
+        fragmentManager.beginTransaction().replace(R.id.container, camera2Fragment).commit()
     }
 
     private fun fillBytes(planes: Array<Plane>, yuvBytes: Array<ByteArray?>) {
@@ -504,7 +434,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener, P
     }
 
     protected fun showInference(inferenceTime: String?) {
-        binding.bottomSheetLayout.inferenceInfo!!.text = inferenceTime
+        binding.bottomSheetLayout.inferenceInfo.text = inferenceTime
     }
 
     protected abstract fun updateActiveModel()
