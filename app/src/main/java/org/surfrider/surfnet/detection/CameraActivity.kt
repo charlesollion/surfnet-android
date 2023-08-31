@@ -360,16 +360,20 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
 
     private fun setFragment() {
         val cameraId = chooseCamera()
-        val camera2Fragment = CameraConnectionFragment.newInstance(
-            { size, rotation ->
-                previewHeight = size.height
-                previewWidth = size.width
-                onPreviewSizeChosen(size, rotation)
-            }, this, layoutId, desiredPreviewFrameSize
-        )
-        camera2Fragment.setCamera(cameraId)
+        val camera2Fragment = desiredPreviewFrameSize?.let {
+            CameraConnectionFragment.newInstance(
+                { size: Size?, rotation: Int ->
+                    previewHeight = size!!.height
+                    previewWidth = size!!.width
+                    onPreviewSizeChosen(size, rotation)
+                }, this, layoutId, it
+            )
+        }
+        camera2Fragment?.setCamera(cameraId)
 
-        fragmentManager.beginTransaction().replace(R.id.container, camera2Fragment).commit()
+        if (camera2Fragment != null) {
+            supportFragmentManager.beginTransaction().replace(R.id.container, camera2Fragment).commit()
+        }
     }
 
     private fun fillBytes(planes: Array<Plane>, yuvBytes: Array<ByteArray?>) {

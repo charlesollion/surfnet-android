@@ -21,9 +21,9 @@ import android.graphics.RectF;
 import android.os.Build;
 import android.util.Log;
 
+import org.surfrider.surfnet.detection.DetectorActivity;
 import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.Tensor;
-import org.surfrider.surfnet.detection.MainActivity;
 import org.surfrider.surfnet.detection.env.Logger;
 import org.surfrider.surfnet.detection.env.Utils;
 import org.tensorflow.lite.gpu.GpuDelegate;
@@ -225,7 +225,7 @@ public class YoloDetector implements Detector {
 
     @Override
     public float getObjThresh() {
-        return MainActivity.MINIMUM_CONFIDENCE_TF_OD_API;
+        return DetectorActivity.MINIMUM_CONFIDENCE_TF_OD_API;
     }
 
     private static final Logger LOGGER = new Logger();
