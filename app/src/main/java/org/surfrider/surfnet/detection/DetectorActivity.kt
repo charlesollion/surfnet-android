@@ -224,8 +224,7 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
             paint.color = Color.RED
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = 2.0f
-            var minimumConfidence = MINIMUM_CONFIDENCE_TF_OD_API
-            minimumConfidence = when (MODE) {
+            val minimumConfidence: Float = when (MODE) {
                 DetectorMode.TF_OD_API -> MINIMUM_CONFIDENCE_TF_OD_API
             }
             val mappedRecognitions: MutableList<Recognition> = LinkedList()
@@ -275,7 +274,7 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
     companion object {
         private val LOGGER = Logger()
         private val MODE = DetectorMode.TF_OD_API
-        private const val MINIMUM_CONFIDENCE_TF_OD_API = 0.3f
+        const val MINIMUM_CONFIDENCE_TF_OD_API = 0.3f
         private const val MAINTAIN_ASPECT = true
         private const val SAVE_PREVIEW_BITMAP = false
         private const val TEXT_SIZE_DIP = 10f
