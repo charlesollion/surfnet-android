@@ -98,7 +98,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        setupToolbar()
+
         setupPermissions()
         setupBottomSheetLayout()
     }
@@ -171,10 +171,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
         bottomSheetLayout.minus.setOnClickListener(this)
     }
 
-    private fun setupToolbar() {
-        setSupportActionBar(binding.toolbar)
-        supportActionBar?.setDisplayShowTitleEnabled(false)
-    }
+
 
     private fun setupPermissions() {
         if (hasPermission()) {
