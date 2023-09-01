@@ -44,7 +44,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
-import org.surfrider.surfnet.detection.env.Logger
+import timber.log.Timber
 import java.io.IOException
 
 abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
@@ -90,7 +90,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
     var deviceStrings = ArrayList<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        LOGGER.d("onCreate $this")
+        Timber.d("onCreate $this")
         super.onCreate(null)
         //initialize binding
         binding = TfeOdActivityCameraBinding.inflate(layoutInflater)
@@ -244,7 +244,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
             }
             processImage()
         } catch (e: Exception) {
-            LOGGER.e(e, "Exception!")
+            Timber.e(e, "Exception!")
             Trace.endSection()
             return
         }
@@ -253,13 +253,13 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
 
     @Synchronized
     public override fun onStart() {
-        LOGGER.d("onStart $this")
+        Timber.d("onStart $this")
         super.onStart()
     }
 
     @Synchronized
     public override fun onResume() {
-        LOGGER.d("onResume $this")
+        Timber.d("onResume $this")
         super.onResume()
         handlerThread = HandlerThread("inference")
         handlerThread!!.start()
@@ -268,27 +268,27 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
 
     @Synchronized
     public override fun onPause() {
-        LOGGER.d("onPause $this")
+        Timber.d("onPause $this")
         handlerThread!!.quitSafely()
         try {
             handlerThread!!.join()
             handlerThread = null
             handler = null
         } catch (e: InterruptedException) {
-            LOGGER.e(e, "Exception!")
+            Timber.e(e, "Exception!")
         }
         super.onPause()
     }
 
     @Synchronized
     public override fun onStop() {
-        LOGGER.d("onStop $this")
+        Timber.d("onStop $this")
         super.onStop()
     }
 
     @Synchronized
     public override fun onDestroy() {
-        LOGGER.d("onDestroy $this")
+        Timber.d("onDestroy $this")
         super.onDestroy()
     }
 
@@ -350,7 +350,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
                 return cameraId
             }
         } catch (e: CameraAccessException) {
-            LOGGER.e(e, "Not allowed to access camera")
+            Timber.e(e, "Not allowed to access camera")
         }
         return null
     }
@@ -361,7 +361,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
             CameraConnectionFragment.newInstance(
                 { size: Size?, rotation: Int ->
                     previewHeight = size!!.height
-                    previewWidth = size!!.width
+                    previewWidth = size.width
                     onPreviewSizeChosen(size, rotation)
                 }, this, layoutId, it
             )
@@ -379,7 +379,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
         for (i in planes.indices) {
             val buffer = planes[i].buffer
             if (yuvBytes[i] == null) {
-                LOGGER.d("Initializing buffer %d at size %d", i, buffer.capacity())
+                Timber.d("Initializing buffer %d at size %d", i, buffer.capacity())
                 yuvBytes[i] = ByteArray(buffer.capacity())
             }
             buffer[yuvBytes[i]]
@@ -447,7 +447,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
     protected abstract fun setUseNNAPI(isChecked: Boolean)
 
     companion object {
-        private val LOGGER = Logger()
         private const val PERMISSIONS_REQUEST = 1
         private const val PERMISSION_CAMERA = Manifest.permission.CAMERA
         private const val ASSET_PATH = ""

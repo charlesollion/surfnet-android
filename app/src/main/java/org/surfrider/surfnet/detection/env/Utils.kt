@@ -7,12 +7,8 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.os.Environment
-import android.util.Log
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.io.IOException
-import java.io.InputStream
+import timber.log.Timber
+import java.io.*
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 
@@ -77,7 +73,7 @@ object Utils {
             //            return bitmap.copy(Bitmap.Config.ARGB_8888,true);
         } catch (e: IOException) {
             // handle exception
-            Log.e("getBitmapFromAsset", "getBitmapFromAsset: " + e.message)
+            Timber.tag("getBitmapFromAsset").e("getBitmapFromAsset: " + e.message)
         }
         return bitmap
     }
@@ -164,7 +160,7 @@ object Utils {
                 stream.write(data.toByteArray())
             }
         } catch (e: IOException) {
-            Log.e("Exception", "File write failed: $e")
+            Timber.tag("Exception").e("File write failed: %s", e)
         }
     }
 }

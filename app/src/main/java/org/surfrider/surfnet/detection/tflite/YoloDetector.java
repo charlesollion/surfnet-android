@@ -19,12 +19,10 @@ import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.RectF;
 import android.os.Build;
-import android.util.Log;
 
 import org.surfrider.surfnet.detection.DetectorActivity;
 import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.Tensor;
-import org.surfrider.surfnet.detection.env.Logger;
 import org.surfrider.surfnet.detection.env.Utils;
 import org.tensorflow.lite.gpu.GpuDelegate;
 import org.tensorflow.lite.nnapi.NnApiDelegate;
@@ -43,6 +41,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Vector;
+
+import timber.log.Timber;
 
 
 /**
@@ -79,7 +79,7 @@ public class YoloDetector implements Detector {
         BufferedReader br = new BufferedReader(new InputStreamReader(labelsInput));
         String line;
         while ((line = br.readLine()) != null) {
-            LOGGER.w(line);
+            Timber.w(line);
             d.labels.add(line);
         }
         br.close();
@@ -146,7 +146,7 @@ public class YoloDetector implements Detector {
         }
 
         int[] shape = d.tfLite.getOutputTensor(0).shape();
-        LOGGER.i("out shape ==== "+Arrays.toString(shape));
+        Timber.i("out shape ==== "+Arrays.toString(shape));
         int numClass = 0;
         if(!isV8) {
             // yolov5 case: (1, num_anchors, num_class+5)
@@ -227,8 +227,6 @@ public class YoloDetector implements Detector {
     public float getObjThresh() {
         return DetectorActivity.MINIMUM_CONFIDENCE_TF_OD_API;
     }
-
-    private static final Logger LOGGER = new Logger();
 
     // Float model
     private final float IMAGE_MEAN = 0;
@@ -395,7 +393,7 @@ public class YoloDetector implements Detector {
 
         outData.rewind();
         outputMap.put(0, outData);
-        Log.d("YoloDetector", "mObjThresh: " + getObjThresh());
+        Timber.tag("YoloDetector").d("mObjThresh: %s", getObjThresh());
 
         Object[] inputArray = {imgData};
         tfLite.runForMultipleInputsOutputs(inputArray, outputMap);
@@ -407,7 +405,7 @@ public class YoloDetector implements Detector {
 
         float[][][] out = new float[1][output_box][numClass + 5];
         if(!isV8) {
-            Log.d("YoloDetector", "out[0] detect start");
+            Timber.tag("YoloDetector").d("out[0] detect start");
             for (int i = 0; i < output_box; ++i) {
                 for (int j = 0; j < numClass + 5; ++j) {
                     if (isModelQuantized) {
@@ -423,7 +421,7 @@ public class YoloDetector implements Detector {
             }
         } else {
             // switch the way we span through the bytebuffer
-            Log.d("YoloDetector V8", "out[0] detect start");
+            Timber.tag("YoloDetector V8").d("out[0] detect start");
             for (int j = 0; j < numClass + 4; ++j) {
                 for (int i = 0; i < output_box; ++i) {
                     if (isModelQuantized) {
@@ -468,8 +466,7 @@ public class YoloDetector implements Detector {
 
                 final float w = out[0][i][2];
                 final float h = out[0][i][3];
-                Log.d("YoloDetector",
-                        Float.toString(xPos) + ',' + yPos + ',' + w + ',' + h);
+                Timber.tag("YoloDetector").d(Float.toString(xPos) + ',' + yPos + ',' + w + ',' + h);
 
                 final RectF rect =
                         new RectF(
@@ -481,7 +478,7 @@ public class YoloDetector implements Detector {
                         confidenceInClass, rect, detectedClass));
             }
         }
-        Log.d("YoloDetector", "detect end");
+        Timber.tag("YoloDetector").d("detect end");
 
         final ArrayList<Recognition> recognitions = nms(detections);
         return recognitions;
@@ -528,11 +525,11 @@ public class YoloDetector implements Detector {
         float temp2 = pred_coor[3] - pred_coor[1];
         float temp = temp1 * temp2;
         if (temp < 0) {
-            Log.e("checkInvalidateBox", "temp < 0");
+            Timber.tag("checkInvalidateBox").e("temp < 0");
             return false;
         }
         if (Math.sqrt(temp) > Float.MAX_VALUE) {
-            Log.e("checkInvalidateBox", "temp max");
+            Timber.tag("checkInvalidateBox").e("temp max");
             return false;
         }
 

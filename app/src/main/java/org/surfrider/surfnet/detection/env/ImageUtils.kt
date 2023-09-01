@@ -17,8 +17,11 @@ package org.surfrider.surfnet.detection.env
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.Environment
+import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.math.abs
+import kotlin.math.max
 
 /** Utility class for manipulating images.  */
 object ImageUtils {
@@ -26,8 +29,6 @@ object ImageUtils {
     // are normalized to eight bits.
     private const val kMaxChannelValue = 262143
 
-    @Suppress("unused")
-    private val LOGGER = Logger()
 
     /**
      * Utility method to compute the allocated size in bytes of a YUV420SP image of the given
@@ -59,10 +60,10 @@ object ImageUtils {
         var filename = "preview.png"
         val root =
             Environment.getExternalStorageDirectory().absolutePath + File.separator + "tensorflow"
-        LOGGER.i("Saving %dx%d bitmap to %s.", bitmap.width, bitmap.height, root)
+        Timber.i("Saving %dx%d bitmap to %s.", bitmap.width, bitmap.height, root)
         val myDir = File(root)
         if (!myDir.mkdirs()) {
-            LOGGER.i("Make dir failed")
+            Timber.i("Make dir failed")
         }
         val file = File(myDir, filename)
         if (file.exists()) {
@@ -74,7 +75,7 @@ object ImageUtils {
             out.flush()
             out.close()
         } catch (e: Exception) {
-            LOGGER.e(e, "Exception!")
+            Timber.e(e, "Exception!")
         }
     }
 
@@ -181,7 +182,7 @@ object ImageUtils {
         val matrix = Matrix()
         if (applyRotation != 0) {
             if (applyRotation % 90 != 0) {
-                LOGGER.w("Rotation of %d % 90 != 0", applyRotation)
+                Timber.w("Rotation of %d % 90 != 0", applyRotation)
             }
 
             // Translate so center of image is at origin.
@@ -193,7 +194,7 @@ object ImageUtils {
 
         // Account for the already applied rotation, if any, and then determine how
         // much scaling is needed for each axis.
-        val transpose = (Math.abs(applyRotation) + 90) % 180 == 0
+        val transpose = (abs(applyRotation) + 90) % 180 == 0
         val inWidth = if (transpose) srcHeight else srcWidth
         val inHeight = if (transpose) srcWidth else srcHeight
 
@@ -204,7 +205,7 @@ object ImageUtils {
             if (maintainAspectRatio) {
                 // Scale by minimum factor so that dst is filled completely while
                 // maintaining the aspect ratio. Some image may fall off the edge.
-                val scaleFactor = Math.max(scaleFactorX, scaleFactorY)
+                val scaleFactor = max(scaleFactorX, scaleFactorY)
                 matrix.postScale(scaleFactor, scaleFactor)
             } else {
                 // Scale exactly to fill dst from src.
