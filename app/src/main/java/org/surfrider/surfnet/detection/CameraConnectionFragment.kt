@@ -43,7 +43,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.DialogFragment
 import org.surfrider.surfnet.detection.customview.AutoFitTextureView
-import org.surfrider.surfnet.detection.env.Logger
+import timber.log.Timber
 import java.util.*
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
@@ -223,7 +223,7 @@ class CameraConnectionFragment private constructor(
                 textureView!!.setAspectRatio(previewSize!!.height, previewSize!!.width)
             }
         } catch (e: CameraAccessException) {
-            LOGGER.e(e, "Exception!")
+            Timber.e(e, "Exception!")
         } catch (e: NullPointerException) {
             // Currently an NPE is thrown when the Camera2API is used but not supported on the
             // device this code runs.
@@ -246,7 +246,7 @@ class CameraConnectionFragment private constructor(
             }
             manager.openCamera(cameraId!!, stateCallback, backgroundHandler)
         } catch (e: CameraAccessException) {
-            LOGGER.e(e, "Exception!")
+            Timber.e(e, "Exception!")
         } catch (e: InterruptedException) {
             throw RuntimeException("Interrupted while trying to lock camera opening.", e)
         }
@@ -290,7 +290,7 @@ class CameraConnectionFragment private constructor(
             backgroundThread = null
             backgroundHandler = null
         } catch (e: InterruptedException) {
-            LOGGER.e(e, "Exception!")
+            Timber.e(e, "Exception!")
         }
     }
 
@@ -309,7 +309,7 @@ class CameraConnectionFragment private constructor(
             previewRequestBuilder =
                 cameraDevice!!.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
             previewRequestBuilder!!.addTarget(surface)
-            LOGGER.i("Opening camera preview: " + previewSize!!.width + "x" + previewSize!!.height)
+            Timber.i("Opening camera preview: " + previewSize!!.width + "x" + previewSize!!.height)
 
             // Create the reader for the preview frames.
             previewReader = ImageReader.newInstance(
@@ -348,7 +348,7 @@ class CameraConnectionFragment private constructor(
                                 previewRequest!!, captureCallback, backgroundHandler
                             )
                         } catch (e: CameraAccessException) {
-                            LOGGER.e(e, "Exception!")
+                            Timber.e(e, "Exception!")
                         }
                     }
 
@@ -359,7 +359,7 @@ class CameraConnectionFragment private constructor(
                 null
             )
         } catch (e: CameraAccessException) {
-            LOGGER.e(e, "Exception!")
+            Timber.e(e, "Exception!")
         }
     }
 
@@ -436,8 +436,6 @@ class CameraConnectionFragment private constructor(
     }
 
     companion object {
-        private val LOGGER = Logger()
-
         /**
          * The camera preview size will be chosen to be the smallest frame by pixel size capable of
          * containing a DESIRED_SIZE x DESIRED_SIZE square.
@@ -483,21 +481,21 @@ class CameraConnectionFragment private constructor(
                     tooSmall.add(option)
                 }
             }
-            LOGGER.i("Desired size: " + desiredSize + ", min size: " + minSize + "x" + minSize)
-            LOGGER.i("Valid preview sizes: [" + TextUtils.join(", ", bigEnough) + "]")
-            LOGGER.i("Rejected preview sizes: [" + TextUtils.join(", ", tooSmall) + "]")
+            Timber.i("Desired size: " + desiredSize + ", min size: " + minSize + "x" + minSize)
+            Timber.i("Valid preview sizes: [" + TextUtils.join(", ", bigEnough) + "]")
+            Timber.i("Rejected preview sizes: [" + TextUtils.join(", ", tooSmall) + "]")
             if (exactSizeFound) {
-                LOGGER.i("Exact size match found.")
+                Timber.i("Exact size match found.")
                 return desiredSize
             }
 
             // Pick the smallest of those, assuming we found any
             return if (bigEnough.size > 0) {
                 val chosenSize = Collections.min(bigEnough, CompareSizesByArea())
-                LOGGER.i("Chosen size: " + chosenSize!!.width + "x" + chosenSize.height)
+                Timber.i("Chosen size: " + chosenSize!!.width + "x" + chosenSize.height)
                 chosenSize
             } else {
-                LOGGER.e("Couldn't find any suitable preview size")
+                Timber.e("Couldn't find any suitable preview size")
                 choices[0]
             }
         }

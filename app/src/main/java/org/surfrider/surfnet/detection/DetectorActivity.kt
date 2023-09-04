@@ -23,7 +23,6 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.media.ImageReader.OnImageAvailableListener
 import android.os.SystemClock
-import android.util.Log
 import android.util.Size
 import android.util.TypedValue
 import android.view.View
@@ -33,11 +32,11 @@ import org.surfrider.surfnet.detection.customview.OverlayView.DrawCallback
 import org.surfrider.surfnet.detection.env.BorderedText
 import org.surfrider.surfnet.detection.env.ImageUtils.getTransformationMatrix
 import org.surfrider.surfnet.detection.env.ImageUtils.saveBitmap
-import org.surfrider.surfnet.detection.env.Logger
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import org.surfrider.surfnet.detection.tflite.DetectorFactory
 import org.surfrider.surfnet.detection.tflite.YoloDetector
 import org.surfrider.surfnet.detection.tracking.MultiBoxTracker
+import timber.log.Timber
 import java.io.IOException
 import java.util.LinkedList
 
@@ -72,7 +71,7 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
             detector = DetectorFactory.getDetector(assets, modelString)
         } catch (e: IOException) {
             e.printStackTrace()
-            LOGGER.e(e, "Exception initializing classifier!")
+            Timber.e(e, "Exception initializing classifier!")
             val toast = Toast.makeText(
                 applicationContext, "Classifier could not be initialized", Toast.LENGTH_SHORT
             )
@@ -87,8 +86,8 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
         if (rotation != null) {
             sensorOrientation = rotation - screenOrientation
         }
-        LOGGER.i("Camera orientation relative to screen canvas: %d", sensorOrientation)
-        LOGGER.i("Initializing at size %dx%d", previewWidth, previewHeight)
+        Timber.i("Camera orientation relative to screen canvas: %d", sensorOrientation)
+        Timber.i("Initializing at size %dx%d", previewWidth, previewHeight)
         rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
         cropSize?.let {
             croppedBitmap = Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888)
@@ -136,7 +135,7 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
             // Lookup names of parameters.
             val modelString = modelStrings[modelIndex]
             val device = deviceStrings[deviceIndex]
-            LOGGER.i("Changing model to $modelString device $device")
+            Timber.i("Changing model to $modelString device $device")
 
             // Try to load model.
             try {
@@ -147,7 +146,7 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
                 }
             } catch (e: IOException) {
                 e.printStackTrace()
-                LOGGER.e(e, "Exception in updateActiveModel()")
+                Timber.e(e, "Exception in updateActiveModel()")
                 val toast = Toast.makeText(
                     applicationContext, "Classifier could not be initialized", Toast.LENGTH_SHORT
                 )
@@ -193,7 +192,7 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
             return
         }
         computingDetection = true
-        LOGGER.i("Preparing image $currTimestamp for detection in bg thread.")
+        Timber.i("Preparing image $currTimestamp for detection in bg thread.")
         rgbFrameBitmap?.setPixels(
             getRgbBytes(),
             0,
@@ -213,11 +212,11 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
             }
         }
         runInBackground {
-            LOGGER.i("Running detection on image $currTimestamp")
+            Timber.i("Running detection on image $currTimestamp")
             val startTime = SystemClock.uptimeMillis()
             val results: List<Recognition>? = detector?.recognizeImage(croppedBitmap)
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
-            Log.e("CHECK", "run: " + results?.size)
+            Timber.tag("CHECK").e("run: %s", results?.size)
             cropCopyBitmap = croppedBitmap?.let { Bitmap.createBitmap(it) }
             val canvas = cropCopyBitmap?.let { Canvas(it) }
             val paint = Paint()
@@ -272,7 +271,6 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
     }
 
     companion object {
-        private val LOGGER = Logger()
         private val MODE = DetectorMode.TF_OD_API
         const val MINIMUM_CONFIDENCE_TF_OD_API = 0.3f
         private const val MAINTAIN_ASPECT = true
