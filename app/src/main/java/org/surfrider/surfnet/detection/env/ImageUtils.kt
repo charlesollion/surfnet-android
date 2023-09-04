@@ -29,27 +29,6 @@ object ImageUtils {
     // are normalized to eight bits.
     private const val kMaxChannelValue = 262143
 
-
-    /**
-     * Utility method to compute the allocated size in bytes of a YUV420SP image of the given
-     * dimensions.
-     */
-    @JvmStatic
-    fun getYUVByteSize(width: Int, height: Int): Int {
-        // The luminance plane requires 1 byte per pixel.
-        val ySize = width * height
-
-        // The UV plane works on 2x2 blocks, so dimensions with odd size must be rounded up.
-        // Each 2x2 block takes 2 bytes to encode, one each for U and V.
-        val uvSize = (width + 1) / 2 * ((height + 1) / 2) * 2
-        return ySize + uvSize
-    }
-    /**
-     * Saves a Bitmap object to disk for analysis.
-     *
-     * @param bitmap The bitmap to save.
-     * @param filename The location to save the bitmap to.
-     */
     /**
      * Saves a Bitmap object to disk for analysis.
      *
@@ -76,30 +55,6 @@ object ImageUtils {
             out.close()
         } catch (e: Exception) {
             Timber.e(e, "Exception!")
-        }
-    }
-
-    @JvmStatic
-    fun convertYUV420SPToARGB8888(input: ByteArray, width: Int, height: Int, output: IntArray) {
-        val frameSize = width * height
-        var j = 0
-        var yp = 0
-        while (j < height) {
-            var uvp = frameSize + (j shr 1) * width
-            var u = 0
-            var v = 0
-            var i = 0
-            while (i < width) {
-                val y = 0xff and input[yp].toInt()
-                if (i and 1 == 0) {
-                    v = 0xff and input[uvp++].toInt()
-                    u = 0xff and input[uvp++].toInt()
-                }
-                output[yp] = YUV2RGB(y, u, v)
-                i++
-                yp++
-            }
-            j++
         }
     }
 
