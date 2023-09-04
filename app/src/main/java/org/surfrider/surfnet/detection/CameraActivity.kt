@@ -334,13 +334,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
             else -> 0
         }
 
-    //  @Override
-    //  public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-    //    setUseNNAPI(isChecked);
-    //    if (isChecked) apiSwitchCompat.setText("NNAPI");
-    //    else apiSwitchCompat.setText("TFLITE");
-    //  }
-
     protected fun showFrameInfo(frameInfo: String?) {
         binding.bottomSheetLayout.frameInfo.text = frameInfo
     }

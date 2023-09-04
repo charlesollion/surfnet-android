@@ -65,11 +65,7 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
         borderedText = BorderedText(textSizePx)
         borderedText?.setTypeface(Typeface.MONOSPACE)
         tracker = MultiBoxTracker(this)
-        //val modelIndex = binding.bottomSheetLayout.modelList.checkedItemPosition
-        //val modelString = modelStrings[modelIndex]
         try {
-            //detector = DetectorFactory.getDetector(assets, modelString)
-
             detector = YoloDetector.create(
                 assets, modelString, labelFilename, isQuantized, isV8, inputSize
             )
@@ -153,7 +149,6 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
             val startTime = SystemClock.uptimeMillis()
             val results: List<Recognition>? = detector?.recognizeImage(croppedBitmap)
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
-            Timber.tag("CHECK").e("run: %s", results?.size)
             cropCopyBitmap = croppedBitmap?.let { Bitmap.createBitmap(it) }
             val canvas = cropCopyBitmap?.let { Canvas(it) }
             val paint = Paint()
