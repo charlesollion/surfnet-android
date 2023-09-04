@@ -15,12 +15,7 @@
  */
 package org.surfrider.surfnet.detection
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Matrix
-import android.graphics.Paint
-import android.graphics.Typeface
+import android.graphics.*
 import android.media.ImageReader.OnImageAvailableListener
 import android.os.SystemClock
 import android.util.Log
@@ -39,7 +34,7 @@ import org.surfrider.surfnet.detection.tflite.DetectorFactory
 import org.surfrider.surfnet.detection.tflite.YoloDetector
 import org.surfrider.surfnet.detection.tracking.MultiBoxTracker
 import java.io.IOException
-import java.util.LinkedList
+import java.util.*
 
 /**
  * An activity that uses a TensorFlowMultiBoxDetector and ObjectTracker to detect and then track
@@ -59,6 +54,12 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
     private var cropToFrameTransform: Matrix? = null
     private var tracker: MultiBoxTracker? = null
     private var borderedText: BorderedText? = null
+    private val modelString = "yolov8n_float16.tflite"
+    private val labelFilename = "file:///android_asset/coco.txt"
+    private val inputSize = 640
+    private val isV8 = true
+    private val isQuantized = false
+    private val numThreads = 1
     public override fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
         val textSizePx = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, resources.displayMetrics
@@ -66,15 +67,21 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
         borderedText = BorderedText(textSizePx)
         borderedText?.setTypeface(Typeface.MONOSPACE)
         tracker = MultiBoxTracker(this)
-        val modelIndex = binding.bottomSheetLayout.modelList.checkedItemPosition
-        val modelString = modelStrings[modelIndex]
+        //val modelIndex = binding.bottomSheetLayout.modelList.checkedItemPosition
+        //val modelString = modelStrings[modelIndex]
         try {
-            detector = DetectorFactory.getDetector(assets, modelString)
+            //detector = DetectorFactory.getDetector(assets, modelString)
+
+            detector = YoloDetector.create(
+                assets, modelString, labelFilename, isQuantized, isV8, inputSize
+            )
+            detector?.useGpu()
+            detector?.setNumThreads(numThreads)
         } catch (e: IOException) {
             e.printStackTrace()
-            LOGGER.e(e, "Exception initializing classifier!")
+            LOGGER.e(e, "Exception in onPreviewSizeChosen()")
             val toast = Toast.makeText(
-                applicationContext, "Classifier could not be initialized", Toast.LENGTH_SHORT
+                applicationContext, "Detector could not be initialized", Toast.LENGTH_SHORT
             )
             toast.show()
             finish()
@@ -115,18 +122,18 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
 
     override fun updateActiveModel() {
         // Get UI information before delegating to background
-        val modelIndex = binding.bottomSheetLayout.modelList.checkedItemPosition
-        val deviceIndex = binding.bottomSheetLayout.deviceList.checkedItemPosition
-        val threads = binding.bottomSheetLayout.threads.text.toString().trim { it <= ' ' }
-        val numThreads = threads.toInt()
+        // val modelIndex = binding.bottomSheetLayout.modelList.checkedItemPosition
+        // val deviceIndex = binding.bottomSheetLayout.deviceList.checkedItemPosition
+        // val threads = binding.bottomSheetLayout.threads.text.toString().trim { it <= ' ' }
+        // val numThreads = threads.toInt()
         handler?.post {
-            if (modelIndex == currentModel && deviceIndex == currentDevice && numThreads == currentNumThreads) {
+            /*if (modelIndex == currentModel && deviceIndex == currentDevice && numThreads == currentNumThreads) {
                 return@post
             }
             currentModel = modelIndex
             currentDevice = deviceIndex
             currentNumThreads = numThreads
-
+            */
             // Disable classifier while updating
             if (detector != null) {
                 detector?.close()
@@ -134,13 +141,16 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
             }
 
             // Lookup names of parameters.
-            val modelString = modelStrings[modelIndex]
-            val device = deviceStrings[deviceIndex]
-            LOGGER.i("Changing model to $modelString device $device")
+            // var modelString = modelStrings[modelIndex]
+            //val device = deviceStrings[deviceIndex]
+            // LOGGER.i("Changing model to $modelString device $device")
 
             // Try to load model.
             try {
-                detector = DetectorFactory.getDetector(assets, modelString)
+                // detector = DetectorFactory.getDetector(assets, modelString)
+                detector = YoloDetector.create(
+                    assets, modelString, labelFilename, isQuantized, isV8, inputSize
+                )
                 // Customize the interpreter to the type of device we want to use.
                 if (detector == null) {
                     return@post
@@ -154,7 +164,7 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
                 toast.show()
                 finish()
             }
-            when (device) {
+            /*when (device) {
                 "CPU" -> {
                     detector?.useCPU()
                 }
@@ -167,7 +177,7 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
                     detector?.useNNAPI()
                 }
             }
-            detector?.setNumThreads(numThreads)
+            detector?.setNumThreads(numThreads)*/
             val cropSize = detector?.inputSize
             cropSize?.let {
                 croppedBitmap = Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888)
