@@ -28,7 +28,6 @@ import org.surfrider.surfnet.detection.env.BorderedText
 import org.surfrider.surfnet.detection.env.ImageUtils.getTransformationMatrix
 import org.surfrider.surfnet.detection.env.ImageUtils.saveBitmap
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
-import org.surfrider.surfnet.detection.tflite.DetectorFactory
 import org.surfrider.surfnet.detection.tflite.YoloDetector
 import org.surfrider.surfnet.detection.tracking.MultiBoxTracker
 import timber.log.Timber
@@ -119,73 +118,6 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
         tracker?.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
     }
 
-    override fun updateActiveModel() {
-        // Get UI information before delegating to background
-        // val modelIndex = binding.bottomSheetLayout.modelList.checkedItemPosition
-        // val deviceIndex = binding.bottomSheetLayout.deviceList.checkedItemPosition
-        // val threads = binding.bottomSheetLayout.threads.text.toString().trim { it <= ' ' }
-        // val numThreads = threads.toInt()
-        handler?.post {
-            /*if (modelIndex == currentModel && deviceIndex == currentDevice && numThreads == currentNumThreads) {
-                return@post
-            }
-            currentModel = modelIndex
-            currentDevice = deviceIndex
-            currentNumThreads = numThreads
-            */
-            // Disable classifier while updating
-            if (detector != null) {
-                detector?.close()
-                detector = null
-            }
-
-            // Try to load model.
-            try {
-                // detector = DetectorFactory.getDetector(assets, modelString)
-                detector = YoloDetector.create(
-                    assets, modelString, labelFilename, isQuantized, isV8, inputSize
-                )
-                // Customize the interpreter to the type of device we want to use.
-                if (detector == null) {
-                    return@post
-                }
-            } catch (e: IOException) {
-                e.printStackTrace()
-                Timber.e(e, "Exception in updateActiveModel()")
-                val toast = Toast.makeText(
-                    applicationContext, "Classifier could not be initialized", Toast.LENGTH_SHORT
-                )
-                toast.show()
-                finish()
-            }
-            /*when (device) {
-                "CPU" -> {
-                    detector?.useCPU()
-                }
-
-                "GPU" -> {
-                    detector?.useGpu()
-                }
-
-                "NNAPI" -> {
-                    detector?.useNNAPI()
-                }
-            }
-            detector?.setNumThreads(numThreads)*/
-            val cropSize = detector?.inputSize
-            cropSize?.let {
-                croppedBitmap = Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888)
-                frameToCropTransform = getTransformationMatrix(
-                    previewWidth, previewHeight,
-                    it, it,
-                    sensorOrientation, MAINTAIN_ASPECT
-                )
-            }
-            cropToFrameTransform = Matrix()
-            frameToCropTransform?.invert(cropToFrameTransform)
-        }
-    }
-
     override fun processImage() {
         ++timestamp
         val currTimestamp = timestamp
@@ -265,14 +197,6 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
     // checkpoints.
     private enum class DetectorMode {
         TF_OD_API
-    }
-
-    override fun setUseNNAPI(isChecked: Boolean) {
-        runInBackground { detector?.setUseNNAPI(isChecked) }
-    }
-
-    override fun setNumThreads(numThreads: Int) {
-        runInBackground { detector?.setNumThreads(numThreads) }
     }
 
     companion object {
