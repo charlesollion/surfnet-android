@@ -216,7 +216,7 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
             val startTime = SystemClock.uptimeMillis()
             val results: List<Recognition>? = detector?.recognizeImage(croppedBitmap)
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
-            Timber.tag("CHECK").e("run: " + results?.size)
+            Timber.tag("CHECK").e("run: %s", results?.size)
             cropCopyBitmap = croppedBitmap?.let { Bitmap.createBitmap(it) }
             val canvas = cropCopyBitmap?.let { Canvas(it) }
             val paint = Paint()
