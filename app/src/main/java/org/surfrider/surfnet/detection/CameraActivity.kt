@@ -311,6 +311,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
                 Timber.d("Initializing buffer %d at size %d", i, buffer.capacity())
                 yuvBytes[i] = ByteArray(buffer.capacity())
             }
+            buffer[yuvBytes[i]]
         }
     }
 
