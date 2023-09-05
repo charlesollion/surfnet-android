@@ -29,6 +29,7 @@ import android.hardware.camera2.*
 import android.hardware.camera2.CameraCaptureSession.CaptureCallback
 import android.media.ImageReader
 import android.media.ImageReader.OnImageAvailableListener
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
@@ -42,7 +43,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.fragment.app.DialogFragment
-import org.surfrider.surfnet.detection.customview.AutoFitTextureView
+import org.surfrider.surfnet.detection.databinding.TfeOdCameraConnectionFragmentTrackingBinding
 import timber.log.Timber
 import java.util.*
 import java.util.concurrent.Semaphore
@@ -55,11 +56,12 @@ class CameraConnectionFragment private constructor(
     private val cameraConnectionCallback: (Size?, Int) -> Unit,
     /** A [OnImageAvailableListener] to receive frames as they are available.  */
     private val imageListener: OnImageAvailableListener,
-    /** The layout identifier to inflate for this Fragment.  */
-    private val layout: Int,
     /** The input size in pixels desired by TensorFlow (width and height of a square bitmap).  */
     private val inputSize: Size
 ) : Fragment() {
+
+    private lateinit var binding: TfeOdCameraConnectionFragmentTrackingBinding
+
     /** A [Semaphore] to prevent the app from exiting before closing the camera.  */
     private val cameraOpenCloseLock = Semaphore(1)
     private val captureCallback: CaptureCallback = object : CaptureCallback() {
@@ -76,9 +78,6 @@ class CameraConnectionFragment private constructor(
 
     /** ID of the current [CameraDevice].  */
     private var cameraId: String? = null
-
-    /** An [AutoFitTextureView] for camera preview.  */
-    private var textureView: AutoFitTextureView? = null
 
     /** A [CameraCaptureSession] for camera preview.  */
     private var captureSession: CameraCaptureSession? = null
@@ -134,25 +133,26 @@ class CameraConnectionFragment private constructor(
     /**
      * [SurfaceTextureListener] handles several lifecycle events on a [ ].
      */
-    private val surfaceTextureListener: SurfaceTextureListener = object : SurfaceTextureListener {
-        override fun onSurfaceTextureAvailable(
-            texture: SurfaceTexture, width: Int, height: Int
-        ) {
-            openCamera(width, height)
-        }
+    private val newSurfaceTextureListener: SurfaceTextureListener =
+        object : SurfaceTextureListener {
+            override fun onSurfaceTextureAvailable(
+                texture: SurfaceTexture, width: Int, height: Int
+            ) {
+                openCamera(width, height)
+            }
 
-        override fun onSurfaceTextureSizeChanged(
-            texture: SurfaceTexture, width: Int, height: Int
-        ) {
-            configureTransform(width, height)
-        }
+            override fun onSurfaceTextureSizeChanged(
+                texture: SurfaceTexture, width: Int, height: Int
+            ) {
+                configureTransform(width, height)
+            }
 
-        override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
-            return true
-        }
+            override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
+                return true
+            }
 
-        override fun onSurfaceTextureUpdated(texture: SurfaceTexture) {}
-    }
+            override fun onSurfaceTextureUpdated(texture: SurfaceTexture) {}
+        }
 
     /**
      * Shows a [Toast] on the UI thread.
@@ -166,12 +166,9 @@ class CameraConnectionFragment private constructor(
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View? {
-        return inflater.inflate(layout, container, false)
-    }
-
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        textureView = view.findViewById<View>(R.id.texture) as AutoFitTextureView
+    ): View {
+        binding = TfeOdCameraConnectionFragmentTrackingBinding.inflate(inflater, container, false)
+        return binding.root
     }
 
     override fun onResume() {
@@ -182,10 +179,12 @@ class CameraConnectionFragment private constructor(
         // available, and "onSurfaceTextureAvailable" will not be called. In that case, we can open
         // a camera and start preview from here (otherwise, we wait until the surface is ready in
         // the SurfaceTextureListener).
-        if (textureView!!.isAvailable) {
-            openCamera(textureView!!.width, textureView!!.height)
-        } else {
-            textureView!!.surfaceTextureListener = surfaceTextureListener
+        with(binding.texture) {
+            if (isAvailable) {
+                openCamera(width, height)
+            } else {
+                surfaceTextureListener = newSurfaceTextureListener
+            }
         }
     }
 
@@ -217,10 +216,12 @@ class CameraConnectionFragment private constructor(
 
             // We fit the aspect ratio of TextureView to the size of preview we picked.
             val orientation = resources.configuration.orientation
-            if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                textureView!!.setAspectRatio(previewSize!!.width, previewSize!!.height)
-            } else {
-                textureView!!.setAspectRatio(previewSize!!.height, previewSize!!.width)
+            with(binding.texture) {
+                if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                    setAspectRatio(previewSize!!.width, previewSize!!.height)
+                } else {
+                    setAspectRatio(previewSize!!.height, previewSize!!.width)
+                }
             }
         } catch (e: CameraAccessException) {
             Timber.e(e, "Exception!")
@@ -296,71 +297,72 @@ class CameraConnectionFragment private constructor(
 
     /** Creates a new [CameraCaptureSession] for camera preview.  */
     private fun createCameraPreviewSession() {
-        try {
-            val texture = textureView!!.surfaceTexture!!
+        binding.texture.surfaceTexture.let { texture ->
+            try {
+                // We configure the size of default buffer to be the size of camera preview we want.
+                texture?.setDefaultBufferSize(previewSize!!.width, previewSize!!.height)
+                // This is the output Surface we need to start preview.
+                val surface = Surface(texture)
 
-            // We configure the size of default buffer to be the size of camera preview we want.
-            texture.setDefaultBufferSize(previewSize!!.width, previewSize!!.height)
+                // We set up a CaptureRequest.Builder with the output Surface.
+                previewRequestBuilder =
+                    cameraDevice!!.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                previewRequestBuilder!!.addTarget(surface)
+                Timber.i("Opening camera preview: " + previewSize!!.width + "x" + previewSize!!.height)
 
-            // This is the output Surface we need to start preview.
-            val surface = Surface(texture)
+                // Create the reader for the preview frames.
+                previewReader = ImageReader.newInstance(
+                    previewSize!!.width, previewSize!!.height, ImageFormat.YUV_420_888, 2
+                )
+                previewReader!!.setOnImageAvailableListener(imageListener, backgroundHandler)
+                previewRequestBuilder!!.addTarget(previewReader!!.surface)
 
-            // We set up a CaptureRequest.Builder with the output Surface.
-            previewRequestBuilder =
-                cameraDevice!!.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-            previewRequestBuilder!!.addTarget(surface)
-            Timber.i("Opening camera preview: " + previewSize!!.width + "x" + previewSize!!.height)
+                // Here, we create a CameraCaptureSession for camera preview.
+                cameraDevice!!.createCaptureSession(
+                    listOf(surface, previewReader!!.surface),
+                    object : CameraCaptureSession.StateCallback() {
+                        override fun onConfigured(cameraCaptureSession: CameraCaptureSession) {
+                            // The camera is already closed
+                            if (null == cameraDevice) {
+                                return
+                            }
 
-            // Create the reader for the preview frames.
-            previewReader = ImageReader.newInstance(
-                previewSize!!.width, previewSize!!.height, ImageFormat.YUV_420_888, 2
-            )
-            previewReader!!.setOnImageAvailableListener(imageListener, backgroundHandler)
-            previewRequestBuilder!!.addTarget(previewReader!!.surface)
+                            // When the session is ready, we start displaying the preview.
+                            captureSession = cameraCaptureSession
+                            try {
+                                // Auto focus should be continuous for camera preview.
+                                previewRequestBuilder!!.set(
+                                    CaptureRequest.CONTROL_AF_MODE,
+                                    CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
+                                )
+                                // Flash is automatically enabled when necessary.
+                                previewRequestBuilder!!.set(
+                                    CaptureRequest.CONTROL_AE_MODE,
+                                    CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH
+                                )
 
-            // Here, we create a CameraCaptureSession for camera preview.
-            cameraDevice!!.createCaptureSession(
-                listOf(surface, previewReader!!.surface),
-                object : CameraCaptureSession.StateCallback() {
-                    override fun onConfigured(cameraCaptureSession: CameraCaptureSession) {
-                        // The camera is already closed
-                        if (null == cameraDevice) {
-                            return
+                                // Finally, we start displaying the camera preview.
+                                previewRequest = previewRequestBuilder!!.build()
+                                captureSession!!.setRepeatingRequest(
+                                    previewRequest!!, captureCallback, backgroundHandler
+                                )
+                            } catch (e: CameraAccessException) {
+                                Timber.e(e, "Exception!")
+                            }
                         }
 
-                        // When the session is ready, we start displaying the preview.
-                        captureSession = cameraCaptureSession
-                        try {
-                            // Auto focus should be continuous for camera preview.
-                            previewRequestBuilder!!.set(
-                                CaptureRequest.CONTROL_AF_MODE,
-                                CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
-                            )
-                            // Flash is automatically enabled when necessary.
-                            previewRequestBuilder!!.set(
-                                CaptureRequest.CONTROL_AE_MODE,
-                                CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH
-                            )
-
-                            // Finally, we start displaying the camera preview.
-                            previewRequest = previewRequestBuilder!!.build()
-                            captureSession!!.setRepeatingRequest(
-                                previewRequest!!, captureCallback, backgroundHandler
-                            )
-                        } catch (e: CameraAccessException) {
-                            Timber.e(e, "Exception!")
+                        override fun onConfigureFailed(cameraCaptureSession: CameraCaptureSession) {
+                            showToast("Failed")
                         }
-                    }
-
-                    override fun onConfigureFailed(cameraCaptureSession: CameraCaptureSession) {
-                        showToast("Failed")
-                    }
-                },
-                null
-            )
-        } catch (e: CameraAccessException) {
-            Timber.e(e, "Exception!")
+                    },
+                    null
+                )
+            } catch (e: CameraAccessException) {
+                Timber.e(e, "Exception!")
+            }
         }
+
+
     }
 
     /**
@@ -373,10 +375,18 @@ class CameraConnectionFragment private constructor(
      */
     private fun configureTransform(viewWidth: Int, viewHeight: Int) {
         val activity = activity
-        if (null == textureView || null == previewSize || null == activity) {
+        if (null == previewSize || null == activity || context == null) {
             return
         }
-        val rotation = activity.windowManager.defaultDisplay.rotation
+        val rotation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            context?.display?.rotation
+        } else {
+            @Suppress("DEPRECATION")
+            activity.windowManager.defaultDisplay.rotation
+        }
+
+
+
         val matrix = Matrix()
         val viewRect = RectF(0f, 0f, viewWidth.toFloat(), viewHeight.toFloat())
         val bufferRect =
@@ -395,7 +405,7 @@ class CameraConnectionFragment private constructor(
         } else if (Surface.ROTATION_180 == rotation) {
             matrix.postRotate(180f, centerX, centerY)
         }
-        textureView!!.setTransform(matrix)
+        binding.texture.setTransform(matrix)
     }
 
     /** Compares two `Size`s based on their areas.  */
@@ -462,7 +472,7 @@ class CameraConnectionFragment private constructor(
          * @param height The minimum desired height
          * @return The optimal `Size`, or an arbitrary one if none were big enough
          */
-        protected fun chooseOptimalSize(choices: Array<Size>, width: Int, height: Int): Size {
+        private fun chooseOptimalSize(choices: Array<Size>, width: Int, height: Int): Size {
             val minSize = max(min(width, height), MINIMUM_PREVIEW_SIZE)
             val desiredSize = Size(width, height)
 
@@ -503,10 +513,9 @@ class CameraConnectionFragment private constructor(
         fun newInstance(
             callback: (Size?, Int) -> Unit,
             imageListener: OnImageAvailableListener,
-            layout: Int,
             inputSize: Size
         ): CameraConnectionFragment {
-            return CameraConnectionFragment(callback, imageListener, layout, inputSize)
+            return CameraConnectionFragment(callback, imageListener, inputSize)
         }
     }
 }

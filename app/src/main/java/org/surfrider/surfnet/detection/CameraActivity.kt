@@ -17,7 +17,6 @@ package org.surfrider.surfnet.detection
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.content.res.AssetManager
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -34,10 +33,7 @@ import android.view.Surface
 import android.view.View
 import android.view.ViewTreeObserver.OnGlobalLayoutListener
 import android.view.WindowManager
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.LinearLayout
-import android.widget.ListView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -45,11 +41,10 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCa
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
 import timber.log.Timber
-import java.io.IOException
 
 abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
-    lateinit var binding: TfeOdActivityCameraBinding
+    private lateinit var binding: TfeOdActivityCameraBinding
 
     @JvmField
     protected var previewWidth = 0
@@ -297,7 +292,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
                     previewHeight = size!!.height
                     previewWidth = size.width
                     onPreviewSizeChosen(size, rotation)
-                }, this, layoutId, it
+                }, this, it
             )
         }
         camera2Fragment?.setCamera(cameraId)
@@ -354,7 +349,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     companion object {
         private const val PERMISSIONS_REQUEST = 1
         private const val PERMISSION_CAMERA = Manifest.permission.CAMERA
-        private const val ASSET_PATH = ""
         private fun allPermissionsGranted(grantResults: IntArray): Boolean {
             for (result in grantResults) {
                 if (result != PackageManager.PERMISSION_GRANTED) {
