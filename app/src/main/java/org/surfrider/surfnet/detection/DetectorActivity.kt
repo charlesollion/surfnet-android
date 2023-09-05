@@ -15,12 +15,7 @@
  */
 package org.surfrider.surfnet.detection
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Matrix
-import android.graphics.Paint
-import android.graphics.Typeface
+import android.graphics.*
 import android.media.ImageReader.OnImageAvailableListener
 import android.os.SystemClock
 import android.util.Size
@@ -33,12 +28,11 @@ import org.surfrider.surfnet.detection.env.BorderedText
 import org.surfrider.surfnet.detection.env.ImageUtils.getTransformationMatrix
 import org.surfrider.surfnet.detection.env.ImageUtils.saveBitmap
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
-import org.surfrider.surfnet.detection.tflite.DetectorFactory
 import org.surfrider.surfnet.detection.tflite.YoloDetector
 import org.surfrider.surfnet.detection.tracking.MultiBoxTracker
 import timber.log.Timber
 import java.io.IOException
-import java.util.LinkedList
+import java.util.*
 
 /**
  * An activity that uses a TensorFlowMultiBoxDetector and ObjectTracker to detect and then track
@@ -58,6 +52,12 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
     private var cropToFrameTransform: Matrix? = null
     private var tracker: MultiBoxTracker? = null
     private var borderedText: BorderedText? = null
+    private val modelString = "yolov8n_float16.tflite"
+    private val labelFilename = "file:///android_asset/coco.txt"
+    private val inputSize = 640
+    private val isV8 = true
+    private val isQuantized = false
+    private val numThreads = 1
     public override fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
         val textSizePx = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, resources.displayMetrics
@@ -65,15 +65,17 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
         borderedText = BorderedText(textSizePx)
         borderedText?.setTypeface(Typeface.MONOSPACE)
         tracker = MultiBoxTracker(this)
-        val modelIndex = binding.bottomSheetLayout.modelList.checkedItemPosition
-        val modelString = modelStrings[modelIndex]
         try {
-            detector = DetectorFactory.getDetector(assets, modelString)
+            detector = YoloDetector.create(
+                assets, modelString, labelFilename, isQuantized, isV8, inputSize
+            )
+            detector?.useGpu()
+            detector?.setNumThreads(numThreads)
         } catch (e: IOException) {
             e.printStackTrace()
-            Timber.e(e, "Exception initializing classifier!")
+            Timber.e(e, "Exception initializing Detector!")
             val toast = Toast.makeText(
-                applicationContext, "Classifier could not be initialized", Toast.LENGTH_SHORT
+                applicationContext, "Detector could not be initialized", Toast.LENGTH_SHORT
             )
             toast.show()
             finish()
@@ -112,75 +114,6 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
         tracker?.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
     }
 
-    override fun updateActiveModel() {
-        // Get UI information before delegating to background
-        val modelIndex = binding.bottomSheetLayout.modelList.checkedItemPosition
-        val deviceIndex = binding.bottomSheetLayout.deviceList.checkedItemPosition
-        val threads = binding.bottomSheetLayout.threads.text.toString().trim { it <= ' ' }
-        val numThreads = threads.toInt()
-        handler?.post {
-            if (modelIndex == currentModel && deviceIndex == currentDevice && numThreads == currentNumThreads) {
-                return@post
-            }
-            currentModel = modelIndex
-            currentDevice = deviceIndex
-            currentNumThreads = numThreads
-
-            // Disable classifier while updating
-            if (detector != null) {
-                detector?.close()
-                detector = null
-            }
-
-            // Lookup names of parameters.
-            val modelString = modelStrings[modelIndex]
-            val device = deviceStrings[deviceIndex]
-            Timber.i("Changing model to $modelString device $device")
-
-            // Try to load model.
-            try {
-                detector = DetectorFactory.getDetector(assets, modelString)
-                // Customize the interpreter to the type of device we want to use.
-                if (detector == null) {
-                    return@post
-                }
-            } catch (e: IOException) {
-                e.printStackTrace()
-                Timber.e(e, "Exception in updateActiveModel()")
-                val toast = Toast.makeText(
-                    applicationContext, "Classifier could not be initialized", Toast.LENGTH_SHORT
-                )
-                toast.show()
-                finish()
-            }
-            when (device) {
-                "CPU" -> {
-                    detector?.useCPU()
-                }
-
-                "GPU" -> {
-                    detector?.useGpu()
-                }
-
-                "NNAPI" -> {
-                    detector?.useNNAPI()
-                }
-            }
-            detector?.setNumThreads(numThreads)
-            val cropSize = detector?.inputSize
-            cropSize?.let {
-                croppedBitmap = Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888)
-                frameToCropTransform = getTransformationMatrix(
-                    previewWidth, previewHeight,
-                    it, it,
-                    sensorOrientation, MAINTAIN_ASPECT
-                )
-            }
-            cropToFrameTransform = Matrix()
-            frameToCropTransform?.invert(cropToFrameTransform)
-        }
-    }
-
     override fun processImage() {
         ++timestamp
         val currTimestamp = timestamp
@@ -216,7 +149,6 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
             val startTime = SystemClock.uptimeMillis()
             val results: List<Recognition>? = detector?.recognizeImage(croppedBitmap)
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
-            Timber.tag("CHECK").e("run: %s", results?.size)
             cropCopyBitmap = croppedBitmap?.let { Bitmap.createBitmap(it) }
             val canvas = cropCopyBitmap?.let { Canvas(it) }
             val paint = Paint()
@@ -260,14 +192,6 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
     // checkpoints.
     private enum class DetectorMode {
         TF_OD_API
-    }
-
-    override fun setUseNNAPI(isChecked: Boolean) {
-        runInBackground { detector?.setUseNNAPI(isChecked) }
-    }
-
-    override fun setNumThreads(numThreads: Int) {
-        runInBackground { detector?.setNumThreads(numThreads) }
     }
 
     companion object {
