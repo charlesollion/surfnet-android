@@ -252,7 +252,7 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
     }
 
     override val layoutId: Int
-        protected get() = R.layout.tfe_od_camera_connection_fragment_tracking
+        get() = R.layout.tfe_od_camera_connection_fragment_tracking
     override val desiredPreviewFrameSize: Size?
         get() = Size(640, 640)
 

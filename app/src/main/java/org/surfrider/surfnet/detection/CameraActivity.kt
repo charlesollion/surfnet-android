@@ -66,7 +66,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
     private val yuvBytes = arrayOfNulls<ByteArray>(3)
     private var rgbBytes: IntArray? = null
     private var luminanceStride = 0
-        private set
     private var defaultModelIndex = 0
     private var defaultDeviceIndex = 0
     private var postInferenceCallback: Runnable? = null
@@ -363,7 +362,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
                     previewHeight = size!!.height
                     previewWidth = size.width
                     onPreviewSizeChosen(size, rotation)
-                }, this, layoutId, it
+                }, this, it
             )
         }
         camera2Fragment?.setCamera(cameraId)
@@ -382,7 +381,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
                 Timber.d("Initializing buffer %d at size %d", i, buffer.capacity())
                 yuvBytes[i] = ByteArray(buffer.capacity())
             }
-            buffer[yuvBytes[i]]
         }
     }
 
@@ -400,12 +398,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
             else -> 0
         }
 
-    //  @Override
-    //  public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-    //    setUseNNAPI(isChecked);
-    //    if (isChecked) apiSwitchCompat.setText("NNAPI");
-    //    else apiSwitchCompat.setText("TFLITE");
-    //  }
     override fun onClick(v: View) {
         if (v.id == R.id.plus) {
             val threads = binding.bottomSheetLayout.threads.text.toString().trim { it <= ' ' }
