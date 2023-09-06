@@ -17,7 +17,6 @@ package org.surfrider.surfnet.detection
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.content.res.AssetManager
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -34,10 +33,7 @@ import android.view.Surface
 import android.view.View
 import android.view.ViewTreeObserver.OnGlobalLayoutListener
 import android.view.WindowManager
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.LinearLayout
-import android.widget.ListView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -49,12 +45,14 @@ import java.io.IOException
 import android.location.LocationManager
 import android.util.Log
 import androidx.core.content.ContextCompat
+import timber.log.Timber
 
-abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
-    View.OnClickListener {
+abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
-    lateinit var binding: TfeOdActivityCameraBinding
+
     private lateinit var locationManager: LocationManager
+    private lateinit var binding: TfeOdActivityCameraBinding
+
 
     @JvmField
     protected var previewWidth = 0
@@ -70,31 +68,13 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
     private val yuvBytes = arrayOfNulls<ByteArray>(3)
     private var rgbBytes: IntArray? = null
     private var luminanceStride = 0
-        private set
-    private var defaultModelIndex = 0
-    private var defaultDeviceIndex = 0
     private var postInferenceCallback: Runnable? = null
     private var imageConverter: Runnable? = null
 
-    @JvmField
-    protected var modelStrings = ArrayList<String>()
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
 
-    /** Current indices of device and model.  */
-    @JvmField
-    var currentDevice = -1
-
-    @JvmField
-    var currentModel = -1
-
-    @JvmField
-    var currentNumThreads = -1
-
-    @JvmField
-    var deviceStrings = ArrayList<String>()
-
     override fun onCreate(savedInstanceState: Bundle?) {
-        LOGGER.d("onCreate $this")
+        Timber.d("onCreate $this")
         super.onCreate(null)
         //initialize binding
         binding = TfeOdActivityCameraBinding.inflate(layoutInflater)
@@ -102,27 +82,15 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        setupToolbar()
+
         setupPermissions()
         setupBottomSheetLayout()
     }
 
     private fun setupBottomSheetLayout() {
         val bottomSheetLayout = binding.bottomSheetLayout
-        deviceStrings.add("CPU")
-        deviceStrings.add("GPU")
-        deviceStrings.add("NNAPI")
-        currentDevice = defaultDeviceIndex
         sheetBehavior = BottomSheetBehavior.from(bottomSheetLayout.bottomSheetLayout)
-        modelStrings = getModelStrings(assets, ASSET_PATH)
-        currentModel = defaultModelIndex
-        currentNumThreads = bottomSheetLayout.threads.text.toString().trim { it <= ' ' }.toInt()
-        val deviceAdapter = ArrayAdapter(
-            this@CameraActivity, R.layout.deviceview_row, R.id.deviceview_row_text, deviceStrings
-        )
-        val modelAdapter = ArrayAdapter(
-            this@CameraActivity, R.layout.listview_row, R.id.listview_row_text, modelStrings
-        )
+
         val vto = bottomSheetLayout.gestureLayout.viewTreeObserver
         vto.addOnGlobalLayoutListener(object : OnGlobalLayoutListener {
             override fun onGlobalLayout() {
@@ -155,30 +123,9 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
 
             override fun onSlide(bottomSheet: View, slideOffset: Float) {}
         })
-
-        with(bottomSheetLayout.deviceList) {
-            choiceMode = ListView.CHOICE_MODE_SINGLE
-            adapter = deviceAdapter
-            setItemChecked(defaultDeviceIndex, true)
-            onItemClickListener =
-                AdapterView.OnItemClickListener { _, _, _, _ -> updateActiveModel() }
-        }
-
-        with(bottomSheetLayout.modelList) {
-            choiceMode = ListView.CHOICE_MODE_SINGLE
-            adapter = modelAdapter
-            setItemChecked(defaultModelIndex, true)
-            onItemClickListener =
-                AdapterView.OnItemClickListener { _, _, _, _ -> updateActiveModel() }
-        }
-        bottomSheetLayout.plus.setOnClickListener(this)
-        bottomSheetLayout.minus.setOnClickListener(this)
     }
 
-    private fun setupToolbar() {
-        setSupportActionBar(binding.toolbar)
-        supportActionBar?.setDisplayShowTitleEnabled(false)
-    }
+
 
     private fun setupPermissions() {
         val permissions = arrayOf(
@@ -203,23 +150,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
             }
         }
         return true
-    }
-
-    private fun getModelStrings(mgr: AssetManager, path: String?): ArrayList<String> {
-        val res = ArrayList<String>()
-        try {
-            val files = mgr.list(path!!)
-            for (file in files!!) {
-                val splits =
-                    file.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
-                if (splits[splits.size - 1] == "tflite") {
-                    res.add(file)
-                }
-            }
-        } catch (e: IOException) {
-            System.err.println("getModelStrings: " + e.message)
-        }
-        return res
     }
 
     protected fun getRgbBytes(): IntArray? {
@@ -268,7 +198,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
             }
             processImage()
         } catch (e: Exception) {
-            LOGGER.e(e, "Exception!")
+            Timber.e(e, "Exception!")
             Trace.endSection()
             return
         }
@@ -277,13 +207,13 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
 
     @Synchronized
     public override fun onStart() {
-        LOGGER.d("onStart $this")
+        Timber.d("onStart $this")
         super.onStart()
     }
 
     @Synchronized
     public override fun onResume() {
-        LOGGER.d("onResume $this")
+        Timber.d("onResume $this")
         super.onResume()
         handlerThread = HandlerThread("inference")
         handlerThread!!.start()
@@ -292,27 +222,27 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
 
     @Synchronized
     public override fun onPause() {
-        LOGGER.d("onPause $this")
+        Timber.d("onPause $this")
         handlerThread!!.quitSafely()
         try {
             handlerThread!!.join()
             handlerThread = null
             handler = null
         } catch (e: InterruptedException) {
-            LOGGER.e(e, "Exception!")
+            Timber.e(e, "Exception!")
         }
         super.onPause()
     }
 
     @Synchronized
     public override fun onStop() {
-        LOGGER.d("onStop $this")
+        Timber.d("onStop $this")
         super.onStop()
     }
 
     @Synchronized
     public override fun onDestroy() {
-        LOGGER.d("onDestroy $this")
+        Timber.d("onDestroy $this")
         super.onDestroy()
     }
 
@@ -371,7 +301,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
                 return cameraId
             }
         } catch (e: CameraAccessException) {
-            LOGGER.e(e, "Not allowed to access camera")
+            Timber.e(e, "Not allowed to access camera")
         }
         return null
     }
@@ -382,9 +312,9 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
             CameraConnectionFragment.newInstance(
                 { size: Size?, rotation: Int ->
                     previewHeight = size!!.height
-                    previewWidth = size!!.width
+                    previewWidth = size.width
                     onPreviewSizeChosen(size, rotation)
-                }, this, layoutId, it
+                }, this, it
             )
         }
         camera2Fragment?.setCamera(cameraId)
@@ -400,7 +330,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
         for (i in planes.indices) {
             val buffer = planes[i].buffer
             if (yuvBytes[i] == null) {
-                LOGGER.d("Initializing buffer %d at size %d", i, buffer.capacity())
+                Timber.d("Initializing buffer %d at size %d", i, buffer.capacity())
                 yuvBytes[i] = ByteArray(buffer.capacity())
             }
             buffer[yuvBytes[i]]
@@ -421,32 +351,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
             else -> 0
         }
 
-    //  @Override
-    //  public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-    //    setUseNNAPI(isChecked);
-    //    if (isChecked) apiSwitchCompat.setText("NNAPI");
-    //    else apiSwitchCompat.setText("TFLITE");
-    //  }
-    override fun onClick(v: View) {
-        if (v.id == R.id.plus) {
-            val threads = binding.bottomSheetLayout.threads.text.toString().trim { it <= ' ' }
-            var numThreads = threads.toInt()
-            if (numThreads >= 9) return
-            numThreads++
-            binding.bottomSheetLayout.threads.text = numThreads.toString()
-            setNumThreads(numThreads)
-        } else if (v.id == R.id.minus) {
-            val threads = binding.bottomSheetLayout.threads.text.toString().trim { it <= ' ' }
-            var numThreads = threads.toInt()
-            if (numThreads == 1) {
-                return
-            }
-            numThreads--
-            binding.bottomSheetLayout.threads.text = numThreads.toString()
-            setNumThreads(numThreads)
-        }
-    }
-
     protected fun showFrameInfo(frameInfo: String?) {
         binding.bottomSheetLayout.frameInfo.text = frameInfo
     }
@@ -466,20 +370,15 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener,
         }
     }
 
-    protected abstract fun updateActiveModel()
     protected abstract fun processImage()
     protected abstract fun onPreviewSizeChosen(size: Size?, rotation: Int?)
     protected abstract val layoutId: Int
     protected abstract val desiredPreviewFrameSize: Size?
-    protected abstract fun setNumThreads(numThreads: Int)
-    protected abstract fun setUseNNAPI(isChecked: Boolean)
 
     companion object {
-        private val LOGGER = Logger()
         private const val PERMISSIONS_REQUEST = 1
         private const val PERMISSION_CAMERA = Manifest.permission.CAMERA
         private const val PERMISSION_LOCATION = Manifest.permission.ACCESS_FINE_LOCATION
-        private const val ASSET_PATH = ""
         private fun allPermissionsGranted(grantResults: IntArray): Boolean {
             for (result in grantResults) {
                 if (result != PackageManager.PERMISSION_GRANTED) {

@@ -17,10 +17,7 @@ package org.surfrider.surfnet.detection.env
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Paint.Align
-import android.graphics.Rect
 import android.graphics.Typeface
-import java.util.Vector
 
 /** A class that encapsulates the tedious bits of rendering legible, bordered text onto a canvas.  */
 class BorderedText(interiorColor: Int, exteriorColor: Int, textSize: Float) {
@@ -82,35 +79,7 @@ class BorderedText(interiorColor: Int, exteriorColor: Int, textSize: Float) {
         canvas.drawText(text, posX, posY + textSize, interiorPaint)
     }
 
-    fun drawLines(canvas: Canvas, posX: Float, posY: Float, lines: Vector<String?>) {
-        for ((lineNum, line) in lines.withIndex()) {
-            line?.let {
-                drawText(canvas, posX, posY - textSize * (lines.size - lineNum - 1), it)
-            }
-        }
-    }
 
-    fun setInteriorColor(color: Int) {
-        interiorPaint.color = color
-    }
 
-    fun setExteriorColor(color: Int) {
-        exteriorPaint.color = color
-    }
 
-    fun setAlpha(alpha: Int) {
-        interiorPaint.alpha = alpha
-        exteriorPaint.alpha = alpha
-    }
-
-    fun getTextBounds(
-        line: String?, index: Int, count: Int, lineBounds: Rect?
-    ) {
-        interiorPaint.getTextBounds(line, index, count, lineBounds)
-    }
-
-    fun setTextAlign(align: Align?) {
-        interiorPaint.textAlign = align
-        exteriorPaint.textAlign = align
-    }
 }
