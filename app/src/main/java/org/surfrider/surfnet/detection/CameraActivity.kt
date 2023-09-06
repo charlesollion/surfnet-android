@@ -40,7 +40,6 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
-import org.surfrider.surfnet.detection.env.Logger
 import java.io.IOException
 import android.location.LocationManager
 import android.util.Log
