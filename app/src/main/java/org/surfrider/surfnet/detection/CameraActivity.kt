@@ -34,15 +34,12 @@ import android.view.View
 import android.view.ViewTreeObserver.OnGlobalLayoutListener
 import android.view.WindowManager
 import android.widget.LinearLayout
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
-import java.io.IOException
 import android.location.LocationManager
-import android.util.Log
 import androidx.core.content.ContextCompat
 import timber.log.Timber
 
@@ -129,7 +126,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private fun setupPermissions() {
         val permissions = arrayOf(
                 PERMISSION_CAMERA,
-                PERMISSION_LOCATION
+                PERMISSION_LOCATION,
+                Manifest.permission.ACCESS_FINE_LOCATION
         )
         if (checkPermissions(permissions)) {
             setFragment()
@@ -261,27 +259,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
                 setFragment()
     }
 
-    private fun hasPermission(permission: String): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
-    }
-
-    private fun requestPermission(permission: String) {
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (shouldShowRequestPermissionRationale(permission)) {
-                Toast.makeText(
-                    this@CameraActivity,
-                    "Camera and location permission are required for this demo",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-            requestPermissions(arrayOf(permission), PERMISSIONS_REQUEST)
-        }
-    }
 
     private fun chooseCamera(): String? {
         val manager = getSystemService(CAMERA_SERVICE) as CameraManager
@@ -366,6 +343,9 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         if (coordinates != null && coordinates.size == 2) {
             binding.bottomSheetLayout.latitudeInfo.text = coordinates[0]
             binding.bottomSheetLayout.longitudeInfo.text = coordinates[1]
+        } else {
+            binding.bottomSheetLayout.latitudeInfo.text = "null"
+            binding.bottomSheetLayout.longitudeInfo.text = "null"
         }
     }
 
@@ -378,13 +358,5 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         private const val PERMISSIONS_REQUEST = 1
         private const val PERMISSION_CAMERA = Manifest.permission.CAMERA
         private const val PERMISSION_LOCATION = Manifest.permission.ACCESS_FINE_LOCATION
-        private fun allPermissionsGranted(grantResults: IntArray): Boolean {
-            for (result in grantResults) {
-                if (result != PackageManager.PERMISSION_GRANTED) {
-                    return false
-                }
-            }
-            return true
-        }
     }
 }

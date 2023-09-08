@@ -16,10 +16,15 @@
 package org.surfrider.surfnet.detection
 
 
+import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
-import android.location.LocationManager
 import android.graphics.*
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.media.ImageReader.OnImageAvailableListener
+import android.os.Bundle
 import android.os.Handler
 import android.os.SystemClock
 import android.util.Size
@@ -27,7 +32,8 @@ import android.util.TypedValue
 import android.view.View
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.customview.OverlayView.DrawCallback
 import org.surfrider.surfnet.detection.env.BorderedText
@@ -39,21 +45,13 @@ import org.surfrider.surfnet.detection.tracking.MultiBoxTracker
 import timber.log.Timber
 import java.io.IOException
 import java.util.LinkedList
-import android.Manifest
-import android.content.Context
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationRequest
-import android.os.Build
-import android.os.Bundle
-import androidx.annotation.RequiresApi
-import java.util.*
+
 
 /**
  * An activity that uses a TensorFlowMultiBoxDetector and ObjectTracker to detect and then track
  * objects.
  */
-open class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationListener {
+ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationListener {
     private var trackingOverlay: OverlayView? = null
     private var sensorOrientation: Int = 0
     private var detector: YoloDetector? = null
@@ -67,7 +65,6 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener, Locati
     private var cropToFrameTransform: Matrix? = null
     private var tracker: MultiBoxTracker? = null
     private var borderedText: BorderedText? = null
-    private var coordinates: Array<String> = arrayOf("", "")
     private lateinit var locationManager: LocationManager
     private val modelString = "yolov8n_float16.tflite"
     private val labelFilename = "file:///android_asset/coco.txt"
@@ -75,6 +72,47 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener, Locati
     private val isV8 = true
     private val isQuantized = false
     private val numThreads = 1
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private val locationHandler = Handler()
+
+            override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+                fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+           updateLocation()
+    }
+
+    private fun getLocation() {
+        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        if ((ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) && (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCATION_PERMISSION)
+            return
+        }
+        val location = fusedLocationClient.lastLocation
+        location.addOnSuccessListener {
+            if (it != null) {
+                showGPSCoordinates(arrayOf(it.longitude.toString(),it.latitude.toString()))
+            }
+        }
+    }
+
+    private fun updateLocation() {
+        locationHandler.postDelayed({
+            getLocation()
+            locationHandler.postDelayed({
+                updateLocation()
+            }, 1000)
+        }, 0)
+    }
+
+    override fun onLocationChanged(location: Location) {
+        getLocation()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        locationHandler.removeCallbacksAndMessages(null)
+    }
+
     public override fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
         val textSizePx = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, resources.displayMetrics
@@ -131,39 +169,6 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener, Locati
         tracker?.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
     }
 
-    private fun getLocation() {
-        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        if ((ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 2)
-        }
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 5f, this)
-    }
-    override fun onLocationChanged(location: Location) {
-        coordinates[0] = location.latitude.toString()
-        coordinates[1] = location.longitude.toString()
-    }
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 2) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "Permission Granted", Toast.LENGTH_SHORT).show()
-            }
-            else {
-                Toast.makeText(this, "Permission Denied", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-
-
-    private fun getGPSInfo() {
-        val REQUEST_LOCATION_PERMISSION = 2
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCATION_PERMISSION)
-        } else {
-            getLocation()
-        }
-    }
 
     override fun processImage() {
         ++timestamp
@@ -224,14 +229,12 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener, Locati
             tracker?.trackResults(mappedRecognitions, currTimestamp)
             trackingOverlay?.postInvalidate()
             computingDetection = false
-            getGPSInfo()
             runOnUiThread {
                 showFrameInfo(previewWidth.toString() + "x" + previewHeight)
                 showCropInfo(
                     cropCopyBitmap?.width.toString() + "x" + cropCopyBitmap?.height
                 )
                 showInference(lastProcessingTimeMs.toString() + "ms")
-                showGPSCoordinates(coordinates)
             }
         }
     }
@@ -253,5 +256,6 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener, Locati
         private const val MAINTAIN_ASPECT = true
         private const val SAVE_PREVIEW_BITMAP = false
         private const val TEXT_SIZE_DIP = 10f
+        private const val REQUEST_LOCATION_PERMISSION = 2
     }
 }
