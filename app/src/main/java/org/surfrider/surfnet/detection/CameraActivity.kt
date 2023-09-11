@@ -34,17 +34,21 @@ import android.view.View
 import android.view.ViewTreeObserver.OnGlobalLayoutListener
 import android.view.WindowManager
 import android.widget.LinearLayout
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
+import android.location.LocationManager
+import androidx.core.content.ContextCompat
 import timber.log.Timber
 
 abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
+
+    private lateinit var locationManager: LocationManager
     private lateinit var binding: TfeOdActivityCameraBinding
+
 
     @JvmField
     protected var previewWidth = 0
@@ -120,11 +124,29 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
 
     private fun setupPermissions() {
-        if (hasPermission()) {
+        val permissions = arrayOf(
+                PERMISSION_CAMERA,
+                PERMISSION_LOCATION,
+                Manifest.permission.ACCESS_FINE_LOCATION
+        )
+        if (checkPermissions(permissions)) {
             setFragment()
         } else {
-            requestPermission()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                requestPermissions(permissions, PERMISSIONS_REQUEST)
+            }
         }
+    }
+
+    private fun checkPermissions(permissions: Array<String>): Boolean {
+        for (permission in permissions) {
+            if (ContextCompat.checkSelfPermission(this, permission)
+                    != PackageManager.PERMISSION_GRANTED
+            ) {
+                return false
+            }
+        }
+        return true
     }
 
     protected fun getRgbBytes(): IntArray? {
@@ -232,35 +254,11 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         requestCode: Int, permissions: Array<String>, grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == PERMISSIONS_REQUEST) {
-            if (allPermissionsGranted(grantResults)) {
+
+        if (requestCode == PERMISSIONS_REQUEST && checkPermissions(permissions))
                 setFragment()
-            } else {
-                requestPermission()
-            }
-        }
     }
 
-    private fun hasPermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            checkSelfPermission(PERMISSION_CAMERA) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
-    }
-
-    private fun requestPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (shouldShowRequestPermissionRationale(PERMISSION_CAMERA)) {
-                Toast.makeText(
-                    this@CameraActivity,
-                    "Camera permission is required for this demo",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-            requestPermissions(arrayOf(PERMISSION_CAMERA), PERMISSIONS_REQUEST)
-        }
-    }
 
     private fun chooseCamera(): String? {
         val manager = getSystemService(CAMERA_SERVICE) as CameraManager
@@ -341,6 +339,16 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         binding.bottomSheetLayout.inferenceInfo.text = inferenceTime
     }
 
+    protected fun showGPSCoordinates(coordinates: Array<String>?) {
+        if (coordinates != null && coordinates.size == 2) {
+            binding.bottomSheetLayout.latitudeInfo.text = coordinates[0]
+            binding.bottomSheetLayout.longitudeInfo.text = coordinates[1]
+        } else {
+            binding.bottomSheetLayout.latitudeInfo.text = "null"
+            binding.bottomSheetLayout.longitudeInfo.text = "null"
+        }
+    }
+
     protected abstract fun processImage()
     protected abstract fun onPreviewSizeChosen(size: Size?, rotation: Int?)
     protected abstract val layoutId: Int
@@ -349,13 +357,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     companion object {
         private const val PERMISSIONS_REQUEST = 1
         private const val PERMISSION_CAMERA = Manifest.permission.CAMERA
-        private fun allPermissionsGranted(grantResults: IntArray): Boolean {
-            for (result in grantResults) {
-                if (result != PackageManager.PERMISSION_GRANTED) {
-                    return false
-                }
-            }
-            return true
-        }
+        private const val PERMISSION_LOCATION = Manifest.permission.ACCESS_FINE_LOCATION
     }
 }

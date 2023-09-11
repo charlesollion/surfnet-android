@@ -15,13 +15,25 @@
  */
 package org.surfrider.surfnet.detection
 
+
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.*
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.media.ImageReader.OnImageAvailableListener
+import android.os.Bundle
+import android.os.Handler
 import android.os.SystemClock
 import android.util.Size
 import android.util.TypedValue
 import android.view.View
 import android.widget.Toast
+import androidx.core.app.ActivityCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.customview.OverlayView.DrawCallback
 import org.surfrider.surfnet.detection.env.BorderedText
@@ -32,13 +44,14 @@ import org.surfrider.surfnet.detection.tflite.YoloDetector
 import org.surfrider.surfnet.detection.tracking.MultiBoxTracker
 import timber.log.Timber
 import java.io.IOException
-import java.util.*
+import java.util.LinkedList
+
 
 /**
  * An activity that uses a TensorFlowMultiBoxDetector and ObjectTracker to detect and then track
  * objects.
  */
-open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
+ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationListener {
     private var trackingOverlay: OverlayView? = null
     private var sensorOrientation: Int = 0
     private var detector: YoloDetector? = null
@@ -52,12 +65,54 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
     private var cropToFrameTransform: Matrix? = null
     private var tracker: MultiBoxTracker? = null
     private var borderedText: BorderedText? = null
+    private lateinit var locationManager: LocationManager
     private val modelString = "yolov8n_float16.tflite"
     private val labelFilename = "file:///android_asset/coco.txt"
     private val inputSize = 640
     private val isV8 = true
     private val isQuantized = false
     private val numThreads = 1
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private val locationHandler = Handler()
+
+            override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+                fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+           updateLocation()
+    }
+
+    private fun getLocation() {
+        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        if ((ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) && (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCATION_PERMISSION)
+            return
+        }
+        val location = fusedLocationClient.lastLocation
+        location.addOnSuccessListener {
+            if (it != null) {
+                showGPSCoordinates(arrayOf(it.longitude.toString(),it.latitude.toString()))
+            }
+        }
+    }
+
+    private fun updateLocation() {
+        locationHandler.postDelayed({
+            getLocation()
+            locationHandler.postDelayed({
+                updateLocation()
+            }, 1000)
+        }, 0)
+    }
+
+    override fun onLocationChanged(location: Location) {
+        getLocation()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        locationHandler.removeCallbacksAndMessages(null)
+    }
+
     public override fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
         val textSizePx = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, resources.displayMetrics
@@ -113,6 +168,7 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
             })
         tracker?.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
     }
+
 
     override fun processImage() {
         ++timestamp
@@ -200,5 +256,6 @@ open class DetectorActivity : CameraActivity(), OnImageAvailableListener {
         private const val MAINTAIN_ASPECT = true
         private const val SAVE_PREVIEW_BITMAP = false
         private const val TEXT_SIZE_DIP = 10f
+        private const val REQUEST_LOCATION_PERMISSION = 2
     }
 }
