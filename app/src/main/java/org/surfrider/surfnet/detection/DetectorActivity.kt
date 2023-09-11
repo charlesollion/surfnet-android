@@ -230,10 +230,6 @@ import java.util.LinkedList
             trackingOverlay?.postInvalidate()
             computingDetection = false
             runOnUiThread {
-                showFrameInfo(previewWidth.toString() + "x" + previewHeight)
-                showCropInfo(
-                    cropCopyBitmap?.width.toString() + "x" + cropCopyBitmap?.height
-                )
                 showInference(lastProcessingTimeMs.toString() + "ms")
             }
         }

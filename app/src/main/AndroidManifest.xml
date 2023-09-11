@@ -43,7 +43,7 @@
             android:name=".DetectorActivity"
             android:exported="true"
             android:label="@string/tfe_od_app_name"
-            android:screenOrientation="portrait">
+            android:screenOrientation="landscape">
         </activity>
     </application>
 

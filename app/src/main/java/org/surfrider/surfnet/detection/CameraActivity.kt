@@ -327,13 +327,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
             else -> 0
         }
 
-    protected fun showFrameInfo(frameInfo: String?) {
-        binding.bottomSheetLayout.frameInfo.text = frameInfo
-    }
-
-    protected fun showCropInfo(cropInfo: String?) {
-        binding.bottomSheetLayout.cropInfo.text = cropInfo
-    }
 
     protected fun showInference(inferenceTime: String?) {
         binding.bottomSheetLayout.inferenceInfo.text = inferenceTime
