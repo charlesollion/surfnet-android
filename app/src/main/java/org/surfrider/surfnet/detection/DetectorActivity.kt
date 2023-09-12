@@ -77,9 +77,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (BuildConfig.DEBUG) {
-            Timber.plant(Timber.DebugTree())
-        }
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         updateLocation()
