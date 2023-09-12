@@ -51,7 +51,7 @@ import java.util.LinkedList
  * An activity that uses a TensorFlowMultiBoxDetector and ObjectTracker to detect and then track
  * objects.
  */
- class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationListener {
+class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationListener {
     private var trackingOverlay: OverlayView? = null
     private var sensorOrientation: Int = 0
     private var detector: YoloDetector? = null
@@ -75,22 +75,37 @@ import java.util.LinkedList
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val locationHandler = Handler()
 
-            override fun onCreate(savedInstanceState: Bundle?) {
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-                fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-           updateLocation()
+        if (BuildConfig.DEBUG) {
+            Timber.plant(Timber.DebugTree())
+        }
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        updateLocation()
     }
 
     private fun getLocation() {
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        if ((ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) && (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCATION_PERMISSION)
+        if ((ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED) && (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED)
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                REQUEST_LOCATION_PERMISSION
+            )
             return
         }
         val location = fusedLocationClient.lastLocation
         location.addOnSuccessListener {
             if (it != null) {
-                showGPSCoordinates(arrayOf(it.longitude.toString(),it.latitude.toString()))
+                showGPSCoordinates(arrayOf(it.longitude.toString(), it.latitude.toString()))
             }
         }
     }
@@ -113,13 +128,15 @@ import java.util.LinkedList
         locationHandler.removeCallbacksAndMessages(null)
     }
 
-    public override fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
-        val textSizePx = TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, resources.displayMetrics
-        )
-        borderedText = BorderedText(textSizePx)
-        borderedText?.setTypeface(Typeface.MONOSPACE)
-        tracker = MultiBoxTracker(this)
+    public override fun endDetector() {
+        croppedBitmap = null
+        detector = null
+        cropToFrameTransform = null
+        tracker = null
+        trackingOverlay = null
+    }
+
+    public override fun startDetector() {
         try {
             detector = YoloDetector.create(
                 assets, modelString, labelFilename, isQuantized, isV8, inputSize
@@ -135,18 +152,10 @@ import java.util.LinkedList
             toast.show()
             finish()
         }
+        tracker = MultiBoxTracker(this)
         val cropSize = detector?.inputSize
-        size?.let {
-            previewWidth = it.width
-            previewHeight = it.height
-        }
-        if (rotation != null) {
-            sensorOrientation = rotation - screenOrientation
-        }
-        Timber.i("Camera orientation relative to screen canvas: %d", sensorOrientation)
-        Timber.i("Initializing at size %dx%d", previewWidth, previewHeight)
-        rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
         cropSize?.let {
+            Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
             croppedBitmap = Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888)
             frameToCropTransform = getTransformationMatrix(
                 previewWidth, previewHeight,
@@ -154,6 +163,7 @@ import java.util.LinkedList
                 sensorOrientation, MAINTAIN_ASPECT
             )
         }
+
         cropToFrameTransform = Matrix()
         frameToCropTransform?.invert(cropToFrameTransform)
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
@@ -167,6 +177,26 @@ import java.util.LinkedList
                 }
             })
         tracker?.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
+    }
+
+    public override fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
+        val textSizePx = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, resources.displayMetrics
+        )
+        borderedText = BorderedText(textSizePx)
+        borderedText?.setTypeface(Typeface.MONOSPACE)
+        tracker = MultiBoxTracker(this)
+
+        size?.let {
+            previewWidth = it.width
+            previewHeight = it.height
+        }
+        if (rotation != null) {
+            sensorOrientation = rotation - screenOrientation
+        }
+        Timber.i("Camera orientation relative to screen canvas: %d", sensorOrientation)
+        Timber.i("Initializing at size %dx%d", previewWidth, previewHeight)
+        rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
     }
 
 
@@ -203,7 +233,13 @@ import java.util.LinkedList
         runInBackground {
             Timber.i("Running detection on image $currTimestamp")
             val startTime = SystemClock.uptimeMillis()
-            val results: List<Recognition>? = detector?.recognizeImage(croppedBitmap)
+            val results: List<Recognition>? = croppedBitmap?.let {
+
+                detector?.let{
+                    it.recognizeImage(croppedBitmap)
+                }
+            }
+
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
             cropCopyBitmap = croppedBitmap?.let { Bitmap.createBitmap(it) }
             val canvas = cropCopyBitmap?.let { Canvas(it) }
