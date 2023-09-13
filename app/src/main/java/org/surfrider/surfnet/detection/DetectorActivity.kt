@@ -85,17 +85,13 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     private fun getLocation() {
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         if ((ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
+                this, Manifest.permission.ACCESS_FINE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED) && (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
+                this, Manifest.permission.ACCESS_COARSE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED)
         ) {
             ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                REQUEST_LOCATION_PERMISSION
+                this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCATION_PERMISSION
             )
             return
         }
@@ -127,7 +123,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
 
     public override fun endDetector() {
         croppedBitmap = null
-        detector = null
         cropToFrameTransform = null
         tracker = null
         trackingOverlay = null
@@ -135,9 +130,11 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
 
     public override fun startDetector() {
         try {
-            detector = YoloDetector.create(
-                assets, modelString, labelFilename, isQuantized, isV8, inputSize
-            )
+            if (detector == null) {
+                detector = YoloDetector.create(
+                    assets, modelString, labelFilename, isQuantized, isV8, inputSize
+                )
+            }
             detector?.useGpu()
             detector?.setNumThreads(numThreads)
         } catch (e: IOException) {
@@ -155,24 +152,21 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
             croppedBitmap = Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888)
             frameToCropTransform = getTransformationMatrix(
-                previewWidth, previewHeight,
-                it, it,
-                sensorOrientation, MAINTAIN_ASPECT
+                previewWidth, previewHeight, it, it, sensorOrientation, MAINTAIN_ASPECT
             )
         }
 
         cropToFrameTransform = Matrix()
         frameToCropTransform?.invert(cropToFrameTransform)
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
-        trackingOverlay?.addCallback(
-            object : DrawCallback {
-                override fun drawCallback(canvas: Canvas?) {
-                    tracker?.draw(canvas)
-                    if (isDebug) {
-                        tracker?.drawDebug(canvas)
-                    }
+        trackingOverlay?.addCallback(object : DrawCallback {
+            override fun drawCallback(canvas: Canvas?) {
+                tracker?.draw(canvas)
+                if (isDebug) {
+                    tracker?.drawDebug(canvas)
                 }
-            })
+            }
+        })
         tracker?.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
     }
 
@@ -210,13 +204,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         computingDetection = true
         Timber.i("Preparing image $currTimestamp for detection in bg thread.")
         rgbFrameBitmap?.setPixels(
-            getRgbBytes(),
-            0,
-            previewWidth,
-            0,
-            0,
-            previewWidth,
-            previewHeight
+            getRgbBytes(), 0, previewWidth, 0, 0, previewWidth, previewHeight
         )
         readyForNextImage()
         if (croppedBitmap != null && rgbFrameBitmap != null && frameToCropTransform != null) {
@@ -232,7 +220,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             val startTime = SystemClock.uptimeMillis()
             val results: List<Recognition>? = croppedBitmap?.let {
 
-                detector?.let{
+                detector?.let {
                     it.recognizeImage(croppedBitmap)
                 }
             }
