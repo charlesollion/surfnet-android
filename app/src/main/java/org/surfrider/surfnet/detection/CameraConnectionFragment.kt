@@ -29,6 +29,7 @@ import android.hardware.camera2.*
 import android.hardware.camera2.CameraCaptureSession.CaptureCallback
 import android.media.ImageReader
 import android.media.ImageReader.OnImageAvailableListener
+import android.opengl.Visibility
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -54,6 +55,8 @@ import kotlin.math.min
 @SuppressLint("ValidFragment")
 class CameraConnectionFragment private constructor(
     private val cameraConnectionCallback: (Size?, Int) -> Unit,
+    private val startDetector: () -> Unit,
+    private val endDetector: () -> Unit,
     /** A [OnImageAvailableListener] to receive frames as they are available.  */
     private val imageListener: OnImageAvailableListener,
     /** The input size in pixels desired by TensorFlow (width and height of a square bitmap).  */
@@ -168,6 +171,19 @@ class CameraConnectionFragment private constructor(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         binding = TfeOdCameraConnectionFragmentTrackingBinding.inflate(inflater, container, false)
+
+        binding.startButton.setOnClickListener {
+            binding.startButton.visibility = View.INVISIBLE
+            binding.stopButton.visibility = View.VISIBLE
+            startDetector()
+        }
+
+        binding.stopButton.setOnClickListener {
+            binding.startButton.visibility = View.VISIBLE
+            binding.stopButton.visibility = View.INVISIBLE
+            endDetector()
+        }
+
         return binding.root
     }
 
@@ -475,7 +491,6 @@ class CameraConnectionFragment private constructor(
         private fun chooseOptimalSize(choices: Array<Size>, width: Int, height: Int): Size {
             val minSize = max(min(width, height), MINIMUM_PREVIEW_SIZE)
             val desiredSize = Size(width, height)
-
             // Collect the supported resolutions that are at least as big as the preview Surface
             var exactSizeFound = false
             val bigEnough: MutableList<Size?> = ArrayList()
@@ -512,10 +527,12 @@ class CameraConnectionFragment private constructor(
 
         fun newInstance(
             callback: (Size?, Int) -> Unit,
+            startDetector: () -> Unit,
+            endDetector: () -> Unit,
             imageListener: OnImageAvailableListener,
             inputSize: Size
         ): CameraConnectionFragment {
-            return CameraConnectionFragment(callback, imageListener, inputSize)
+            return CameraConnectionFragment(callback, startDetector, endDetector, imageListener, inputSize)
         }
     }
 }
