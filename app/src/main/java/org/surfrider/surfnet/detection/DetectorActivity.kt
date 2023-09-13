@@ -34,6 +34,7 @@ import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import org.opencv.android.OpenCVLoader
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.customview.OverlayView.DrawCallback
 import org.surfrider.surfnet.detection.env.BorderedText
@@ -79,7 +80,8 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        if(OpenCVLoader.initDebug())
+            Timber.i("Successful opencv loading")
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         updateLocation()
     }

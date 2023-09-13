@@ -11,15 +11,8 @@ Works in Android Emulator, without GPU support.
 ### Setup
 
 You need Android Studio with API level above 31. 
-
-Instructions on how to create your own model to come.
-
-### TODO
-
-- [x] Test CPU and GPU on lower end samsung phones
-- [ ] Monitor performances without tracking
-- [ ] Optimize model, delegate options and numThreads
-- [ ] Update old dependencies
-- [ ] Clean up remaining code
-- [ ] Check performances in landscape mode
-- [ ] Emulator with local Video (and GPU ?)
+You need to set up OpenCV, here are instructions on Android Studio:
+- Download opencv sdk (tested with [4.8.0](https://github.com/opencv/opencv/releases/download/4.8.0/opencv-4.8.0-android-sdk.zip))
+- File > New > Import Module, select the sdk folder, name it `:opencv`
+- Change opencv's `build.gradle` to match android target and min sdk version of the main app
+- File > Project Structure > Add dependency (module) > select 'app' > click `opencv`
