@@ -70,6 +70,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
 
+    var detectorPaused = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate $this")
         super.onCreate(null)
@@ -121,12 +123,11 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     }
 
 
-
     private fun setupPermissions() {
         val permissions = arrayOf(
-                PERMISSION_CAMERA,
-                PERMISSION_LOCATION,
-                Manifest.permission.ACCESS_FINE_LOCATION
+            PERMISSION_CAMERA,
+            PERMISSION_LOCATION,
+            Manifest.permission.ACCESS_FINE_LOCATION
         )
         if (checkPermissions(permissions)) {
             setFragment()
@@ -140,7 +141,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private fun checkPermissions(permissions: Array<String>): Boolean {
         for (permission in permissions) {
             if (ContextCompat.checkSelfPermission(this, permission)
-                    != PackageManager.PERMISSION_GRANTED
+                != PackageManager.PERMISSION_GRANTED
             ) {
                 return false
             }
@@ -155,6 +156,9 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
     /** Callback for Camera2 API  */
     override fun onImageAvailable(reader: ImageReader) {
+
+
+
         // We need wait until we have some size from onPreviewSizeChosen
         if (previewWidth == 0 || previewHeight == 0) {
             return
@@ -192,13 +196,18 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
                 image.close()
                 isProcessingFrame = false
             }
-            processImage()
+            if(detectorPaused) {
+                readyForNextImage()
+            } else {
+                processImage()
+            }
         } catch (e: Exception) {
             Timber.e(e, "Exception!")
             Trace.endSection()
             return
         }
         Trace.endSection()
+
     }
 
     @Synchronized
@@ -255,7 +264,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
         if (requestCode == PERMISSIONS_REQUEST && checkPermissions(permissions))
-                setFragment()
+            setFragment()
     }
 
 
@@ -289,13 +298,14 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
                     previewHeight = size!!.height
                     previewWidth = size.width
                     onPreviewSizeChosen(size, rotation)
-                }, this, it
+                }, { startDetector() }, { endDetector() }, this, it
             )
         }
         camera2Fragment?.setCamera(cameraId)
 
         if (camera2Fragment != null) {
-            supportFragmentManager.beginTransaction().replace(R.id.container, camera2Fragment).commit()
+            supportFragmentManager.beginTransaction().replace(R.id.container, camera2Fragment)
+                .commit()
         }
     }
 
@@ -343,6 +353,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
     protected abstract fun processImage()
     protected abstract fun onPreviewSizeChosen(size: Size?, rotation: Int?)
+    protected abstract fun startDetector()
+    protected abstract fun endDetector()
     protected abstract val layoutId: Int
     protected abstract val desiredPreviewFrameSize: Size?
 
