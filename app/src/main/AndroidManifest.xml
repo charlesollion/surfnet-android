@@ -44,7 +44,8 @@
             android:name=".DetectorActivity"
             android:exported="true"
             android:label="@string/tfe_od_app_name"
-            android:screenOrientation="portrait">
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            android:screenOrientation="landscape">
         </activity>
     </application>
 

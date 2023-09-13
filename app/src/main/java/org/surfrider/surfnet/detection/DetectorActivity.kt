@@ -24,14 +24,21 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.media.ImageReader.OnImageAvailableListener
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.SystemClock
 import android.util.Size
 import android.util.TypedValue
 import android.view.View
+import android.view.WindowInsets
+import android.view.WindowManager
 import android.widget.Toast
+import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import org.surfrider.surfnet.detection.customview.OverlayView
@@ -79,11 +86,42 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+               hideSystemUI()
+                fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+           updateLocation()
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         updateLocation()
     }
-
+    private fun hideSystemUI() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.hide(WindowInsets.Type.statusBars())
+        } else {
+            window.setFlags(
+                    WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                    WindowManager.LayoutParams.FLAG_FULLSCREEN
+            )
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            hideNavigationBar()
+        } else {
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+        }
+    }
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun hideNavigationBar() {
+        val windowInsetsController =
+                WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        window.decorView.setOnApplyWindowInsetsListener { view, windowInsets ->
+            if (windowInsets.isVisible(WindowInsetsCompat.Type.navigationBars())
+                    || windowInsets.isVisible(WindowInsetsCompat.Type.statusBars())) {
+            }
+            view.onApplyWindowInsets(windowInsets)
+        }
+    }
     private fun getLocation() {
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         if ((ActivityCompat.checkSelfPermission(
@@ -260,10 +298,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             trackingOverlay?.postInvalidate()
             computingDetection = false
             runOnUiThread {
-                showFrameInfo(previewWidth.toString() + "x" + previewHeight)
-                showCropInfo(
-                    cropCopyBitmap?.width.toString() + "x" + cropCopyBitmap?.height
-                )
                 showInference(lastProcessingTimeMs.toString() + "ms")
             }
         }
