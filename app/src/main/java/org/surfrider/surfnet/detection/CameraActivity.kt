@@ -69,6 +69,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
 
+    var detectorPaused = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate $this")
         super.onCreate(null)
@@ -155,6 +157,9 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
     /** Callback for Camera2 API  */
     override fun onImageAvailable(reader: ImageReader) {
+
+
+
         // We need wait until we have some size from onPreviewSizeChosen
         if (previewWidth == 0 || previewHeight == 0) {
             return
@@ -192,13 +197,18 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
                 image.close()
                 isProcessingFrame = false
             }
-            processImage()
+            if(detectorPaused) {
+                readyForNextImage()
+            } else {
+                processImage()
+            }
         } catch (e: Exception) {
             Timber.e(e, "Exception!")
             Trace.endSection()
             return
         }
         Trace.endSection()
+
     }
 
     @Synchronized

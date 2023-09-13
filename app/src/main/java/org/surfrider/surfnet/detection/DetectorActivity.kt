@@ -75,6 +75,8 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val locationHandler = Handler()
 
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -122,6 +124,11 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     }
 
     public override fun endDetector() {
+        detectorPaused = true
+        //removes all drawings of the trackingOverlay from the screen
+        trackingOverlay?.invalidate()
+
+        //reset trackers
         croppedBitmap = null
         cropToFrameTransform = null
         tracker = null
@@ -130,6 +137,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
 
     public override fun startDetector() {
         try {
+            //create detector only one time
             if (detector == null) {
                 detector = YoloDetector.create(
                     assets, modelString, labelFilename, isQuantized, isV8, inputSize
@@ -137,6 +145,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             }
             detector?.useGpu()
             detector?.setNumThreads(numThreads)
+            detectorPaused = false
         } catch (e: IOException) {
             e.printStackTrace()
             Timber.e(e, "Exception initializing Detector!")
