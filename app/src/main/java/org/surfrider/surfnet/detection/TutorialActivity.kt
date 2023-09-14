@@ -1,5 +1,6 @@
 package org.surfrider.surfnet.detection
 
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import org.surfrider.surfnet.detection.databinding.ActivityTutorialBinding
@@ -13,5 +14,10 @@ class TutorialActivity : AppCompatActivity() {
 
         binding = ActivityTutorialBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        binding.readyButton.setOnClickListener {
+            val intent = Intent(this, DetectorActivity::class.java)
+            startActivity(intent)
+        }
     }
 }

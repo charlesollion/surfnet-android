@@ -3,8 +3,14 @@
     <string name="tfe_od_camera_error" translation_description="Error regarding camera support[CHAR_LIMIT=40]">This device doesn\'t support Camera2 API.</string>
     <string name="home_title">PLASTIC\nORIGINS</string>
     <string name="home_subtitle">Bienvenue sur la nouvelle application de Plastic Origins !</string>
-    <string name="home_p1">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</string>
-    <string name="home_p2">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</string>
+    <string name="home_p1">Cette application permet de collecter des données sur la présence des déchets échoués sur les berges. Pour cela, vous pourrez filmer et identifier en direct les déchets grâce à un algorithme d’intelligence artificielle.</string>
+    <string name="home_p2">Nous aimerions récolter vos avis sur cette première version de l’application afin de la faire évoluer par la suite. Vous pouvez saisir une adresse mail sur laquelle nous pourrons éventuellement vous contacter.</string>
     <string name="home_placeholder">Entrez votre email</string>
     <string name="home_button">Lancer un nouveau suivi vidéo</string>
+    <string name="red_dot_tutorial_text"><i>Déchet en cours\nd’analyse</i></string>
+    <string name="green_dot_tutorial_text"><i>Déchet correctement\nidentifié</i></string>
+    <string name="tutorial_title">Comment ca marche ?</string>
+    <string name="tutorial_p1_text">Avant de commencer ta vidéo, tourne ton téléphone en mode\npaysage, assure toi que la ligne rouge se situe au niveau de la\nberge​ et garde ton téléphone le plus stable possible.</string>
+    <string name="tutorial_p2_text">L\'IA détecte et compte\nautomatiquement les\ndéchets sur la berge.</string>
+    <string name="tutorial_button_text">Je suis prêt</string>
 </resources>

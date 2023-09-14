@@ -30,7 +30,7 @@ class HomeActivity : AppCompatActivity() {
             var editor = sharedPreference.edit()
             editor.putString("email",binding.editTextTextEmailAddress.text.toString())
             editor.commit()
-            val intent = Intent(this, DetectorActivity::class.java)
+            val intent = Intent(this, TutorialActivity::class.java)
             startActivity(intent)
         }
     }
