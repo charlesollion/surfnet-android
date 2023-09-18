@@ -351,6 +351,16 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         }
     }
 
+    protected fun showIMUStats(stats: Array<Float>?) {
+        if (stats != null && stats.size == 4) {
+            binding.bottomSheetLayout.positionInfo.text = stats[0].toString() + " " +  stats[1].toString() + " " +  stats[2].toString()
+            binding.bottomSheetLayout.speedInfo.text = stats[3].toString()
+        } else {
+            binding.bottomSheetLayout.positionInfo.text = "null"
+            binding.bottomSheetLayout.speedInfo.text = "null"
+        }
+    }
+
     protected abstract fun processImage()
     protected abstract fun onPreviewSizeChosen(size: Size?, rotation: Int?)
     protected abstract fun startDetector()

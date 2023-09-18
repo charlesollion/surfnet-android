@@ -68,7 +68,7 @@ public class MainActivity2 extends AppCompatActivity implements CameraBridgeView
                 case LoaderCallbackInterface.SUCCESS:
                     Log.i(TAG, "OpenCV loaded successfully");
 
-                    mOpenCvCameraView.enableView();
+                    //mOpenCvCameraView.enableView();
 
                     break;
                 default:
