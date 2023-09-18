@@ -42,6 +42,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCa
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
 import timber.log.Timber
+import java.text.DecimalFormat
 
 
 abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
@@ -67,6 +68,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private var luminanceStride = 0
     private var postInferenceCallback: Runnable? = null
     private var imageConverter: Runnable? = null
+    private lateinit var df : DecimalFormat;
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
 
@@ -80,6 +82,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         setContentView(binding.root)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        df = DecimalFormat("#.##")
 
         setupPermissions()
         setupBottomSheetLayout()
@@ -353,8 +357,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
     protected fun showIMUStats(stats: Array<Float>?) {
         if (stats != null && stats.size == 4) {
-            binding.bottomSheetLayout.positionInfo.text = stats[0].toString() + " " +  stats[1].toString() + " " +  stats[2].toString()
-            binding.bottomSheetLayout.speedInfo.text = stats[3].toString()
+            binding.bottomSheetLayout.positionInfo.text = df.format(stats[0]) + " " +  df.format(stats[1]) + " " +  df.format(stats[2])
+            binding.bottomSheetLayout.speedInfo.text = df.format(stats[3])
         } else {
             binding.bottomSheetLayout.positionInfo.text = "null"
             binding.bottomSheetLayout.speedInfo.text = "null"
