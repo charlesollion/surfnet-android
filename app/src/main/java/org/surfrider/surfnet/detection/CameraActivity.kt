@@ -20,6 +20,7 @@ import android.content.pm.PackageManager
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
+import android.location.LocationManager
 import android.media.Image.Plane
 import android.media.ImageReader
 import android.media.ImageReader.OnImageAvailableListener
@@ -35,13 +36,13 @@ import android.view.ViewTreeObserver.OnGlobalLayoutListener
 import android.view.WindowManager
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
-import android.location.LocationManager
-import androidx.core.content.ContextCompat
 import timber.log.Timber
+
 
 abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
@@ -80,7 +81,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-
         setupPermissions()
         setupBottomSheetLayout()
     }
@@ -118,7 +118,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
                     )
                 }
             }
-
             override fun onSlide(bottomSheet: View, slideOffset: Float) {}
         })
     }
@@ -337,13 +336,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
             else -> 0
         }
 
-    protected fun showFrameInfo(frameInfo: String?) {
-        binding.bottomSheetLayout.frameInfo.text = frameInfo
-    }
-
-    protected fun showCropInfo(cropInfo: String?) {
-        binding.bottomSheetLayout.cropInfo.text = cropInfo
-    }
 
     protected fun showInference(inferenceTime: String?) {
         binding.bottomSheetLayout.inferenceInfo.text = inferenceTime
