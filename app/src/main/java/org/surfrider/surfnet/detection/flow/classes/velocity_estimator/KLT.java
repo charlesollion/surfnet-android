@@ -91,7 +91,7 @@ public class KLT implements OpticalFlow {
         currFrame = new_frame;
 
         // convert the frame to Gray
-        Imgproc.cvtColor(currFrame, currGray, Imgproc.COLOR_RGBA2GRAY);
+        //Imgproc.cvtColor(currFrame, currGray, Imgproc.COLOR_RGBA2GRAY);
 
         // if this is the first loop, find good features
         if (prevGray.empty()){

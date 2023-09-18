@@ -39,12 +39,17 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback
+import org.opencv.core.CvType.*
+import org.opencv.core.Mat
+import org.opencv.imgproc.Imgproc
+
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.Basic_fusion
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.IMU_estimator
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.KLT
 import timber.log.Timber
+import java.nio.ByteBuffer
 import java.text.DecimalFormat
 
 
@@ -70,6 +75,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private var rgbBytes: IntArray? = null
     private var luminanceStride = 0
     private var postInferenceCallback: Runnable? = null
+    private var opticalFlowRunner: Runnable? = null
     private var imageConverter: Runnable? = null
     private lateinit var df : DecimalFormat;
     private lateinit var imuEstimator : IMU_estimator
@@ -199,6 +205,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
                 return
             }
             isProcessingFrame = true
+
+            // Processing frame
             Trace.beginSection("imageAvailable")
             val planes = image.planes
             fillBytes(planes, yuvBytes)
@@ -217,10 +225,22 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
                     uvPixelStride,
                     rgbBytes!!
                 )
+
+
             }
             postInferenceCallback = Runnable {
                 image.close()
                 isProcessingFrame = false
+            }
+            opticalFlowRunner = Runnable {
+                val bytes = ByteArray(rgbBytes!!.size)
+                for(i in rgbBytes!!.indices) {
+                    bytes[i] = avgBytes(rgbBytes!![i]).toByte()
+                }
+
+                val currFrame = Mat(previewWidth, previewHeight, CV_8UC1, ByteBuffer.wrap(bytes))
+                val output = opticalFlow.run(currFrame);
+                Timber.i(output.position.toString())
             }
             if(detectorPaused) {
                 readyForNextImage()
@@ -235,7 +255,12 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         Trace.endSection()
 
     }
-
+    private fun avgBytes(i: Int) : Int {
+        val r = i shr 16 and 0xff
+        val g = i shr 8 and 0xff
+        val b = i and 0xff
+        return (r + g + b) / 3
+    }
     @Synchronized
     public override fun onStart() {
         Timber.d("onStart $this")
