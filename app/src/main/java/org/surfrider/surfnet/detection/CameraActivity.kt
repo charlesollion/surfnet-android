@@ -41,6 +41,9 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
+import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.Basic_fusion
+import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.IMU_estimator
+import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.KLT
 import timber.log.Timber
 import java.text.DecimalFormat
 
@@ -69,6 +72,9 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private var postInferenceCallback: Runnable? = null
     private var imageConverter: Runnable? = null
     private lateinit var df : DecimalFormat;
+    private lateinit var imuEstimator : IMU_estimator
+    private lateinit var opticalFlow : KLT
+    private lateinit var fusion : Basic_fusion
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
 
@@ -84,6 +90,10 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         df = DecimalFormat("#.##")
+        // init IMU_estimator, optical flow and fusion
+        imuEstimator = IMU_estimator(this.applicationContext)
+        opticalFlow = KLT()
+        fusion = Basic_fusion()
 
         setupPermissions()
         setupBottomSheetLayout()
@@ -161,7 +171,19 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     /** Callback for Camera2 API  */
     override fun onImageAvailable(reader: ImageReader) {
 
+        // get IMU variables
+        val velocity: FloatArray = imuEstimator.velocity
+        val imuPosition: FloatArray = imuEstimator.position
+        // Convert the velocity to kmh
+        val xVelocity = velocity[0] * 3.6f
+        val yVelocity = velocity[1] * 3.6f
+        val zVelocity = velocity[2] * 3.6f
 
+        // Get the magnitude of the velocity vector
+        val speed =
+            kotlin.math.sqrt((xVelocity * xVelocity + yVelocity * yVelocity + zVelocity * zVelocity).toDouble())
+                .toFloat()
+        showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2], speed))
 
         // We need wait until we have some size from onPreviewSizeChosen
         if (previewWidth == 0 || previewHeight == 0) {

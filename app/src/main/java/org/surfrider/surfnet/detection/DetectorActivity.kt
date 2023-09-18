@@ -42,12 +42,13 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import org.opencv.android.OpenCVLoader
+import org.opencv.core.CvType
+import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.customview.OverlayView.DrawCallback
 import org.surfrider.surfnet.detection.env.BorderedText
 import org.surfrider.surfnet.detection.env.ImageUtils.getTransformationMatrix
 import org.surfrider.surfnet.detection.env.ImageUtils.saveBitmap
-import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.IMU_estimator
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import org.surfrider.surfnet.detection.tflite.YoloDetector
 import org.surfrider.surfnet.detection.tracking.MultiBoxTracker
@@ -83,22 +84,17 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     private val numThreads = 1
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val locationHandler = Handler()
-    private lateinit var imuEstimator : IMU_estimator;
-
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
         if(OpenCVLoader.initDebug())
             Timber.i("Successful opencv loading")
+
+        super.onCreate(savedInstanceState)
 
         hideSystemUI()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         updateLocation()
-
-        // init IMU_estimator
-        imuEstimator = IMU_estimator(this.applicationContext)
 
     }
     private fun hideSystemUI() {
@@ -248,19 +244,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
 
     override fun processImage() {
 
-        // get IMU variables
-        val velocity: FloatArray = imuEstimator.velocity
-        val imuPosition: FloatArray = imuEstimator.position
-        // Convert the velocity to kmh
-        val xVelocity = velocity[0] * 3.6f
-        val yVelocity = velocity[1] * 3.6f
-        val zVelocity = velocity[2] * 3.6f
 
-        // Get the magnitude of the velocity vector
-        val speed =
-            kotlin.math.sqrt((xVelocity * xVelocity + yVelocity * yVelocity + zVelocity * zVelocity).toDouble())
-                .toFloat()
-        showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2], speed))
 
 
         ++timestamp

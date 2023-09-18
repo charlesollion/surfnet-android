@@ -108,7 +108,7 @@ public class MainActivity2 extends AppCompatActivity implements CameraBridgeView
 
     private void init_vars(){
         // first initialize with KLT optical flow
-        optical_flow = new KLT(vel_pred_text);
+        optical_flow = new KLT();
         output = new OF_output();
 
         // init fusion algorithm

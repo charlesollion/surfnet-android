@@ -38,8 +38,7 @@ public class KLT implements OpticalFlow {
     private OF_output of_output;
 
 
-    public KLT(TextView vel_label_init){
-        vel_label = vel_label_init;
+    public KLT(){
         prevFrame = new Mat();
         currFrame = new Mat();
         prevGray = new Mat();
