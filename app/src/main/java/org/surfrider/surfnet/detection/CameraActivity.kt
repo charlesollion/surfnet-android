@@ -17,6 +17,7 @@ package org.surfrider.surfnet.detection
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -24,11 +25,7 @@ import android.location.LocationManager
 import android.media.Image.Plane
 import android.media.ImageReader
 import android.media.ImageReader.OnImageAvailableListener
-import android.os.Build
-import android.os.Bundle
-import android.os.Handler
-import android.os.HandlerThread
-import android.os.Trace
+import android.os.*
 import android.util.Size
 import android.view.Surface
 import android.view.View
@@ -39,18 +36,19 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback
+import org.opencv.android.Utils
 import org.opencv.core.CvType.*
 import org.opencv.core.Mat
-import org.opencv.imgproc.Imgproc
-
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.Basic_fusion
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.IMU_estimator
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.KLT
 import timber.log.Timber
-import java.nio.ByteBuffer
 import java.text.DecimalFormat
+import java.util.*
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 
 abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
@@ -69,7 +67,9 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
     @JvmField
     protected var handler: Handler? = null
+    protected var flowHandler: Handler? = null
     private var handlerThread: HandlerThread? = null
+    private var flowHandlerThread: HandlerThread? = null
     private var isProcessingFrame = false
     private val yuvBytes = arrayOfNulls<ByteArray>(3)
     private var rgbBytes: IntArray? = null
@@ -103,6 +103,10 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
         setupPermissions()
         setupBottomSheetLayout()
+
+        // run in background the optical flow loop
+        val executorService = Executors.newSingleThreadScheduledExecutor()
+        executorService.scheduleAtFixedRate({ scheduledOpticalFlow() }, 0, 1, TimeUnit.SECONDS)
     }
 
     private fun setupBottomSheetLayout() {
@@ -225,23 +229,12 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
                     uvPixelStride,
                     rgbBytes!!
                 )
-
-
             }
             postInferenceCallback = Runnable {
                 image.close()
                 isProcessingFrame = false
             }
-            opticalFlowRunner = Runnable {
-                val bytes = ByteArray(rgbBytes!!.size)
-                for(i in rgbBytes!!.indices) {
-                    bytes[i] = avgBytes(rgbBytes!![i]).toByte()
-                }
 
-                val currFrame = Mat(previewWidth, previewHeight, CV_8UC1, ByteBuffer.wrap(bytes))
-                val output = opticalFlow.run(currFrame);
-                Timber.i(output.position.toString())
-            }
             if(detectorPaused) {
                 readyForNextImage()
             } else {
@@ -371,6 +364,25 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
             }
             buffer[yuvBytes[i]]
         }
+    }
+
+    private fun scheduledOpticalFlow() {
+        Timber.d("### background run flow")
+        if(rgbBytes == null) {
+            return
+        }
+        Timber.i("bitmap size: $previewWidth $previewHeight")
+        val rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
+        rgbFrameBitmap.setPixels(
+            getRgbBytes(), 0, previewWidth, 0, 0, previewWidth, previewHeight
+        )
+        val bmp32: Bitmap = rgbFrameBitmap.copy(Bitmap.Config.ARGB_8888, true)
+        val currFrame = Mat()
+        Utils.bitmapToMat(bmp32, currFrame)
+
+        val output = opticalFlow.run(currFrame)
+        Timber.i("### flow output: " + output.position.toString())
+
     }
 
     protected fun readyForNextImage() {

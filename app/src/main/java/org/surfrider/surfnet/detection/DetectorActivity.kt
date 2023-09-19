@@ -243,10 +243,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
 
 
     override fun processImage() {
-
-
-
-
         ++timestamp
         val currTimestamp = timestamp
         trackingOverlay?.postInvalidate()
