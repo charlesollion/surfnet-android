@@ -25,9 +25,8 @@
             xmlns:tools="http://schemas.android.com/tools"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@android:color/black"
+            android:background="#000000"
             android:orientation="vertical">
-
 
             <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
                 xmlns:tools="http://schemas.android.com/tools"
@@ -35,7 +34,37 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 tools:context="org.tensorflow.demo.CameraActivity" />
+<TableLayout
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_alignParentEnd="true"
+    >
+            <TableRow
+                android:id="@+id/row1"
+                android:layout_width="wrap_content"
+                android:background="@drawable/rounded_corner_timer"
+                android:gravity="center"
+                android:padding="10dp"
+                android:layout_margin="10dp"
+                android:layout_height="wrap_content">
 
+                <RelativeLayout
+                    android:layout_width="15dp"
+                    android:layout_height="15dp"
+                    android:layout_marginRight="10dp"
+                    android:background="@drawable/chrono_red_dot">
+                </RelativeLayout>
+
+                <Chronometer
+                    android:id="@+id/chronometer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentEnd="true"
+                    android:textColor="@android:color/black"
+                    android:textSize="17sp"
+                    android:textStyle="bold"/>
+            </TableRow>
+</TableLayout>
         </RelativeLayout>
 
         <include
