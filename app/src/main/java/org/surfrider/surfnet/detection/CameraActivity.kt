@@ -82,7 +82,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         chronometer = findViewById(R.id.chronometer)
         setupPermissions()
         setupBottomSheetLayout()
-        //chronometer.start()
     }
     private fun setupBottomSheetLayout() {
         val bottomSheetLayout = binding.bottomSheetLayout
