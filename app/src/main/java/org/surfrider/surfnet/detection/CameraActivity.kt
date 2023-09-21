@@ -81,7 +81,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private var imageConverter: Runnable? = null
     private lateinit var df : DecimalFormat;
     private lateinit var imuEstimator : IMU_estimator
-    private lateinit var opticalFlow : KLT //DenseOpticalFlow
+    private lateinit var opticalFlow : DenseOpticalFlow
     private lateinit var fusion : Basic_fusion
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
@@ -100,8 +100,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         df = DecimalFormat("#.##")
         // init IMU_estimator, optical flow and fusion
         imuEstimator = IMU_estimator(this.applicationContext)
-        opticalFlow = KLT()
-        //opticalFlow = DenseOpticalFlow()
+        //opticalFlow = KLT()
+        opticalFlow = DenseOpticalFlow()
         fusion = Basic_fusion()
 
         setupPermissions()
@@ -384,8 +384,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         Utils.bitmapToMat(bmp32, currFrame)
 
         val output = opticalFlow.run(currFrame)
-        // Timber.i("### flow output: " + output.x.toString())
-        Timber.i("### flow output: " + output.position.toString())
+        Timber.i("### flow output: " + df.format(output.x) + " / " + df.format((output.y)))
+        //Timber.i("### flow output: " + output.position.toString())
 
     }
 

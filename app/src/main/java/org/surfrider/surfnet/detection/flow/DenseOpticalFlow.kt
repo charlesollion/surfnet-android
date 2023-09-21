@@ -7,10 +7,10 @@ import timber.log.Timber
 
 
 class DenseOpticalFlow {
-    private lateinit var currGreyImage : Mat
-    private lateinit var prevGreyImage : Mat
-    private lateinit var prevPts: MatOfPoint2f
-    private lateinit var currPts: MatOfPoint2f
+    private var currGreyImage = Mat()
+    private var prevGreyImage = Mat()
+    private var prevPts = MatOfPoint2f()
+    private var currPts = MatOfPoint2f()
     private val maxCorners = 50
     private var flowPtsCount = 50
     private var status = MatOfByte()
@@ -26,7 +26,6 @@ class DenseOpticalFlow {
         Timber.i("Optical Flow - Start")
         // convert the frame to Gray
         Imgproc.cvtColor(newFrame, currGreyImage, Imgproc.COLOR_RGBA2GRAY)
-
         // if this is the first loop, find good features
         if (prevGreyImage.empty()) {
             currGreyImage.copyTo(prevGreyImage)
@@ -38,12 +37,13 @@ class DenseOpticalFlow {
             currGreyImage.copyTo(prevGreyImage)
             updatePoints(currGreyImage)
         }
-        Timber.i("Optical Flow - Running algorithm")
         // Run the KLT algorithm for Optical Flow
         Video.calcOpticalFlowPyrLK(prevGreyImage, currGreyImage, prevPts, currPts, status, err)
-        Timber.i("Optical Flow - Done algorithm")
+
         // returns the average motion vector
-        return avgMotionVector()
+        val avgMV = avgMotionVector()
+        Timber.i("Optical Flow - Done algorithm, tracked points: "+flowPtsCount)
+        return avgMV
     }
 
     private fun avgMotionVector() : Point {
@@ -61,7 +61,7 @@ class DenseOpticalFlow {
                 pt1Avg.x += pt1x
                 pt1Avg.y += pt1y
                 pt2Avg.x += pt2x
-                pt2Avg.y += pt2x
+                pt2Avg.y += pt2y
                 flowPtsCount++
             }
         }
