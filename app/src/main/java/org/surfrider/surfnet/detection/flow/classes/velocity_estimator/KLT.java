@@ -103,6 +103,7 @@ public class KLT implements OpticalFlow {
         try{
             semaphore.acquire();
             limit = max_corners / 5;
+            Log.d("RUN-OF", "updating features");
             if (flow_pts < limit || this.update_features){
                 this.update_points(prevGray, currGray, prevPts);
                 this.update_features = false;
@@ -133,7 +134,7 @@ public class KLT implements OpticalFlow {
                 x_avg2 += pt2.x;
                 y_avg1 += pt1.y;
                 y_avg2 += pt2.y;
-                Imgproc.line(currFrame, pt1, pt2, color, 10);
+                //Imgproc.line(currFrame, pt1, pt2, color, 10);
                 flow_pts++;
             }
         }
@@ -146,8 +147,10 @@ public class KLT implements OpticalFlow {
 
         currMv = new Point((x_avg1 - x_avg2)/10, (y_avg1 - y_avg2)/10);
 
-        currMv.x += prevMv.x;
-        currMv.y += prevMv.y;
+        if(prevMv!= null) {
+            currMv.x += prevMv.x;
+            currMv.y += prevMv.y;
+        }
 
         prevMv = currMv;
 
