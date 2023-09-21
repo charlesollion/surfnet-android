@@ -1,6 +1,6 @@
 package org.surfrider.surfnet.detection.flow.interfaces.velocity_estimator;
 
-import org.surfrider.surfnet.detection.flow.dataTypes.velocity_estimator.OF_output;
+import org.surfrider.surfnet.detection.flow.dataTypes.OF_output;
 
 import org.opencv.core.Mat;
 

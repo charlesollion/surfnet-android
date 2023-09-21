@@ -41,9 +41,11 @@ import org.opencv.core.CvType.*
 import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
+import org.surfrider.surfnet.detection.flow.DenseOpticalFlow
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.Basic_fusion
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.IMU_estimator
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.KLT
+import org.surfrider.surfnet.detection.flow.dataTypes.OF_output
 import timber.log.Timber
 import java.text.DecimalFormat
 import java.util.*
@@ -79,7 +81,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private var imageConverter: Runnable? = null
     private lateinit var df : DecimalFormat;
     private lateinit var imuEstimator : IMU_estimator
-    private lateinit var opticalFlow : KLT
+    private lateinit var opticalFlow : KLT //DenseOpticalFlow
     private lateinit var fusion : Basic_fusion
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
@@ -99,6 +101,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         // init IMU_estimator, optical flow and fusion
         imuEstimator = IMU_estimator(this.applicationContext)
         opticalFlow = KLT()
+        //opticalFlow = DenseOpticalFlow()
         fusion = Basic_fusion()
 
         setupPermissions()
@@ -381,6 +384,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         Utils.bitmapToMat(bmp32, currFrame)
 
         val output = opticalFlow.run(currFrame)
+        // Timber.i("### flow output: " + output.x.toString())
         Timber.i("### flow output: " + output.position.toString())
 
     }

@@ -3,7 +3,7 @@ package org.surfrider.surfnet.detection.flow.classes.velocity_estimator;
 import android.util.Log;
 import android.widget.TextView;
 
-import org.surfrider.surfnet.detection.flow.dataTypes.velocity_estimator.OF_output;
+import org.surfrider.surfnet.detection.flow.dataTypes.OF_output;
 import org.surfrider.surfnet.detection.flow.interfaces.velocity_estimator.OpticalFlow;
 
 import org.opencv.core.Mat;
@@ -145,14 +145,10 @@ public class KLT implements OpticalFlow {
         y_avg2 /= flow_pts;
 
         currMv = new Point((x_avg1 - x_avg2)/10, (y_avg1 - y_avg2)/10);
-        if (prevMv == null){
-            currMv.x += 200;
-            currMv.y += 200;
-        }
-        else{
-            currMv.x += prevMv.x;
-            currMv.y += prevMv.y;
-        }
+
+        currMv.x += prevMv.x;
+        currMv.y += prevMv.y;
+
         prevMv = currMv;
 
         Log.d("RUN-OF", "Processed");

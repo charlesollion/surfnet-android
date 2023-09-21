@@ -15,11 +15,10 @@ import android.content.pm.PackageManager;
 import android.Manifest;
 
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.Basic_fusion;
-import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.FraneBack;
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.IMU_estimator;
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.KLT;
 import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.MotionVectorViz;
-import org.surfrider.surfnet.detection.flow.dataTypes.velocity_estimator.OF_output;
+import org.surfrider.surfnet.detection.flow.dataTypes.OF_output;
 import org.surfrider.surfnet.detection.flow.interfaces.velocity_estimator.OpticalFlow;
 import org.surfrider.surfnet.detection.flow.interfaces.velocity_estimator.Sensor_fusion;
 
