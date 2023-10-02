@@ -34,8 +34,15 @@ import android.view.WindowManager
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModel
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback
+import kotlinx.coroutines.Dispatchers
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.opencv.android.Utils
 import org.opencv.core.CvType.*
 import org.opencv.core.Mat
@@ -69,19 +76,17 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
     @JvmField
     protected var handler: Handler? = null
-    protected var flowHandler: Handler? = null
     private var handlerThread: HandlerThread? = null
-    private var flowHandlerThread: HandlerThread? = null
     private var isProcessingFrame = false
     private val yuvBytes = arrayOfNulls<ByteArray>(3)
     private var rgbBytes: IntArray? = null
     private var luminanceStride = 0
     private var postInferenceCallback: Runnable? = null
-    private var opticalFlowRunner: Runnable? = null
     private var imageConverter: Runnable? = null
     private lateinit var df : DecimalFormat;
     private lateinit var imuEstimator : IMU_estimator
     private lateinit var opticalFlow : DenseOpticalFlow
+    // private lateinit var opticalFlow : KLT
     private lateinit var fusion : Basic_fusion
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
@@ -100,7 +105,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         df = DecimalFormat("#.##")
         // init IMU_estimator, optical flow and fusion
         imuEstimator = IMU_estimator(this.applicationContext)
-        //opticalFlow = KLT()
+        // opticalFlow = KLT()
         opticalFlow = DenseOpticalFlow()
         fusion = Basic_fusion()
 
@@ -108,8 +113,17 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         setupBottomSheetLayout()
 
         // run in background the optical flow loop
-        val executorService = Executors.newSingleThreadScheduledExecutor()
-        executorService.scheduleAtFixedRate({ scheduledOpticalFlow() }, 0, 1, TimeUnit.SECONDS)
+        // val executorService = Executors.newSingleThreadScheduledExecutor()
+        // executorService.scheduleAtFixedRate({ scheduledOpticalFlow() }, 0, 1000, TimeUnit.MILLISECONDS)
+
+        lifecycleScope.launch(Dispatchers.Default) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while(true) {
+                    scheduledOpticalFlow()
+                    delay(1000)
+                }
+            }
+        }
     }
 
     private fun setupBottomSheetLayout() {
@@ -369,8 +383,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         }
     }
 
-    private fun scheduledOpticalFlow() {
-        Timber.d("### background run flow")
+    private suspend fun scheduledOpticalFlow() {
+        Timber.d("############# background run flow")
         if(rgbBytes == null) {
             return
         }
