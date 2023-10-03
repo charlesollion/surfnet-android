@@ -1,4 +1,4 @@
-package org.surfrider.surfnet.detection.flow.classes.velocity_estimator;
+package org.surfrider.surfnet.detection.flow;
 
 import android.content.Context;
 import android.hardware.Sensor;

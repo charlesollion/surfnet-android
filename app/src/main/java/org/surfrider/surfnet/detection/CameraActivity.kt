@@ -35,7 +35,6 @@ import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.ViewModel
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetBehavior.BottomSheetCallback
 import kotlinx.coroutines.Dispatchers
@@ -49,15 +48,10 @@ import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
 import org.surfrider.surfnet.detection.flow.DenseOpticalFlow
-import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.Basic_fusion
-import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.IMU_estimator
-import org.surfrider.surfnet.detection.flow.classes.velocity_estimator.KLT
-import org.surfrider.surfnet.detection.flow.dataTypes.OF_output
+import org.surfrider.surfnet.detection.flow.IMU_estimator
 import timber.log.Timber
 import java.text.DecimalFormat
 import java.util.*
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 
 abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
@@ -86,8 +80,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private lateinit var df : DecimalFormat;
     private lateinit var imuEstimator : IMU_estimator
     private lateinit var opticalFlow : DenseOpticalFlow
-    // private lateinit var opticalFlow : KLT
-    private lateinit var fusion : Basic_fusion
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
 
@@ -103,18 +95,12 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         df = DecimalFormat("#.##")
-        // init IMU_estimator, optical flow and fusion
+        // init IMU_estimator, optical flow
         imuEstimator = IMU_estimator(this.applicationContext)
-        // opticalFlow = KLT()
         opticalFlow = DenseOpticalFlow()
-        fusion = Basic_fusion()
 
         setupPermissions()
         setupBottomSheetLayout()
-
-        // run in background the optical flow loop
-        // val executorService = Executors.newSingleThreadScheduledExecutor()
-        // executorService.scheduleAtFixedRate({ scheduledOpticalFlow() }, 0, 1000, TimeUnit.MILLISECONDS)
 
         lifecycleScope.launch(Dispatchers.Default) {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -198,19 +184,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     /** Callback for Camera2 API  */
     override fun onImageAvailable(reader: ImageReader) {
 
-        // get IMU variables
-        val velocity: FloatArray = imuEstimator.velocity
-        val imuPosition: FloatArray = imuEstimator.position
-        // Convert the velocity to kmh
-        val xVelocity = velocity[0] * 3.6f
-        val yVelocity = velocity[1] * 3.6f
-        val zVelocity = velocity[2] * 3.6f
 
-        // Get the magnitude of the velocity vector
-        val speed =
-            kotlin.math.sqrt((xVelocity * xVelocity + yVelocity * yVelocity + zVelocity * zVelocity).toDouble())
-                .toFloat()
-        showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2], speed))
 
         // We need wait until we have some size from onPreviewSizeChosen
         if (previewWidth == 0 || previewHeight == 0) {
@@ -384,11 +358,24 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     }
 
     private suspend fun scheduledOpticalFlow() {
-        Timber.d("############# background run flow")
+        Timber.d("##### background run flow and IMU")
+        // get IMU variables
+        val velocity: FloatArray = imuEstimator.velocity
+        val imuPosition: FloatArray = imuEstimator.position
+        // Convert the velocity to kmh
+        val xVelocity = velocity[0] * 3.6f
+        val yVelocity = velocity[1] * 3.6f
+        val zVelocity = velocity[2] * 3.6f
+
+        // Get the magnitude of the velocity vector
+        val speed =
+            kotlin.math.sqrt((xVelocity * xVelocity + yVelocity * yVelocity + zVelocity * zVelocity).toDouble())
+                .toFloat()
+
+
         if(rgbBytes == null) {
             return
         }
-        Timber.i("bitmap size: $previewWidth $previewHeight")
         val rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
         rgbFrameBitmap.setPixels(
             getRgbBytes(), 0, previewWidth, 0, 0, previewWidth, previewHeight
@@ -397,10 +384,9 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         val currFrame = Mat()
         Utils.bitmapToMat(bmp32, currFrame)
 
-        val output = opticalFlow.run(currFrame)
-        Timber.i("### flow output: " + df.format(output.x) + " / " + df.format((output.y)))
-        //Timber.i("### flow output: " + output.position.toString())
-
+        val outputFlow = opticalFlow.run(currFrame)
+        // Timber.i("### flow output: " + df.format(outputFlow.x) + " / " + df.format((outputFlow.y)))
+        showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2], speed, outputFlow.x.toFloat(), outputFlow.y.toFloat()))
     }
 
     protected fun readyForNextImage() {
@@ -433,12 +419,14 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     }
 
     protected fun showIMUStats(stats: Array<Float>?) {
-        if (stats != null && stats.size == 4) {
+        if (stats != null && stats.size == 6) {
             binding.bottomSheetLayout.positionInfo.text = df.format(stats[0]) + " " +  df.format(stats[1]) + " " +  df.format(stats[2])
             binding.bottomSheetLayout.speedInfo.text = df.format(stats[3])
+            binding.bottomSheetLayout.flowInfo.text = df.format(stats[4]) + " " + df.format(stats[5])
         } else {
             binding.bottomSheetLayout.positionInfo.text = "null"
             binding.bottomSheetLayout.speedInfo.text = "null"
+            binding.bottomSheetLayout.flowInfo.text = "null"
         }
     }
 
