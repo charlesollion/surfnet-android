@@ -85,7 +85,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val locationHandler = Handler()
 
-
     override fun onCreate(savedInstanceState: Bundle?) {
         if(OpenCVLoader.initDebug())
             Timber.i("Successful opencv loading")
@@ -216,9 +215,35 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                 if (isDebug) {
                     tracker?.drawDebug(canvas)
                 }
+                drawOFLines(canvas)
             }
         })
         tracker?.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
+
+        // Display a simple line
+    }
+
+    private fun drawOFLines(canvas: Canvas?) {
+        val paint = Paint()
+        paint.color = Color.RED
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 4.0f
+        val factor = 40
+        val gridSize = 2.0F * factor
+        Timber.i("canvas size: ${canvas?.width} ${canvas?.height}")
+        Timber.i("preview size: $previewWidth $previewHeight")
+        Timber.i("output flow size: ${outputFlow.cols()} ${outputFlow.rows()}")
+
+        for (i: Int in 0 until outputFlow.rows() / factor - 1) {
+            for (j: Int in 0 until outputFlow.cols() / factor - 1) {
+                val y : Float = gridSize * i
+                val x : Float = gridSize * j
+                val dy : Float = outputFlow[i * factor, j * factor][0].toFloat() * 2.0F
+                val dx : Float = outputFlow[i * factor, j * factor][1].toFloat() * 2.0F
+                //Timber.i(" flow - i, j, dx, dy, $i, $j, $dx, $dy")
+                canvas?.drawLine(x, y, x + dx, y + dy, paint)
+            }
+        }
     }
 
     public override fun onPreviewSizeChosen(size: Size?, rotation: Int?) {

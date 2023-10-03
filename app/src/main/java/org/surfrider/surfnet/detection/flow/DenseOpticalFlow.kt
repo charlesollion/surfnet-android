@@ -2,9 +2,7 @@ package org.surfrider.surfnet.detection.flow
 
 import org.opencv.core.*
 import org.opencv.imgproc.Imgproc
-import org.opencv.video.FarnebackOpticalFlow
 import org.opencv.video.Video
-import timber.log.Timber
 
 
 class DenseOpticalFlow {
@@ -23,7 +21,7 @@ class DenseOpticalFlow {
         prevPts.fromArray(*corners.toArray())
     }
 
-    fun run(newFrame: Mat): Point {
+    fun run(newFrame: Mat): Mat {
         // return  PyrLK(newFrame)
         return Farneback(newFrame)
     }
@@ -47,28 +45,30 @@ class DenseOpticalFlow {
 
         // update last image
         currGreyImage.copyTo(prevGreyImage)
+        prevPts.fromArray(*currPts.toArray())
 
         // returns the average motion vector
         val avgMV = avgMotionVector()
         return avgMV
     }
 
-    fun Farneback(newFrame: Mat) : Point {
+    fun Farneback(newFrame: Mat) : Mat {
         // Downsample and convert to Gray
         val downscaledFrame = Mat()
         Imgproc.resize(newFrame, downscaledFrame, Size(), 0.5, 0.5)
         Imgproc.cvtColor(downscaledFrame, currGreyImage, Imgproc.COLOR_RGBA2GRAY)
 
+        val flow = Mat(currGreyImage.size(), CvType.CV_32FC2)
         if (prevGreyImage.empty()) {
             currGreyImage.copyTo(prevGreyImage)
-            return Point(0.0, 0.0)
+            return flow
+            //return Point(0.0, 0.0)
         }
-
-        val flow = Mat(currGreyImage.size(), CvType.CV_32FC2)
         Video.calcOpticalFlowFarneback(prevGreyImage, currGreyImage, flow, 0.5, 3, 15, 3, 5, 1.2, 0)
 
-        val avgMV : Scalar = Core.mean(flow)
-        return Point(avgMV.`val`[0], avgMV.`val`[1])
+        //val avgMV : Scalar = Core.mean(flow)
+        //Point(avgMV.`val`[0], avgMV.`val`[1])
+        return flow
     }
 
     private fun avgMotionVector() : Point {

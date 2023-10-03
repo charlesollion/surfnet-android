@@ -18,6 +18,9 @@ package org.surfrider.surfnet.detection
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -80,6 +83,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private lateinit var df : DecimalFormat;
     private lateinit var imuEstimator : IMU_estimator
     private lateinit var opticalFlow : DenseOpticalFlow
+    public lateinit var outputFlow : Mat
+
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
 
@@ -98,6 +103,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         // init IMU_estimator, optical flow
         imuEstimator = IMU_estimator(this.applicationContext)
         opticalFlow = DenseOpticalFlow()
+        outputFlow = Mat()
 
         setupPermissions()
         setupBottomSheetLayout()
@@ -239,12 +245,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         Trace.endSection()
 
     }
-    private fun avgBytes(i: Int) : Int {
-        val r = i shr 16 and 0xff
-        val g = i shr 8 and 0xff
-        val b = i and 0xff
-        return (r + g + b) / 3
-    }
+
+
     @Synchronized
     public override fun onStart() {
         Timber.d("onStart $this")
@@ -384,9 +386,10 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         val currFrame = Mat()
         Utils.bitmapToMat(bmp32, currFrame)
 
-        val outputFlow = opticalFlow.run(currFrame)
+        outputFlow = opticalFlow.run(currFrame)
         // Timber.i("### flow output: " + df.format(outputFlow.x) + " / " + df.format((outputFlow.y)))
-        showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2], speed, outputFlow.x.toFloat(), outputFlow.y.toFloat()))
+        // outputFlow.x.toFloat(), outputFlow.y.toFloat()
+        showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2], speed, 0.0F, 0.0F))
     }
 
     protected fun readyForNextImage() {
