@@ -120,7 +120,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 while(true) {
                     scheduledOpticalFlow()
-                    delay(1000)
+                    delay(250)
                 }
             }
         }

@@ -2,6 +2,7 @@ package org.surfrider.surfnet.detection.flow
 
 import org.opencv.core.*
 import org.opencv.imgproc.Imgproc
+import org.opencv.video.FarnebackOpticalFlow
 import org.opencv.video.Video
 import timber.log.Timber
 
@@ -23,7 +24,11 @@ class DenseOpticalFlow {
     }
 
     fun run(newFrame: Mat): Point {
-        Timber.i("Optical Flow - Start")
+        // return  PyrLK(newFrame)
+        return Farneback(newFrame)
+    }
+
+    fun PyrLK(newFrame: Mat) : Point {
         // convert the frame to Gray
         Imgproc.cvtColor(newFrame, currGreyImage, Imgproc.COLOR_RGBA2GRAY)
         // if this is the first loop, find good features
@@ -40,10 +45,30 @@ class DenseOpticalFlow {
         // Run the KLT algorithm for Optical Flow
         Video.calcOpticalFlowPyrLK(prevGreyImage, currGreyImage, prevPts, currPts, status, err)
 
+        // update last image
+        currGreyImage.copyTo(prevGreyImage)
+
         // returns the average motion vector
         val avgMV = avgMotionVector()
-        Timber.i("Optical Flow - Done algorithm, tracked points: "+flowPtsCount)
         return avgMV
+    }
+
+    fun Farneback(newFrame: Mat) : Point {
+        // Downsample and convert to Gray
+        val downscaledFrame = Mat()
+        Imgproc.resize(newFrame, downscaledFrame, Size(), 0.5, 0.5)
+        Imgproc.cvtColor(downscaledFrame, currGreyImage, Imgproc.COLOR_RGBA2GRAY)
+
+        if (prevGreyImage.empty()) {
+            currGreyImage.copyTo(prevGreyImage)
+            return Point(0.0, 0.0)
+        }
+
+        val flow = Mat(currGreyImage.size(), CvType.CV_32FC2)
+        Video.calcOpticalFlowFarneback(prevGreyImage, currGreyImage, flow, 0.5, 3, 15, 3, 5, 1.2, 0)
+
+        val avgMV : Scalar = Core.mean(flow)
+        return Point(avgMV.`val`[0], avgMV.`val`[1])
     }
 
     private fun avgMotionVector() : Point {
