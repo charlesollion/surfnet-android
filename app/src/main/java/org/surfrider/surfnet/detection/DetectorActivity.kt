@@ -174,6 +174,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     }
 
     public override fun startDetector() {
+        val context = this
         try {
             //create detector only one time
             if (detector == null) {
@@ -193,7 +194,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             toast.show()
             finish()
         }
-        tracker = MultiBoxTracker(this)
+        tracker = MultiBoxTracker(context)
         val cropSize = detector?.inputSize
         cropSize?.let {
             Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
@@ -208,7 +209,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
         trackingOverlay?.addCallback(object : DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
-                tracker?.draw(canvas)
+                tracker?.draw(canvas, context)
                 if (isDebug) {
                     tracker?.drawDebug(canvas)
                 }
