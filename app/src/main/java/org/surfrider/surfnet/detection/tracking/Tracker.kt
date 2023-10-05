@@ -4,7 +4,10 @@ import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.RectF
 import org.surfrider.surfnet.detection.tflite.Detector
+import timber.log.Timber
+import java.time.format.DateTimeFormatter
 import java.util.*
+import kotlin.math.abs
 
 public class Tracker(det: TrackedDetection, idx: Int) {
     private val MAX_TIMESTAMP = 1000
@@ -43,18 +46,21 @@ public class Tracker(det: TrackedDetection, idx: Int) {
 
     fun update() {
         alreadyAssociated = false
-        // TODO create function timeDiff
-        val age = timeDiff(trackedObjects.last.timestamp)
+        val age = compareTimeDifferenceInMilliseconds(System.currentTimeMillis(), trackedObjects.last.timestamp)
+        Timber.i("AGE +> ${age.toString()} | MAX TIMESTAMP +> $MAX_TIMESTAMP")
         if(age > MAX_TIMESTAMP) {
             status = TrackerStatus.INACTIVE
         }
     }
 
+    fun compareTimeDifferenceInMilliseconds(timestamp1: Long, timestamp2: Long): Long {
+        return abs(timestamp1 - timestamp2)
+    }
+
     class TrackedDetection(det: Detector.Recognition) {
         var location: RectF = RectF(det.location)
         var detectionConfidence = det.confidence
-        var timestamp: Int = 0
-        // TODO add real timestamp from current date
+        var timestamp: Long = System.currentTimeMillis()
         var classId: String = det.id
         var associatedId = -1
 

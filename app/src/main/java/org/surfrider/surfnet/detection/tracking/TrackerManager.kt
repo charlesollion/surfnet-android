@@ -23,11 +23,11 @@ class TrackerManager {
     private var sensorOrientation = 0
 
     fun updateTrackers() {
-        // TODO: update each tracker
+        trackers.forEach { tracker -> tracker.update() }
     }
 
     fun processDetections(results: List<Recognition>) {
-
+        updateTrackers()
         // Store all Recognition objects in a list of TrackedDetections
         val dets = LinkedList<Tracker.TrackedDetection>()
         for (result in results) {
@@ -41,18 +41,16 @@ class TrackerManager {
             Timber.i("Trackers Size = ${trackers.size}")
             // Greedy assignment of trackers
             trackers.forEachIndexed { i, tracker ->
-                //TODO check if tracker is inactive
-                //TODO check alreadyAssociated
-                Timber.i("Tracker Associatied ? = ${tracker.associated}")
-                val dist = tracker.distTo(position)
-                Timber.i("Distance = ${dist}")
-                if (dist < minDist) {
-                    minDist = dist
-                    det.associatedId = i
+                if(tracker.status != Tracker.TrackerStatus.INACTIVE && !tracker.alreadyAssociated) {
+                    val dist = tracker.distTo(position)
+                    Timber.i("Distance = ${dist}")
+                    if (dist < minDist) {
+                        minDist = dist
+                        det.associatedId = i
+                    }
                 }
 
             }
-            //TODO We need to update trackers to check if they're inactive
             if (det.associatedId != -1) {
                 trackers[det.associatedId].addDetection(det)
             } else {
@@ -89,20 +87,25 @@ class TrackerManager {
         )
         for (tracker in trackers) {
             val trackedPos = tracker.position
-            val bmp = context?.let {
-                getBitmap(
-                    it,
-                    if (tracker.status == Tracker.TrackerStatus.GREEN) R.drawable.green_dot else R.drawable.red_dot
-                )
-            }
-            if (bmp != null) {
-                canvas.drawBitmap(bmp, trackedPos.x, trackedPos.y, null)
-            }
-            canvas.drawText()
+            //Only draw tracker if not inactive
+            if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
+                val bmp = context?.let {
+                    getBitmap(
+                        it,
+                        if (tracker.status == Tracker.TrackerStatus.GREEN) R.drawable.green_dot else R.drawable.red_dot
+                    )
+                }
+                if (bmp != null) {
+                    canvas.drawBitmap(bmp, trackedPos.x, trackedPos.y, null)
+                }
 
-            // affichage du text avec le numéro du tracker
+                //affichage du text avec le numéro du tracker
+                val paint = Paint()
+                paint.textSize = 40.0F
+                canvas.drawText(tracker.index.toString(), trackedPos.x, trackedPos.y,paint )
 
-            /*
+
+                /*
             Old boxes +>
 
             boxPaint.setColor(recognition.color);
@@ -117,6 +120,7 @@ class TrackerManager {
             borderedText.drawText(
                    canvas, trackedPos.left + cornerSize, trackedPos.top, labelString + "%", boxPaint);
             */
+            }
         }
     }
 

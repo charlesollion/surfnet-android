@@ -215,7 +215,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                 }
                 if (isDebug) {
                     if (canvas != null) {
-                        //TODO add drawDebug
+                        //TODO create drawDebug
                         trackerManager?.draw(canvas, context)
                     }
                 }
@@ -301,7 +301,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                     }
                 }
             }
-            //TODO add currTimestamp ?
             trackerManager?.processDetections(mappedRecognitions)
             trackingOverlay?.postInvalidate()
             computingDetection = false
