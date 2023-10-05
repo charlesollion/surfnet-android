@@ -12,7 +12,7 @@ public class Tracker(det: TrackedDetection, idx: Int) {
     private val ASSOCIATION_THRESHOLD = 10.0F
 
     var index = idx
-    var status : String = "red"
+    var status : TrackerStatus = TrackerStatus.RED
     var associated = false
 
     private val firstDetection = det
@@ -37,7 +37,7 @@ public class Tracker(det: TrackedDetection, idx: Int) {
         associated = true
 
         if(trackedObjects.size > NUM_CONSECUTIVE_DET) {
-            status = "green"
+            status = TrackerStatus.GREEN
         }
     }
 
@@ -46,7 +46,7 @@ public class Tracker(det: TrackedDetection, idx: Int) {
             trackedObject.timestamp += elapsedTime
         }
         if(trackedObjects.last.timestamp > MAX_TIMESTAMP) {
-            status = "inactive"
+            status = TrackerStatus.INACTIVE
         }
     }
 
@@ -60,5 +60,9 @@ public class Tracker(det: TrackedDetection, idx: Int) {
         fun getCenter(): PointF {
             return PointF(location.centerX(), location.centerY())
         }
+    }
+
+    enum class TrackerStatus {
+        GREEN, RED, INACTIVE
     }
 }

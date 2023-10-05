@@ -49,6 +49,7 @@ import org.surfrider.surfnet.detection.env.ImageUtils.saveBitmap
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import org.surfrider.surfnet.detection.tflite.YoloDetector
 import org.surfrider.surfnet.detection.tracking.MultiBoxTracker
+import org.surfrider.surfnet.detection.tracking.TrackerManager
 import timber.log.Timber
 import java.io.IOException
 import java.util.LinkedList
@@ -70,7 +71,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     private var timestamp: Long = 0
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
-    private var tracker: MultiBoxTracker? = null
+    private var trackerManager: TrackerManager? = null
     private var borderedText: BorderedText? = null
     private lateinit var locationManager: LocationManager
     private val modelString = "yolov8n_float16.tflite"
@@ -169,7 +170,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         //reset trackers
         croppedBitmap = null
         cropToFrameTransform = null
-        tracker = null
+        trackerManager = null
         trackingOverlay = null
     }
 
@@ -194,7 +195,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             toast.show()
             finish()
         }
-        tracker = MultiBoxTracker(context)
+        trackerManager = TrackerManager()
         val cropSize = detector?.inputSize
         cropSize?.let {
             Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
@@ -209,13 +210,18 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
         trackingOverlay?.addCallback(object : DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
-                tracker?.draw(canvas, context)
+                if (canvas != null) {
+                    trackerManager?.draw(canvas, context)
+                }
                 if (isDebug) {
-                    tracker?.drawDebug(canvas)
+                    if (canvas != null) {
+                        //TODO add drawDebug
+                        trackerManager?.draw(canvas, context)
+                    }
                 }
             }
         })
-        tracker?.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
+        trackerManager?.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
     }
 
     public override fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
@@ -224,7 +230,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         )
         borderedText = BorderedText(textSizePx)
         borderedText?.setTypeface(Typeface.MONOSPACE)
-        tracker = MultiBoxTracker(this)
+        trackerManager = TrackerManager()
 
         size?.let {
             previewWidth = it.width
@@ -295,7 +301,8 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                     }
                 }
             }
-            tracker?.trackResults(mappedRecognitions, currTimestamp)
+            //TODO add currTimestamp ?
+            trackerManager?.processDetections(mappedRecognitions)
             trackingOverlay?.postInvalidate()
             computingDetection = false
             runOnUiThread {
