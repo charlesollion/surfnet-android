@@ -26,6 +26,7 @@ class TrackerManager {
         trackers.forEach { tracker -> tracker.update() }
     }
 
+    @Synchronized
     fun processDetections(results: List<Recognition>) {
         updateTrackers()
         // Store all Recognition objects in a list of TrackedDetections
