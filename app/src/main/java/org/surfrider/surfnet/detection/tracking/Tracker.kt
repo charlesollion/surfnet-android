@@ -13,7 +13,7 @@ public class Tracker(det: TrackedDetection, idx: Int) {
 
     var index = idx
     var status : TrackerStatus = TrackerStatus.RED
-    var associated = false
+    var alreadyAssociated = false
 
     private val firstDetection = det
     private val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
@@ -34,18 +34,18 @@ public class Tracker(det: TrackedDetection, idx: Int) {
     fun addDetection(newDet: TrackedDetection) {
         trackedObjects.addLast(newDet)
         position = newDet.getCenter()
-        associated = true
+        alreadyAssociated = true
 
         if(trackedObjects.size > NUM_CONSECUTIVE_DET) {
             status = TrackerStatus.GREEN
         }
     }
 
-    fun update(elapsedTime: Int) {
-        for(trackedObject in trackedObjects) {
-            trackedObject.timestamp += elapsedTime
-        }
-        if(trackedObjects.last.timestamp > MAX_TIMESTAMP) {
+    fun update() {
+        alreadyAssociated = false
+        // TODO create function timeDiff
+        val age = timeDiff(trackedObjects.last.timestamp)
+        if(age > MAX_TIMESTAMP) {
             status = TrackerStatus.INACTIVE
         }
     }
@@ -54,6 +54,7 @@ public class Tracker(det: TrackedDetection, idx: Int) {
         var location: RectF = RectF(det.location)
         var detectionConfidence = det.confidence
         var timestamp: Int = 0
+        // TODO add real timestamp from current date
         var classId: String = det.id
         var associatedId = -1
 

@@ -22,7 +22,12 @@ class TrackerManager {
     private var frameHeight = 0
     private var sensorOrientation = 0
 
+    fun updateTrackers() {
+        // TODO: update each tracker
+    }
+
     fun processDetections(results: List<Recognition>) {
+
         // Store all Recognition objects in a list of TrackedDetections
         val dets = LinkedList<Tracker.TrackedDetection>()
         for (result in results) {
@@ -36,11 +41,12 @@ class TrackerManager {
             Timber.i("Trackers Size = ${trackers.size}")
             // Greedy assignment of trackers
             trackers.forEachIndexed { i, tracker ->
+                //TODO check if tracker is inactive
+                //TODO check alreadyAssociated
                 Timber.i("Tracker Associatied ? = ${tracker.associated}")
                 val dist = tracker.distTo(position)
                 Timber.i("Distance = ${dist}")
                 if (dist < minDist) {
-                    //TODO Change how minDist works
                     minDist = dist
                     det.associatedId = i
                 }
@@ -92,6 +98,9 @@ class TrackerManager {
             if (bmp != null) {
                 canvas.drawBitmap(bmp, trackedPos.x, trackedPos.y, null)
             }
+            canvas.drawText()
+
+            // affichage du text avec le numéro du tracker
 
             /*
             Old boxes +>
