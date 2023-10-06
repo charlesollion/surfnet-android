@@ -17,10 +17,6 @@ import kotlin.math.min
 class TrackerManager {
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
     var trackerIndex = 0
-    private var frameToCanvasMatrix: Matrix? = null
-    private var frameWidth = 0
-    private var frameHeight = 0
-    private var sensorOrientation = 0
 
     fun updateTrackers() {
         trackers.forEach { tracker -> tracker.update() }
@@ -65,27 +61,7 @@ class TrackerManager {
     //TODO Refactor all old code under this todo
 
     @Synchronized
-    fun setFrameConfiguration(width: Int, height: Int, sensorOrientation: Int) {
-        frameWidth = width
-        frameHeight = height
-        this.sensorOrientation = sensorOrientation
-    }
-
-    @Synchronized
     fun draw(canvas: Canvas, context: Context?) {
-        val rotated = sensorOrientation % 180 == 90
-        val multiplier: Float = min(
-            canvas.height / (if (rotated) frameWidth else frameHeight).toFloat(),
-            canvas.width / (if (rotated) frameHeight else frameWidth).toFloat()
-        )
-        frameToCanvasMatrix = getTransformationMatrix(
-            frameWidth,
-            frameHeight,
-            (multiplier * if (rotated) frameHeight else frameWidth).toInt(),
-            (multiplier * if (rotated) frameWidth else frameHeight).toInt(),
-            sensorOrientation,
-            false
-        )
         for (tracker in trackers) {
             val trackedPos = tracker.position
             //Only draw tracker if not inactive
@@ -121,6 +97,18 @@ class TrackerManager {
             borderedText.drawText(
                    canvas, trackedPos.left + cornerSize, trackedPos.top, labelString + "%", boxPaint);
             */
+            }
+        }
+    }
+
+    @Synchronized
+    fun drawDebug(canvas: Canvas, context: Context?) {
+        for (tracker in trackers) {
+            val trackedPos = tracker.position
+            if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
+                val paint = Paint()
+                paint.textSize = 40.0F
+                canvas.drawText(tracker.index.toString(), trackedPos.x, trackedPos.y,paint )
             }
         }
     }

@@ -215,13 +215,11 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                 }
                 if (isDebug) {
                     if (canvas != null) {
-                        //TODO create drawDebug
-                        trackerManager?.draw(canvas, context)
+                        trackerManager?.drawDebug(canvas, context)
                     }
                 }
             }
         })
-        trackerManager?.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
     }
 
     public override fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
