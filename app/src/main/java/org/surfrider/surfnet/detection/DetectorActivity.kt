@@ -29,7 +29,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.SystemClock
 import android.util.Size
-import android.util.TypedValue
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
@@ -43,12 +42,10 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.customview.OverlayView.DrawCallback
-import org.surfrider.surfnet.detection.env.BorderedText
 import org.surfrider.surfnet.detection.env.ImageUtils.getTransformationMatrix
 import org.surfrider.surfnet.detection.env.ImageUtils.saveBitmap
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import org.surfrider.surfnet.detection.tflite.YoloDetector
-import org.surfrider.surfnet.detection.tracking.MultiBoxTracker
 import org.surfrider.surfnet.detection.tracking.TrackerManager
 import timber.log.Timber
 import java.io.IOException
@@ -72,7 +69,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
     private var trackerManager: TrackerManager? = null
-    private var borderedText: BorderedText? = null
     private lateinit var locationManager: LocationManager
     private val modelString = "yolov8n_float16.tflite"
     private val labelFilename = "file:///android_asset/coco.txt"
@@ -215,7 +211,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                 }
                 if (isDebug) {
                     if (canvas != null) {
-                        trackerManager?.drawDebug(canvas, context)
+                        trackerManager?.drawDebug(canvas)
                     }
                 }
             }
@@ -223,11 +219,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     }
 
     public override fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
-        val textSizePx = TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, resources.displayMetrics
-        )
-        borderedText = BorderedText(textSizePx)
-        borderedText?.setTypeface(Typeface.MONOSPACE)
         trackerManager = TrackerManager()
 
         size?.let {

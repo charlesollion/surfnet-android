@@ -1,11 +1,9 @@
 package org.surfrider.surfnet.detection.tracking
 
-import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.RectF
 import org.surfrider.surfnet.detection.tflite.Detector
 import timber.log.Timber
-import java.time.format.DateTimeFormatter
 import java.util.*
 import kotlin.math.abs
 
@@ -53,7 +51,7 @@ public class Tracker(det: TrackedDetection, idx: Int) {
         }
     }
 
-    fun compareTimeDifferenceInMilliseconds(timestamp1: Long, timestamp2: Long): Long {
+    private fun compareTimeDifferenceInMilliseconds(timestamp1: Long, timestamp2: Long): Long {
         return abs(timestamp1 - timestamp2)
     }
 

@@ -1,18 +1,14 @@
 package org.surfrider.surfnet.detection.tracking
 
-import android.annotation.TargetApi
 import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.VectorDrawable
-import android.os.Build
 import androidx.core.content.ContextCompat
 import org.surfrider.surfnet.detection.R
-import org.surfrider.surfnet.detection.env.ImageUtils.getTransformationMatrix
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import timber.log.Timber
 import java.util.*
-import kotlin.math.min
 
 class TrackerManager {
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
@@ -40,7 +36,7 @@ class TrackerManager {
             trackers.forEachIndexed { i, tracker ->
                 if(tracker.status != Tracker.TrackerStatus.INACTIVE && !tracker.alreadyAssociated) {
                     val dist = tracker.distTo(position)
-                    Timber.i("Distance = ${dist}")
+                    Timber.i("Distance = $dist")
                     if (dist < minDist) {
                         minDist = dist
                         det.associatedId = i
@@ -56,10 +52,6 @@ class TrackerManager {
             }
         }
     }
-
-
-    //TODO Refactor all old code under this todo
-
     @Synchronized
     fun draw(canvas: Canvas, context: Context?) {
         for (tracker in trackers) {
@@ -80,29 +72,12 @@ class TrackerManager {
                 val paint = Paint()
                 paint.textSize = 40.0F
                 canvas.drawText(tracker.index.toString(), trackedPos.x, trackedPos.y,paint )
-
-
-                /*
-            Old boxes +>
-
-            boxPaint.setColor(recognition.color);
-            float cornerSize = Math.min(trackedPos.width(), trackedPos.height()) / 8.0f;
-            canvas.drawRoundRect(trackedPos, cornerSize, cornerSize, boxPaint);
-            final String labelString =
-                  !TextUtils.isEmpty(recognition.title)
-                      ? String.format("%s %.2f", recognition.title, (100 * recognition.detectionConfidence))
-                      : String.format("%.2f", (100 * recognition.detectionConfidence));
-                  borderedText.drawText(canvas, trackedPos.left + cornerSize, trackedPos.top,
-            labelString);
-            borderedText.drawText(
-                   canvas, trackedPos.left + cornerSize, trackedPos.top, labelString + "%", boxPaint);
-            */
             }
         }
     }
 
     @Synchronized
-    fun drawDebug(canvas: Canvas, context: Context?) {
+    fun drawDebug(canvas: Canvas) {
         for (tracker in trackers) {
             val trackedPos = tracker.position
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
@@ -113,7 +88,6 @@ class TrackerManager {
         }
     }
 
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     private fun getBitmap(vectorDrawable: VectorDrawable?): Bitmap? {
         vectorDrawable?.let {
             val bitmap = Bitmap.createBitmap(
@@ -130,13 +104,16 @@ class TrackerManager {
     }
 
     private fun getBitmap(context: Context, drawableId: Int): Bitmap? {
-        val drawable = ContextCompat.getDrawable(context, drawableId)
-        return if (drawable is BitmapDrawable) {
-            BitmapFactory.decodeResource(context.resources, drawableId)
-        } else if (drawable is VectorDrawable) {
-            getBitmap(drawable as VectorDrawable?)
-        } else {
-            throw IllegalArgumentException("unsupported drawable type")
+        return when (val drawable = ContextCompat.getDrawable(context, drawableId)) {
+            is BitmapDrawable -> {
+                BitmapFactory.decodeResource(context.resources, drawableId)
+            }
+            is VectorDrawable -> {
+                getBitmap(drawable as VectorDrawable?)
+            }
+            else -> {
+                throw IllegalArgumentException("unsupported drawable type")
+            }
         }
     }
 
