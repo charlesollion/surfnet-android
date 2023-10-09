@@ -79,7 +79,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         binding = TfeOdActivityCameraBinding.inflate(layoutInflater)
         setContentView(binding.root)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        chronometer = findViewById(R.id.chronometer)
+        chronometer = binding.chronometer
         setupPermissions()
         setupBottomSheetLayout()
     }
