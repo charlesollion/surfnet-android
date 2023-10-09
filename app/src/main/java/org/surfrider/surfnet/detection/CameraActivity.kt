@@ -49,6 +49,7 @@ import kotlinx.coroutines.launch
 import org.opencv.android.Utils
 import org.opencv.core.CvType.*
 import org.opencv.core.Mat
+import org.opencv.core.*
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
 import org.surfrider.surfnet.detection.flow.DenseOpticalFlow
@@ -388,6 +389,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         Utils.bitmapToMat(bmp32, currFrame)
 
         outputFlow = opticalFlow.run(currFrame)
+        if(outputFlow != null)
+            Core.transpose(outputFlow, outputFlow)
         // Timber.i("### flow output: " + df.format(outputFlow.x) + " / " + df.format((outputFlow.y)))
         // outputFlow.x.toFloat(), outputFlow.y.toFloat()
         showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2], speed, 0.0F, 0.0F))

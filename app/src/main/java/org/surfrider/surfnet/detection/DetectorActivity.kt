@@ -42,7 +42,7 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import org.opencv.android.OpenCVLoader
 import org.opencv.core.CvType
-import org.opencv.core.Mat
+import org.opencv.core.*
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.customview.OverlayView.DrawCallback
 import org.surfrider.surfnet.detection.env.ImageUtils.getTransformationMatrix
@@ -231,18 +231,32 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         paint.strokeWidth = 4.0f
         val factor = 40
         val gridSize = 2.0F * factor
-        Timber.i("canvas size: ${canvas?.width} ${canvas?.height}")
-        Timber.i("preview size: $previewWidth $previewHeight")
-        Timber.i("output flow size: ${outputFlow.cols()} ${outputFlow.rows()}")
+        // Timber.i("canvas size: ${canvas?.width} ${canvas?.height}")
+        // Timber.i("output flow size: ${outputFlow.rows()} ${outputFlow.cols()}")
+        // Timber.i("preview size: $previewWidth $previewHeight")
+        if(outputFlow == null)
+            return
 
-        for (i: Int in 0 until outputFlow.rows() / factor - 1) {
-            for (j: Int in 0 until outputFlow.cols() / factor - 1) {
-                val y: Float = gridSize * i
-                val x: Float = gridSize * j
-                val dy: Float = outputFlow[i * factor, j * factor][0].toFloat() * 2.0F
-                val dx: Float = outputFlow[i * factor, j * factor][1].toFloat() * 2.0F
-                //Timber.i(" flow - i, j, dx, dy, $i, $j, $dx, $dy")
-                canvas?.drawLine(x, y, x + dx, y + dy, paint)
+        val frameToCanvasTransform = Matrix()
+        val scale = Math.min(canvas!!.width / previewWidth.toFloat(),
+            canvas!!.height / previewHeight.toFloat())
+        frameToCanvasTransform.postScale(scale, scale)
+        //val rectCam = RectF(90.0F, 90.0F, previewWidth.toFloat()-90.0F, previewHeight.toFloat()-90.0F)
+        //frameToCanvasTransform.mapRect(rectCam)
+        //canvas?.drawRect(rectCam, paint)
+        for (i: Int in 4 until outputFlow.rows() / factor- 4) {
+            for (j: Int in 1 until outputFlow.cols() / factor-1) {
+                val x: Float = gridSize * i
+                val y: Float = gridSize * j
+                val pointFlow = outputFlow[i * factor, j * factor]
+                if(pointFlow != null) {
+                    val dx: Float = pointFlow[0].toFloat() * 2.0F
+                    val dy: Float = pointFlow[1].toFloat() * 2.0F
+                    val points = floatArrayOf(x, y, x + dx, y + dy)
+                    frameToCanvasTransform.mapPoints(points)
+                    //Timber.i(" flow - i, j, dx, dy, $i, $j, $dx, $dy")
+                    canvas?.drawLine(points[0], points[1], points[2], points[3], paint)
+                }
             }
         }
     }
