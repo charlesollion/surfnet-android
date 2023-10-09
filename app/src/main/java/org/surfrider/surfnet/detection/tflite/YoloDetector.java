@@ -393,7 +393,7 @@ public class YoloDetector implements Detector {
 
         outData.rewind();
         outputMap.put(0, outData);
-        Timber.tag("YoloDetector").d("mObjThresh: %s", getObjThresh());
+        // Timber.tag("YoloDetector").d("mObjThresh: %s", getObjThresh());
 
         Object[] inputArray = {imgData};
         tfLite.runForMultipleInputsOutputs(inputArray, outputMap);
@@ -405,7 +405,7 @@ public class YoloDetector implements Detector {
 
         float[][][] out = new float[1][output_box][numClass + 5];
         if(!isV8) {
-            Timber.tag("YoloDetector").d("out[0] detect start");
+            // Timber.tag("YoloDetector").d("out[0] detect start");
             for (int i = 0; i < output_box; ++i) {
                 for (int j = 0; j < numClass + 5; ++j) {
                     if (isModelQuantized) {
@@ -421,7 +421,7 @@ public class YoloDetector implements Detector {
             }
         } else {
             // switch the way we span through the bytebuffer
-            Timber.tag("YoloDetector V8").d("out[0] detect start");
+            // Timber.tag("YoloDetector V8").d("out[0] detect start");
             for (int j = 0; j < numClass + 4; ++j) {
                 for (int i = 0; i < output_box; ++i) {
                     if (isModelQuantized) {
@@ -466,7 +466,7 @@ public class YoloDetector implements Detector {
 
                 final float w = out[0][i][2];
                 final float h = out[0][i][3];
-                Timber.tag("YoloDetector").d(Float.toString(xPos) + ',' + yPos + ',' + w + ',' + h);
+                // Timber.tag("YoloDetector").d(Float.toString(xPos) + ',' + yPos + ',' + w + ',' + h);
 
                 final RectF rect =
                         new RectF(
@@ -478,7 +478,7 @@ public class YoloDetector implements Detector {
                         confidenceInClass, rect, detectedClass));
             }
         }
-        Timber.tag("YoloDetector").d("detect end");
+        // Timber.tag("YoloDetector").d("detect end");
 
         final ArrayList<Recognition> recognitions = nms(detections);
         return recognitions;

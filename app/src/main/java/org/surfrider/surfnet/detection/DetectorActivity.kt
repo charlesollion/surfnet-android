@@ -29,7 +29,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.SystemClock
 import android.util.Size
-import android.util.TypedValue
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
@@ -46,12 +45,11 @@ import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.customview.OverlayView.DrawCallback
-import org.surfrider.surfnet.detection.env.BorderedText
 import org.surfrider.surfnet.detection.env.ImageUtils.getTransformationMatrix
 import org.surfrider.surfnet.detection.env.ImageUtils.saveBitmap
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import org.surfrider.surfnet.detection.tflite.YoloDetector
-import org.surfrider.surfnet.detection.tracking.MultiBoxTracker
+import org.surfrider.surfnet.detection.tracking.TrackerManager
 import timber.log.Timber
 import java.io.IOException
 import java.util.*
@@ -73,8 +71,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     private var timestamp: Long = 0
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
-    private var tracker: MultiBoxTracker? = null
-    private var borderedText: BorderedText? = null
+    private var trackerManager: TrackerManager? = null
     private lateinit var locationManager: LocationManager
     private val modelString = "yolov8n_float16.tflite"
     private val labelFilename = "file:///android_asset/coco.txt"
@@ -172,7 +169,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         //reset trackers
         croppedBitmap = null
         cropToFrameTransform = null
-        tracker = null
+        trackerManager = null
         trackingOverlay = null
     }
 
@@ -197,7 +194,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             toast.show()
             finish()
         }
-        tracker = MultiBoxTracker(context)
+        trackerManager = TrackerManager()
         val cropSize = detector?.inputSize
         cropSize?.let {
             Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
@@ -212,19 +209,22 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
         trackingOverlay?.addCallback(object : DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
-                tracker?.draw(canvas, context)
-                if (isDebug) {
-                    tracker?.drawDebug(canvas)
+                if (canvas != null) {
+                    trackerManager?.draw(canvas, context, previewWidth, previewHeight)
+                    drawOFLines(canvas)
                 }
-                drawOFLines(canvas)
+                if (isDebug) {
+                    if (canvas != null) {
+                        trackerManager?.drawDebug(canvas)
+                    }
+                }
+                //drawDebugScreen(canvas)
             }
         })
-        tracker?.setFrameConfiguration(previewWidth, previewHeight, sensorOrientation)
-
-        // Display a simple line
     }
 
     private fun drawOFLines(canvas: Canvas?) {
+
         val paint = Paint()
         paint.color = Color.RED
         paint.style = Paint.Style.STROKE
@@ -237,23 +237,43 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
 
         for (i: Int in 0 until outputFlow.rows() / factor - 1) {
             for (j: Int in 0 until outputFlow.cols() / factor - 1) {
-                val y : Float = gridSize * i
-                val x : Float = gridSize * j
-                val dy : Float = outputFlow[i * factor, j * factor][0].toFloat() * 2.0F
-                val dx : Float = outputFlow[i * factor, j * factor][1].toFloat() * 2.0F
+                val y: Float = gridSize * i
+                val x: Float = gridSize * j
+                val dy: Float = outputFlow[i * factor, j * factor][0].toFloat() * 2.0F
+                val dx: Float = outputFlow[i * factor, j * factor][1].toFloat() * 2.0F
                 //Timber.i(" flow - i, j, dx, dy, $i, $j, $dx, $dy")
                 canvas?.drawLine(x, y, x + dx, y + dy, paint)
             }
         }
     }
 
+    fun drawDebugScreen(canvas: Canvas?) {
+        // Debug function to show frame size and crop size
+        val paint = Paint()
+        paint.color = Color.RED
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 4.0f
+        val rectCrop = RectF(0.0F, 0.0F, 640.0F, 640.0F)
+        // Slightly smaller than Camera frame width to see all borders
+        val rectCam = RectF(90.0F, 90.0F, previewWidth.toFloat()-90.0F, previewHeight.toFloat()-90.0F)
+
+        val frameToCanvasTransform = Matrix()
+        val scale = Math.min(canvas!!.width / previewWidth.toFloat(), canvas!!.height / previewHeight.toFloat())
+        frameToCanvasTransform.postScale(scale, scale)
+
+        // Draw Camera frame
+        frameToCanvasTransform.mapRect(rectCam)
+        canvas?.drawRect(rectCam, paint)
+
+        // Draw Crop
+        paint.color = Color.GREEN
+        cropToFrameTransform?.mapRect(rectCrop)
+        frameToCanvasTransform.mapRect(rectCrop)
+        canvas?.drawRect(rectCrop, paint)
+    }
+
     public override fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
-        val textSizePx = TypedValue.applyDimension(
-            TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, resources.displayMetrics
-        )
-        borderedText = BorderedText(textSizePx)
-        borderedText?.setTypeface(Typeface.MONOSPACE)
-        tracker = MultiBoxTracker(this)
+        trackerManager = TrackerManager()
 
         size?.let {
             previewWidth = it.width
@@ -279,7 +299,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             return
         }
         computingDetection = true
-        Timber.i("Preparing image $currTimestamp for detection in bg thread.")
+        // Timber.i("Preparing image $currTimestamp for detection in bg thread.")
         rgbFrameBitmap?.setPixels(
             getRgbBytes(), 0, previewWidth, 0, 0, previewWidth, previewHeight
         )
@@ -293,7 +313,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             }
         }
         runInBackground {
-            Timber.i("Running detection on image $currTimestamp")
+            // Timber.i("Running detection on image $currTimestamp")
             val startTime = SystemClock.uptimeMillis()
             val results: List<Recognition>? = croppedBitmap?.let {
 
@@ -324,7 +344,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                     }
                 }
             }
-            tracker?.trackResults(mappedRecognitions, currTimestamp)
+            trackerManager?.processDetections(mappedRecognitions)
             trackingOverlay?.postInvalidate()
             computingDetection = false
             runOnUiThread {
@@ -336,7 +356,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     override val layoutId: Int
         get() = R.layout.tfe_od_camera_connection_fragment_tracking
     override val desiredPreviewFrameSize: Size?
-        get() = Size(640, 640)
+        get() = Size(1280, 720)
 
     // Which detection model to use: by default uses Tensorflow Object Detection API frozen
     // checkpoints.
