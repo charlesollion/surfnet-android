@@ -20,7 +20,6 @@ import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Context
 import android.content.res.Configuration
-import androidx.fragment.app.Fragment
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.RectF
@@ -29,11 +28,11 @@ import android.hardware.camera2.*
 import android.hardware.camera2.CameraCaptureSession.CaptureCallback
 import android.media.ImageReader
 import android.media.ImageReader.OnImageAvailableListener
-import android.opengl.Visibility
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.SystemClock
 import android.text.TextUtils
 import android.util.Size
 import android.util.SparseIntArray
@@ -42,8 +41,10 @@ import android.view.Surface
 import android.view.TextureView.SurfaceTextureListener
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Chronometer
 import android.widget.Toast
 import androidx.fragment.app.DialogFragment
+import androidx.fragment.app.Fragment
 import org.surfrider.surfnet.detection.databinding.TfeOdCameraConnectionFragmentTrackingBinding
 import timber.log.Timber
 import java.util.*
@@ -54,6 +55,7 @@ import kotlin.math.min
 
 @SuppressLint("ValidFragment")
 class CameraConnectionFragment private constructor(
+        private var chrono: Chronometer,
     private val cameraConnectionCallback: (Size?, Int) -> Unit,
     private val startDetector: () -> Unit,
     private val endDetector: () -> Unit,
@@ -61,8 +63,9 @@ class CameraConnectionFragment private constructor(
     private val imageListener: OnImageAvailableListener,
     /** The input size in pixels desired by TensorFlow (width and height of a square bitmap).  */
     private val inputSize: Size
-) : Fragment() {
 
+) : Fragment() {
+    private var lastPause: Long = 0
     private lateinit var binding: TfeOdCameraConnectionFragmentTrackingBinding
 
     /** A [Semaphore] to prevent the app from exiting before closing the camera.  */
@@ -176,12 +179,21 @@ class CameraConnectionFragment private constructor(
             binding.startButton.visibility = View.INVISIBLE
             binding.stopButton.visibility = View.VISIBLE
             startDetector()
+            if (lastPause == 0L) {
+                chrono.setBase(SystemClock.elapsedRealtime())
+            } else {
+                val interval = SystemClock.elapsedRealtime() - lastPause
+                chrono.setBase(chrono.getBase() + interval)
+            }
+            chrono.start()
         }
 
         binding.stopButton.setOnClickListener {
             binding.startButton.visibility = View.VISIBLE
             binding.stopButton.visibility = View.INVISIBLE
             endDetector()
+            lastPause = SystemClock.elapsedRealtime();
+            chrono.stop()
         }
 
         return binding.root
@@ -526,13 +538,14 @@ class CameraConnectionFragment private constructor(
         }
 
         fun newInstance(
-            callback: (Size?, Int) -> Unit,
-            startDetector: () -> Unit,
-            endDetector: () -> Unit,
-            imageListener: OnImageAvailableListener,
-            inputSize: Size
+                chrono: Chronometer,
+                callback: (Size?, Int) -> Unit,
+                startDetector: () -> Unit,
+                endDetector: () -> Unit,
+                imageListener: OnImageAvailableListener,
+                inputSize: Size,
         ): CameraConnectionFragment {
-            return CameraConnectionFragment(callback, startDetector, endDetector, imageListener, inputSize)
+            return CameraConnectionFragment(chrono, callback, startDetector, endDetector, imageListener, inputSize)
         }
     }
 }
