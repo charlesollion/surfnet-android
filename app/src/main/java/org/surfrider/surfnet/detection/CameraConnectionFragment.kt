@@ -179,7 +179,12 @@ class CameraConnectionFragment private constructor(
             binding.startButton.visibility = View.INVISIBLE
             binding.stopButton.visibility = View.VISIBLE
             startDetector()
-            chrono.setBase(SystemClock.elapsedRealtime());
+            if (lastPause == 0L) {
+                chrono.setBase(SystemClock.elapsedRealtime())
+            } else {
+                val interval = SystemClock.elapsedRealtime() - lastPause
+                chrono.setBase(chrono.getBase() + interval)
+            }
             chrono.start()
         }
 
