@@ -34,6 +34,7 @@ import android.view.Surface
 import android.view.View
 import android.view.ViewTreeObserver.OnGlobalLayoutListener
 import android.view.WindowManager
+import android.widget.Chronometer
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -67,10 +68,9 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private var luminanceStride = 0
     private var postInferenceCallback: Runnable? = null
     private var imageConverter: Runnable? = null
-
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
-
     var detectorPaused = true
+    lateinit var chronometer: Chronometer
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate $this")
@@ -78,13 +78,11 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         //initialize binding
         binding = TfeOdActivityCameraBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
+        chronometer = binding.chronometer
         setupPermissions()
         setupBottomSheetLayout()
     }
-
     private fun setupBottomSheetLayout() {
         val bottomSheetLayout = binding.bottomSheetLayout
         sheetBehavior = BottomSheetBehavior.from(bottomSheetLayout.bottomSheetLayout)
@@ -294,11 +292,12 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         val cameraId = chooseCamera()
         val camera2Fragment = desiredPreviewFrameSize?.let {
             CameraConnectionFragment.newInstance(
+                    chronometer,
                 { size: Size?, rotation: Int ->
                     previewHeight = size!!.height
                     previewWidth = size.width
                     onPreviewSizeChosen(size, rotation)
-                }, { startDetector() }, { endDetector() }, this, it
+                }, { startDetector() }, { endDetector() }, this, it,
             )
         }
         camera2Fragment?.setCamera(cameraId)
