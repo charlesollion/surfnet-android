@@ -45,7 +45,7 @@ public class Tracker(det: TrackedDetection, idx: Int) {
     fun update() {
         alreadyAssociated = false
         val age = compareTimeDifferenceInMilliseconds(System.currentTimeMillis(), trackedObjects.last.timestamp)
-        Timber.i("AGE +> ${age.toString()} | MAX TIMESTAMP +> $MAX_TIMESTAMP")
+        // Timber.i("AGE +> ${age.toString()} | MAX TIMESTAMP +> $MAX_TIMESTAMP")
         if(age > MAX_TIMESTAMP) {
             status = TrackerStatus.INACTIVE
         }

@@ -152,7 +152,7 @@ object ImageUtils {
         val transpose = (abs(applyRotation) + 90) % 180 == 0
         val inWidth = if (transpose) srcHeight else srcWidth
         val inHeight = if (transpose) srcWidth else srcHeight
-
+        Timber.i("--------------- inWidth = ${inWidth}, dstWidth $dstWidth")
         // Apply scaling if necessary.
         if (inWidth != dstWidth || inHeight != dstHeight) {
             val scaleFactorX = dstWidth / inWidth.toFloat()
@@ -160,8 +160,12 @@ object ImageUtils {
             if (maintainAspectRatio) {
                 // Scale by minimum factor so that dst is filled completely while
                 // maintaining the aspect ratio. Some image may fall off the edge.
+                // Crop should be centered so we apply translations
+                matrix.postTranslate(-srcWidth / 2.0f, -srcHeight / 2.0f)
                 val scaleFactor = max(scaleFactorX, scaleFactorY)
+                Timber.i("----------------- scaleFactor = ${scaleFactor}, scaleFactorX $scaleFactorX scaleFactorY $scaleFactorY")
                 matrix.postScale(scaleFactor, scaleFactor)
+                matrix.postTranslate(dstWidth / 2.0f, dstHeight / 2.0f)
             } else {
                 // Scale exactly to fill dst from src.
                 matrix.postScale(scaleFactorX, scaleFactorY)

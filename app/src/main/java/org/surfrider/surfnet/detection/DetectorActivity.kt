@@ -80,7 +80,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     private val locationHandler = Handler()
 
 
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
                hideSystemUI()
@@ -207,15 +206,41 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         trackingOverlay?.addCallback(object : DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
                 if (canvas != null) {
-                    trackerManager?.draw(canvas, context)
+                    trackerManager?.draw(canvas, context, previewWidth, previewHeight)
                 }
                 if (isDebug) {
                     if (canvas != null) {
                         trackerManager?.drawDebug(canvas)
                     }
                 }
+                //drawDebugScreen(canvas)
             }
         })
+    }
+
+    fun drawDebugScreen(canvas: Canvas?) {
+        // Debug function to show frame size and crop size
+        val paint = Paint()
+        paint.color = Color.RED
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 4.0f
+        val rectCrop = RectF(0.0F, 0.0F, 640.0F, 640.0F)
+        // Slightly smaller than Camera frame width to see all borders
+        val rectCam = RectF(90.0F, 90.0F, previewWidth.toFloat()-90.0F, previewHeight.toFloat()-90.0F)
+
+        val frameToCanvasTransform = Matrix()
+        val scale = Math.min(canvas!!.width / previewWidth.toFloat(), canvas!!.height / previewHeight.toFloat())
+        frameToCanvasTransform.postScale(scale, scale)
+
+        // Draw Camera frame
+        frameToCanvasTransform.mapRect(rectCam)
+        canvas?.drawRect(rectCam, paint)
+
+        // Draw Crop
+        paint.color = Color.GREEN
+        cropToFrameTransform?.mapRect(rectCrop)
+        frameToCanvasTransform.mapRect(rectCrop)
+        canvas?.drawRect(rectCrop, paint)
     }
 
     public override fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
@@ -245,7 +270,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             return
         }
         computingDetection = true
-        Timber.i("Preparing image $currTimestamp for detection in bg thread.")
+        // Timber.i("Preparing image $currTimestamp for detection in bg thread.")
         rgbFrameBitmap?.setPixels(
             getRgbBytes(), 0, previewWidth, 0, 0, previewWidth, previewHeight
         )
@@ -259,7 +284,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             }
         }
         runInBackground {
-            Timber.i("Running detection on image $currTimestamp")
+            // Timber.i("Running detection on image $currTimestamp")
             val startTime = SystemClock.uptimeMillis()
             val results: List<Recognition>? = croppedBitmap?.let {
 
@@ -302,7 +327,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     override val layoutId: Int
         get() = R.layout.tfe_od_camera_connection_fragment_tracking
     override val desiredPreviewFrameSize: Size?
-        get() = Size(640, 640)
+        get() = Size(1280, 720)
 
     // Which detection model to use: by default uses Tensorflow Object Detection API frozen
     // checkpoints.
