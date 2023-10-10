@@ -381,9 +381,11 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
             return
         }
         val rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
-        rgbFrameBitmap.setPixels(
-            getRgbBytes(), 0, previewWidth, 0, 0, previewWidth, previewHeight
-        )
+        getRgbBytes()?.let {
+            rgbFrameBitmap.setPixels(
+                it, 0, previewWidth, 0, 0, previewWidth, previewHeight
+            )
+        }
         val bmp32: Bitmap = rgbFrameBitmap.copy(Bitmap.Config.ARGB_8888, true)
         val currFrame = Mat()
         Utils.bitmapToMat(bmp32, currFrame)
