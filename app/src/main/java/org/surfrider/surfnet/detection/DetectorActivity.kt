@@ -270,10 +270,13 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             return
         }
         computingDetection = true
+
         // Timber.i("Preparing image $currTimestamp for detection in bg thread.")
-        rgbFrameBitmap?.setPixels(
-            getRgbBytes(), 0, previewWidth, 0, 0, previewWidth, previewHeight
-        )
+        getRgbBytes()?.let {
+            rgbFrameBitmap?.setPixels(
+                it, 0, previewWidth, 0, 0, previewWidth, previewHeight
+            )
+        }
         readyForNextImage()
         if (croppedBitmap != null && rgbFrameBitmap != null && frameToCropTransform != null) {
             val canvas = Canvas(croppedBitmap!!)
