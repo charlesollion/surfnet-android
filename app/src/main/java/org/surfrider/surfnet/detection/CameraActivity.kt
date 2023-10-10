@@ -86,6 +86,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private lateinit var imuEstimator : IMU_estimator
     private lateinit var opticalFlow : DenseOpticalFlow
     public lateinit var outputFlow : Mat
+    public lateinit var outputLinesFlow: ArrayList<FloatArray>
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     var detectorPaused = true
@@ -104,6 +105,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         imuEstimator = IMU_estimator(this.applicationContext)
         opticalFlow = DenseOpticalFlow()
         outputFlow = Mat()
+        outputLinesFlow = arrayListOf()
 
         chronometer = binding.chronometer
 
@@ -390,9 +392,9 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         val currFrame = Mat()
         Utils.bitmapToMat(bmp32, currFrame)
 
-        outputFlow = opticalFlow.run(currFrame)
-        if(outputFlow != null)
-            Core.transpose(outputFlow, outputFlow)
+        // outputFlow = opticalFlow.run(currFrame)
+        outputLinesFlow = opticalFlow.run(currFrame)
+
         // Timber.i("### flow output: " + df.format(outputFlow.x) + " / " + df.format((outputFlow.y)))
         // outputFlow.x.toFloat(), outputFlow.y.toFloat()
         showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2], speed, 0.0F, 0.0F))

@@ -211,7 +211,8 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             override fun drawCallback(canvas: Canvas?) {
                 if (canvas != null) {
                     trackerManager?.draw(canvas, context, previewWidth, previewHeight)
-                    drawOFLines(canvas)
+                    // drawOFLines(canvas)
+                    drawOFLinesPRK(canvas)
                 }
                 if (isDebug) {
                     if (canvas != null) {
@@ -223,16 +224,35 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         })
     }
 
+    private fun drawOFLinesPRK(canvas: Canvas?) {
+        val paint = Paint()
+        paint.color = Color.WHITE
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 4.0f
+        Timber.i("output line flow size: ${outputLinesFlow.size}")
+        val frameToCanvasTransform = Matrix()
+        val scale = Math.min(canvas!!.width / previewWidth.toFloat(),
+                             canvas!!.height / previewHeight.toFloat())
+        // Scale is doubled because the greyImage to compute the flow was downsampled by a factor 2
+        frameToCanvasTransform.postScale(scale * 2.0F, scale * 2.0F)
+        for(line in outputLinesFlow) {
+            val points = line.clone()
+            frameToCanvasTransform.mapPoints(points)
+            //Timber.i(" flow - i, j, dx, dy, $i, $j, $dx, $dy")
+            canvas?.drawLine(points[0], points[1], points[2], points[3], paint)
+        }
+
+    }
     private fun drawOFLines(canvas: Canvas?) {
 
         val paint = Paint()
         paint.color = Color.RED
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 4.0f
-        val factor = 40
-        val gridSize = 2.0F * factor
+        val factor = 10
+        val gridSize = 8.0F * factor
         // Timber.i("canvas size: ${canvas?.width} ${canvas?.height}")
-        // Timber.i("output flow size: ${outputFlow.rows()} ${outputFlow.cols()}")
+        Timber.i("output flow size: ${outputFlow.rows()} ${outputFlow.cols()}")
         // Timber.i("preview size: $previewWidth $previewHeight")
         if(outputFlow == null)
             return
@@ -259,6 +279,14 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                 }
             }
         }
+        paint.color = Color.GREEN
+        paint.strokeWidth = 10.0F
+        val avgMV : Scalar = Core.mean(outputFlow)
+        val cx = canvas!!.width/2.0F
+        val cy = canvas.height/2.0F
+        val factorLine: Float = 10.0F
+        canvas?.drawLine(cx, cy, cx + avgMV.`val`[0].toFloat() * factorLine, cy + avgMV.`val`[1].toFloat() * factorLine, paint)
+
     }
 
     fun drawDebugScreen(canvas: Canvas?) {
