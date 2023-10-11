@@ -71,6 +71,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     var detectorPaused = true
     lateinit var chronometer: Chronometer
+    var detectedWaste: Int = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate $this")
@@ -80,6 +81,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         setContentView(binding.root)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         chronometer = binding.chronometer
+        binding.wasteCounter.setText(detectedWaste.toString())
         setupPermissions()
         setupBottomSheetLayout()
     }

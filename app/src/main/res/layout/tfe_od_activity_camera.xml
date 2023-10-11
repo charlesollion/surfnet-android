@@ -65,6 +65,38 @@
                     android:textStyle="bold"/>
             </TableRow>
 </TableLayout>
+
+            <TableLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                >
+                <TableRow
+                    android:id="@+id/ro"
+                    android:layout_width="wrap_content"
+                    android:background="@drawable/rounded_corner_timer"
+                    android:gravity="center"
+                    android:padding="10dp"
+                    android:layout_margin="10dp"
+                    android:layout_height="wrap_content">
+
+                    <RelativeLayout
+                        android:layout_height="15dp"
+                        android:layout_marginRight="10dp"
+                        android:background="@drawable/waste">
+                    </RelativeLayout>
+
+                    <TextView
+                        android:id="@+id/wasteCounter"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:textColor="@android:color/black"
+                        android:textSize="17sp"
+                        android:textStyle="normal"/>
+                </TableRow>
+            </TableLayout>
+
         </RelativeLayout>
 
         <include
