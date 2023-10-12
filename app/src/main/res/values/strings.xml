@@ -13,7 +13,5 @@
     <string name="tutorial_p1_text">Avant de commencer ta vidéo, tourne ton téléphone en mode\npaysage, assure toi que la ligne rouge se situe au niveau de la\nberge​ et garde ton téléphone le plus stable possible.</string>
     <string name="tutorial_p2_text">L\'IA détecte et compte\nautomatiquement les\ndéchets sur la berge.</string>
     <string name="tutorial_button_text">Je suis prêt</string>
-    <string name="home_cgu">
-        En saisissant votre adresse mail ci-dessous, vous acceptez nos <a href="https://google.com/">CGU</a>. Les données collectées vous seront attribuées.
-    </string>
+    <string name="home_cgu">En saisissant votre adresse mail ci-dessous, vous acceptez nos CGU. Les données collectées vous seront attribuées.</string>
 </resources>
