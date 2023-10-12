@@ -10,7 +10,7 @@
     <string name="red_dot_tutorial_text"><i>Déchet en cours\nd’analyse</i></string>
     <string name="green_dot_tutorial_text"><i>Déchet comptabilisé</i></string>
     <string name="tutorial_title">Comment ca marche ?</string>
-    <string name="tutorial_p1_text">Avant de commencer ta vidéo, tourne ton téléphone en mode\npaysage, assure toi que la ligne rouge se situe au niveau de la\nberge​ et garde ton téléphone le plus stable possible.</string>
+    <string name="tutorial_p1_text">Avant de commencer ta vidéo, tourne ton téléphone en mode paysage, assure toi que la ligne rouge se situe au niveau de la berge et garde ton téléphone le plus stable possible.</string>
     <string name="tutorial_p2_text">L\'IA détecte et compte\nautomatiquement les\ndéchets sur la berge.</string>
     <string name="tutorial_button_text">Je suis prêt</string>
     <string name="home_cgu">En saisissant votre adresse mail ci-dessous, vous acceptez nos CGU. Les données collectées vous seront attribuées.</string>
