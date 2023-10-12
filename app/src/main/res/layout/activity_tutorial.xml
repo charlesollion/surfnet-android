@@ -30,7 +30,7 @@
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/centerPanel"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="match_parent"
         android:paddingTop="20dp"
         app:layout_constraintEnd_toStartOf="@id/endPanel"
@@ -41,9 +41,9 @@
             android:id="@+id/tutorial_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:paddingBottom="10dp"
             android:text="@string/tutorial_title"
             android:textAppearance="@style/SubtitleText"
-            android:paddingBottom="10dp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
@@ -74,7 +74,7 @@
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_weight="1"
-        android:paddingTop="25dp"
+        android:padding="20dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@id/centerPanel"
         app:layout_constraintTop_toTopOf="parent">
@@ -83,13 +83,12 @@
             android:id="@+id/tutorial_p2"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingEnd="64dp"
+            android:paddingEnd="12dp"
             android:paddingBottom="20dp"
             android:text="@string/tutorial_p2_text"
             android:textAppearance="@style/TutorialText"
             app:layout_constraintBottom_toTopOf="@id/red_dot_description"
-            app:layout_constraintStart_toStartOf="parent"
-            />
+            app:layout_constraintStart_toStartOf="parent" />
 
         <TextView
             android:id="@+id/red_dot_description"
@@ -98,17 +97,19 @@
             android:text="@string/red_dot_tutorial_text"
             android:textAppearance="@style/ItalicText"
             app:layout_constraintStart_toEndOf="@id/tutorial_red_dot"
-            app:layout_constraintTop_toBottomOf="@id/tutorial_p2" />
+            app:layout_constraintTop_toTopOf="@id/tutorial_red_dot"
+            app:layout_constraintBottom_toBottomOf="@id/tutorial_red_dot" />
 
         <TextView
             android:id="@+id/green_dot_description"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="15dp"
+
             android:text="@string/green_dot_tutorial_text"
             android:textAppearance="@style/ItalicText"
             app:layout_constraintStart_toEndOf="@id/tutorial_green_dot"
-            app:layout_constraintTop_toBottomOf="@id/red_dot_description" />
+            app:layout_constraintTop_toTopOf="@id/tutorial_green_dot"
+            app:layout_constraintBottom_toBottomOf="@id/tutorial_green_dot"/>
 
         <Button
             android:id="@+id/ready_button"
@@ -116,14 +117,15 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="30dp"
             android:layout_marginBottom="20dp"
-            android:paddingHorizontal="32dp"
             android:background="@drawable/rounded_corner"
-            android:text="@string/tutorial_button_text"
             android:drawableEnd="@drawable/right_arrow"
-            android:textAppearance="@style/TutorialButtonText"
             android:drawablePadding="10dp"
+            android:paddingHorizontal="16dp"
+            android:text="@string/tutorial_button_text"
+            android:textAppearance="@style/TutorialButtonText"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintStart_toStartOf="@id/tutorial_p2"
+            app:layout_constraintEnd_toEndOf="@id/tutorial_p2"
             app:layout_constraintTop_toBottomOf="@id/green_dot_description" />
 
         <ImageView
