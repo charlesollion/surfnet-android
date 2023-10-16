@@ -72,7 +72,9 @@ class TrackerManager {
                         if (tracker.status == Tracker.TrackerStatus.GREEN) {
                             i++
                             R.drawable.green_dot
-                        }else {R.drawable.red_dot}
+                        } else {
+                            R.drawable.red_dot
+                        }
                     )
                 }
                 val point = floatArrayOf(trackedPos.x, trackedPos.y)
