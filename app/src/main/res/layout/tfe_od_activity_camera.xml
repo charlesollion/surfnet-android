@@ -91,7 +91,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
-                        android:textColor="@android:color/black"
+                        android:textColor="#2F88D9"
                         android:textSize="17sp"
                         android:textStyle="normal"/>
                 </TableRow>

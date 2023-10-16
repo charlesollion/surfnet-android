@@ -80,6 +80,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         setContentView(binding.root)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         chronometer = binding.chronometer
+        binding.wasteCounter.text = "0"
         setupPermissions()
         setupBottomSheetLayout()
     }
