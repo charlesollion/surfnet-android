@@ -68,6 +68,18 @@
                     android:layout_width="match_parent"
                     android:layout_height="20dp" />
 
+                <TextView
+                    android:id="@+id/cgu"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/home_cgu"
+                    android:textAppearance="@style/CGUText"
+                    tools:text="@string/home_cgu" />
+
+                <Space
+                    android:layout_width="match_parent"
+                    android:layout_height="20dp" />
+
                 <EditText
                     android:id="@+id/editTextTextEmailAddress"
                     android:layout_width="match_parent"
@@ -75,12 +87,12 @@
                     android:background="@drawable/edit_text_border"
                     android:ems="10"
                     android:hint="@string/home_placeholder"
-                    android:inputType="textEmailAddress"
 
+                    android:inputType="textEmailAddress"
                     android:padding="8dp"
                     android:textAppearance="@style/PlaceholderText"
-                    android:textColor="@android:color/white"
-                    android:textColorHint="#FFFFFF" />
+                    android:textColor="@android:color/black"
+                    android:textColorHint="@android:color/black" />
 
                 <Space
                     android:layout_width="match_parent"
