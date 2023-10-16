@@ -192,9 +192,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             finish()
         }
 
-        //Log.d("TRACKET", "ICI")
-        //detectedWaste = trackerManager!!.detectedWaste
-
         val cropSize = detector?.inputSize
         cropSize?.let {
             Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
@@ -214,8 +211,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                 }
                 if (isDebug) {
                     if (canvas != null) {
-
-                        //trackerManager?.drawDebug(canvas)
+                        trackerManager?.drawDebug(canvas)
                     }
                 }
                 updateCounter(trackerManager!!.detectedWaste.toString())
