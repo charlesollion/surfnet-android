@@ -28,6 +28,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.SystemClock
+import android.util.Log
 import android.util.Size
 import android.view.View
 import android.view.WindowInsets
@@ -190,8 +191,9 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             toast.show()
             finish()
         }
-        trackerManager = TrackerManager()
-        detectedWaste = trackerManager!!.trackerIndex
+
+        //Log.d("TRACKET", "ICI")
+        //detectedWaste = trackerManager!!.detectedWaste
 
         val cropSize = detector?.inputSize
         cropSize?.let {
@@ -212,10 +214,11 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                 }
                 if (isDebug) {
                     if (canvas != null) {
-                        detectedWaste += 1
-                        trackerManager?.drawDebug(canvas)
+
+                        //trackerManager?.drawDebug(canvas)
                     }
                 }
+                updateCounter(trackerManager!!.detectedWaste.toString())
                 //drawDebugScreen(canvas)
             }
         })
