@@ -5,6 +5,10 @@ import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.VectorDrawable
 import androidx.core.content.ContextCompat
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import org.opencv.core.Rect
+import org.opencv.core.Scalar
 import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import timber.log.Timber
@@ -82,6 +86,32 @@ class TrackerManager {
                 canvas.drawText(tracker.index.toString(), point[0], point[1], paint)
             }
         }
+    }
+
+    fun getCurrentRois(width: Int, height: Int, downScale: Int, squareSize: Int): Mat? {
+        if(trackers.size == 0) {
+            return null
+        }
+        val currRois = Mat.zeros(height / downScale, width / downScale, CvType.CV_8UC1)
+        for (tracker in trackers) {
+            val trackedPos = tracker.position
+            if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
+                val x: Int = trackedPos.x.toInt() / downScale
+                val y: Int = trackedPos.y.toInt() / downScale
+
+                for (i in -squareSize/2..squareSize/2) {
+                    for (j in -squareSize/2..squareSize/2) {
+                        val x = x + i
+                        val y = y + j
+
+                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                            currRois.put(y, x, 255.0)  // Set the value to 255 (white) within the square
+                        }
+                    }
+                }
+            }
+        }
+        return currRois
     }
 
     @Synchronized

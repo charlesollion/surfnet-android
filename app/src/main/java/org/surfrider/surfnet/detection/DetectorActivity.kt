@@ -229,7 +229,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         paint.color = Color.WHITE
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 4.0f
-        Timber.i("output line flow size: ${outputLinesFlow.size}")
+        // Timber.i("output line flow size: ${outputLinesFlow.size}")
         val frameToCanvasTransform = Matrix()
         val scale = Math.min(canvas!!.width / previewWidth.toFloat(),
                              canvas!!.height / previewHeight.toFloat())
@@ -390,6 +390,10 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                 }
             }
             trackerManager?.processDetections(mappedRecognitions)
+            currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 40)
+            /*runOnUiThread {
+                Timber.i("Mid - ${currROIs?.dump()}")
+            }*/
             trackingOverlay?.postInvalidate()
             computingDetection = false
             runOnUiThread {

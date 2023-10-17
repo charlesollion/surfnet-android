@@ -18,31 +18,32 @@ class DenseOpticalFlow {
     private var status = MatOfByte()
     private var err = MatOfFloat()
 
-    private fun updatePoints(greyImage: Mat) {
+    private fun updatePoints(greyImage: Mat, mask: Mat?) {
         val corners = MatOfPoint()
-        Imgproc.goodFeaturesToTrack(greyImage, corners, maxCorners, 0.1, 5.0)
+        Imgproc.goodFeaturesToTrack(greyImage, corners, maxCorners, 0.1, 5.0, mask?:Mat())
         prevPts.fromArray(*corners.toArray())
     }
 
-    fun run(newFrame: Mat): ArrayList<FloatArray> {
-        return  PyrLK(newFrame)
+    fun run(newFrame: Mat, mask:Mat?): ArrayList<FloatArray> {
+        return  PyrLK(newFrame, mask)
         // return Farneback(newFrame)
     }
 
-    private fun PyrLK(newFrame: Mat) : ArrayList<FloatArray> {
+    private fun PyrLK(newFrame: Mat, mask: Mat?) : ArrayList<FloatArray> {
         // convert the frame to Gray
         Imgproc.cvtColor(newFrame, currGreyImage, Imgproc.COLOR_RGBA2GRAY)
         // if this is the first loop, find good features
+        // Timber.i("imgSize: ${currGreyImage.size().toString()} mask size: ${mask?.size().toString()}")
         if (prevGreyImage.empty()) {
             currGreyImage.copyTo(prevGreyImage)
-            updatePoints(currGreyImage)
+            updatePoints(currGreyImage, mask)
             return arrayListOf()
             // return Point(0.0, 0.0)
         }
         // If the number of flow points is too low, find new good features
         if (flowPtsCount < maxCorners / 5) {
             currGreyImage.copyTo(prevGreyImage)
-            updatePoints(currGreyImage)
+            updatePoints(currGreyImage, mask)
         }
         // Run the KLT algorithm for Optical Flow
         Video.calcOpticalFlowPyrLK(prevGreyImage, currGreyImage, prevPts, currPts, status, err)
@@ -138,7 +139,7 @@ class DenseOpticalFlow {
                 }
             }
         }
-        Timber.i("output line flow size in func: ${listLines.size}")
+        // Timber.i("output line flow size in func: ${listLines.size}")
         return listLines
     }
 

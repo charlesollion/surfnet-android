@@ -87,6 +87,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private lateinit var opticalFlow : DenseOpticalFlow
     public lateinit var outputFlow : Mat
     public lateinit var outputLinesFlow: ArrayList<FloatArray>
+    protected var currROIs : Mat? = null
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     var detectorPaused = true
@@ -121,6 +122,10 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
             }
         }
     }
+
+
+
+
     private fun setupBottomSheetLayout() {
         val bottomSheetLayout = binding.bottomSheetLayout
         sheetBehavior = BottomSheetBehavior.from(bottomSheetLayout.bottomSheetLayout)
@@ -192,8 +197,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
     /** Callback for Camera2 API  */
     override fun onImageAvailable(reader: ImageReader) {
-
-
 
         // We need wait until we have some size from onPreviewSizeChosen
         if (previewWidth == 0 || previewHeight == 0) {
@@ -364,7 +367,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     }
 
     private suspend fun scheduledOpticalFlow() {
-        Timber.d("##### background run flow and IMU")
+        // Timber.d("##### background run flow and IMU")
         // get IMU variables
         val velocity: FloatArray = imuEstimator.velocity
         val imuPosition: FloatArray = imuEstimator.position
@@ -393,7 +396,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         Utils.bitmapToMat(bmp32, currFrame)
 
         // outputFlow = opticalFlow.run(currFrame)
-        outputLinesFlow = opticalFlow.run(currFrame)
+        outputLinesFlow = opticalFlow.run(currFrame, currROIs)
 
         // Timber.i("### flow output: " + df.format(outputFlow.x) + " / " + df.format((outputFlow.y)))
         // outputFlow.x.toFloat(), outputFlow.y.toFloat()
