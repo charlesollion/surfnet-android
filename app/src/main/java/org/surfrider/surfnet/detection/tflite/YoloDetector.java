@@ -70,6 +70,7 @@ public class YoloDetector implements Detector {
             final float confThreshold,
             final boolean isQuantized,
             final boolean isV8,
+            final boolean outputIsScaled,
             final int inputSize)
             throws IOException {
         final YoloDetector d = new YoloDetector();
@@ -117,6 +118,11 @@ public class YoloDetector implements Detector {
 
         d.confThreshold = confThreshold;
         d.isModelQuantized = isQuantized;
+        if(outputIsScaled) {
+            d.scalingFactor = 1.0F;
+        } else {
+            d.scalingFactor = inputSize;
+        }
         d.isV8 = isV8;
         // Pre-allocate buffers.
         int numBytesPerChannel;
@@ -242,6 +248,8 @@ public class YoloDetector implements Detector {
     private static final int NUM_THREADS = 1;
     private static boolean isNNAPI = false;
     private static boolean isGPU = false;
+
+    private static float scalingFactor = 1.0F;
 
     private boolean isModelQuantized;
 
@@ -429,7 +437,12 @@ public class YoloDetector implements Detector {
                     }
                 }
             }
-            // no need to denormalize for yolov8
+            // not always needed to denormalize for yolov8
+            for (int i = 0; i < output_box; ++i) {
+                for (int j = 0; j < 4; ++j) {
+                    out[0][i][j] *= scalingFactor;
+                }
+            }
         }
         for (int i = 0; i < output_box; ++i) {
             final int offset = 0;
@@ -464,7 +477,7 @@ public class YoloDetector implements Detector {
 
                 final float w = out[0][i][2];
                 final float h = out[0][i][3];
-                // Timber.tag("YoloDetector").d(Float.toString(xPos) + ',' + yPos + ',' + w + ',' + h);
+                Timber.tag("YoloDetector").i(Float.toString(xPos) + ',' + yPos + ',' + w + ',' + h);
 
                 final RectF rect =
                         new RectF(

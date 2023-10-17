@@ -218,7 +218,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 CONFIDENCE_THRESHOLD,
                 IS_QUANTIZED,
                 IS_V8,
-                INPUT_SIZE
+                IS_SCALED,
+                INPUT_SIZE,
             )
             detector?.useGpu()
             detector?.setNumThreads(NUM_THREADS)
@@ -580,11 +581,15 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         private const val DOWNSAMPLING_FACTOR_FLOW: Int = 2
 
         private const val CONFIDENCE_THRESHOLD = 0.3f
-        private const val MODEL_STRING = "yolov8n_float16.tflite"
-        private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
+        //private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
+        // private const val MODEL_STRING = "yolov8n_float16.tflite"
+
+        private const val LABEL_FILENAME = "file:///android_asset/labelmap_surfnet.txt"
+        private const val MODEL_STRING = "surfnet_best_13102023_float16.tflite" // not scaled
         private const val INPUT_SIZE = 640
         private const val IS_V8 = true
         private const val IS_QUANTIZED = false
+        private const val IS_SCALED = false // Only for newer Yolo
         private const val NUM_THREADS = 1
 
         private const val MAINTAIN_ASPECT = true
