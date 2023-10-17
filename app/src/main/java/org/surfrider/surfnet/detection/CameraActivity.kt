@@ -36,6 +36,7 @@ import android.view.ViewTreeObserver.OnGlobalLayoutListener
 import android.view.WindowManager
 import android.widget.Chronometer
 import android.widget.LinearLayout
+import android.widget.TableRow
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.bottomsheet.BottomSheetBehavior
@@ -70,7 +71,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private var imageConverter: Runnable? = null
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     var detectorPaused = true
-    lateinit var chronometer: Chronometer
+    lateinit var chronometer: TableRow
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate $this")
@@ -79,7 +80,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         binding = TfeOdActivityCameraBinding.inflate(layoutInflater)
         setContentView(binding.root)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        chronometer = binding.chronometer
+        chronometer = binding.chronoContainer
         setupPermissions()
         setupBottomSheetLayout()
     }
@@ -335,6 +336,13 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
             else -> 0
         }
 
+    protected fun manageVisibility() {
+        if (binding.chronometer.visibility == View.VISIBLE) {
+            binding.chronometer.visibility = View.INVISIBLE
+        } else {
+            binding.chronometer.visibility = View.VISIBLE
+        }
+    }
 
     protected fun showInference(inferenceTime: String?) {
         binding.bottomSheetLayout.inferenceInfo.text = inferenceTime

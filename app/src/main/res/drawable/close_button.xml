@@ -1,0 +1,9 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/round_white_button" />
+    <item
+        android:drawable="@drawable/cross"
+        android:gravity="center"
+        android:width="15dp"
+        android:height="15dp"
+        />
+</layer-list>
