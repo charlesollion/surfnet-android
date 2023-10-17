@@ -7,6 +7,7 @@ import android.graphics.drawable.VectorDrawable
 import androidx.core.content.ContextCompat
 import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
+import timber.log.Timber
 import java.util.*
 import kotlin.math.min
 
@@ -81,9 +82,10 @@ class TrackerManager {
 
                 //Animation drawing
                 if (tracker.animation) {
+                    val shouldShowBottomAnimation = trackedPos.y < canvas.height.div(scale) / 2
                     val animation = context?.let {
                         getBitmap(
-                            it, R.drawable.animation
+                            it, if (shouldShowBottomAnimation) R.drawable.animation_down else R.drawable.animation
                         )
                     }
 
@@ -91,9 +93,10 @@ class TrackerManager {
                         val animationWidth = animation.width.div(scale)
                         val animationHeight = animation.height.div(scale)
                         val bmpWidth = bmp.width.div(scale)
+                        val bmpHeight = bmp.height.div(scale)
                         val animationPoint = floatArrayOf(
-                            trackedPos.x - (animationWidth / 2) +(bmpWidth / 2) + 3,
-                            trackedPos.y - (animationHeight)
+                            trackedPos.x - (animationWidth / 2) + (bmpWidth / 2) + 3,
+                            if (shouldShowBottomAnimation) trackedPos.y + bmpHeight else trackedPos.y - (animationHeight)
                         )
                         frameToCanvasTransform.mapPoints(animationPoint)
                         canvas.drawBitmap(animation, animationPoint[0], animationPoint[1], null)
@@ -137,9 +140,11 @@ class TrackerManager {
             is BitmapDrawable -> {
                 BitmapFactory.decodeResource(context.resources, drawableId)
             }
+
             is VectorDrawable -> {
                 getBitmap(drawable as VectorDrawable?)
             }
+
             else -> {
                 throw IllegalArgumentException("unsupported drawable type")
             }
