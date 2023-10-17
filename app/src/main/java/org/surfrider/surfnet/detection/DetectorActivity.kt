@@ -28,6 +28,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.SystemClock
+import android.util.Log
 import android.util.Size
 import android.view.View
 import android.view.WindowInsets
@@ -190,7 +191,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             toast.show()
             finish()
         }
-        trackerManager = TrackerManager()
+       trackerManager = TrackerManager()
         val cropSize = detector?.inputSize
         cropSize?.let {
             Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
@@ -213,6 +214,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                         trackerManager?.drawDebug(canvas)
                     }
                 }
+                updateCounter(trackerManager!!.detectedWaste.size.toString())
                 //drawDebugScreen(canvas)
             }
         })
