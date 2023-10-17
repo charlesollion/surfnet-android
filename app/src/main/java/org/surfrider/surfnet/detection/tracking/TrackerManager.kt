@@ -16,7 +16,8 @@ import java.util.*
 
 class TrackerManager {
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
-    var trackerIndex = 0
+    private var trackerIndex = 0
+    val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
 
     fun updateTrackers() {
         trackers.forEach { tracker -> tracker.update() }
@@ -63,6 +64,7 @@ class TrackerManager {
         val scale = Math.min(canvas!!.width / previewWidth.toFloat(),
                              canvas!!.height / previewHeight.toFloat())
         frameToCanvasTransform.postScale(scale, scale)
+            var i = 0
 
         for (tracker in trackers) {
             val trackedPos = tracker.position
@@ -71,7 +73,14 @@ class TrackerManager {
                 val bmp = context?.let {
                     getBitmap(
                         it,
-                        if (tracker.status == Tracker.TrackerStatus.GREEN) R.drawable.green_dot else R.drawable.red_dot
+                        if (tracker.status == Tracker.TrackerStatus.GREEN) {
+                            if (!detectedWaste.contains(tracker)) {
+                                detectedWaste.add(tracker)
+                            }
+                            R.drawable.green_dot
+                        } else {
+                            R.drawable.red_dot
+                        }
                     )
                 }
                 val point = floatArrayOf(trackedPos.x, trackedPos.y)
@@ -89,25 +98,37 @@ class TrackerManager {
     }
 
     fun getCurrentRois(width: Int, height: Int, downScale: Int, squareSize: Int): Mat? {
-        if(trackers.size == 0) {
+        /*if(trackers.size == 0) {
             return null
-        }
+        }*/
         val currRois = Mat.zeros(height / downScale, width / downScale, CvType.CV_8UC1)
-        for (tracker in trackers) {
+        /*for (tracker in trackers) {
             val trackedPos = tracker.position
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
-                val x: Int = trackedPos.x.toInt() / downScale
-                val y: Int = trackedPos.y.toInt() / downScale
+                val xCenter: Int = trackedPos.x.toInt() / downScale
+                val yCenter: Int = trackedPos.y.toInt() / downScale
 
                 for (i in -squareSize/2..squareSize/2) {
                     for (j in -squareSize/2..squareSize/2) {
-                        val x = x + i
-                        val y = y + j
+                        val x = xCenter + i
+                        val y = yCenter + j
 
                         if (x >= 0 && x < width && y >= 0 && y < height) {
                             currRois.put(y, x, 255.0)  // Set the value to 255 (white) within the square
                         }
                     }
+                }
+            }
+        } */
+        val xCenter: Int = width / 2
+        val yCenter: Int = height / 2
+        for (i in -squareSize/2..squareSize/2) {
+            for (j in -squareSize/2..squareSize/2) {
+                val x = xCenter + i
+                val y = yCenter + j
+
+                if (x >= 0 && x < width && y >= 0 && y < height) {
+                    currRois.put(y, x, 255.0)  // Set the value to 255 (white) within the square
                 }
             }
         }

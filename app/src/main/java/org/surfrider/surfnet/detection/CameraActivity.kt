@@ -109,6 +109,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         outputLinesFlow = arrayListOf()
 
         chronometer = binding.chronometer
+        binding.wasteCounter.text = "0"
 
         setupPermissions()
         setupBottomSheetLayout()
@@ -434,14 +435,20 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
 
     protected fun showIMUStats(stats: Array<Float>?) {
         if (stats != null && stats.size == 6) {
-            binding.bottomSheetLayout.positionInfo.text = df.format(stats[0]) + " " +  df.format(stats[1]) + " " +  df.format(stats[2])
+            binding.bottomSheetLayout.positionInfo.text =
+                df.format(stats[0]) + " " + df.format(stats[1]) + " " + df.format(stats[2])
             binding.bottomSheetLayout.speedInfo.text = df.format(stats[3])
-            binding.bottomSheetLayout.flowInfo.text = df.format(stats[4]) + " " + df.format(stats[5])
+            binding.bottomSheetLayout.flowInfo.text =
+                df.format(stats[4]) + " " + df.format(stats[5])
         } else {
             binding.bottomSheetLayout.positionInfo.text = "null"
             binding.bottomSheetLayout.speedInfo.text = "null"
             binding.bottomSheetLayout.flowInfo.text = "null"
         }
+    }
+
+    protected fun updateCounter(count: String?) {
+        binding.wasteCounter.text = count
     }
 
     protected abstract fun processImage()

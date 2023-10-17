@@ -19,6 +19,7 @@ class DenseOpticalFlow {
     private var err = MatOfFloat()
 
     private fun updatePoints(greyImage: Mat, mask: Mat?) {
+        Timber.i("updating OF points")
         val corners = MatOfPoint()
         Imgproc.goodFeaturesToTrack(greyImage, corners, maxCorners, 0.1, 5.0, mask?:Mat())
         prevPts.fromArray(*corners.toArray())
@@ -41,8 +42,8 @@ class DenseOpticalFlow {
             // return Point(0.0, 0.0)
         }
         // If the number of flow points is too low, find new good features
-        if (flowPtsCount < maxCorners / 5) {
-            currGreyImage.copyTo(prevGreyImage)
+        if (flowPtsCount < maxCorners / 2) {
+            // currGreyImage.copyTo(prevGreyImage)
             updatePoints(currGreyImage, mask)
         }
         // Run the KLT algorithm for Optical Flow
