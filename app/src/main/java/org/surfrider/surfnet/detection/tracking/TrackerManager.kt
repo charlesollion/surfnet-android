@@ -13,7 +13,7 @@ import java.util.*
 class TrackerManager {
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
     private var trackerIndex = 0
-    var detectedWaste = 0
+    val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
 
     fun updateTrackers() {
         trackers.forEach { tracker -> tracker.update() }
@@ -70,7 +70,9 @@ class TrackerManager {
                     getBitmap(
                         it,
                         if (tracker.status == Tracker.TrackerStatus.GREEN) {
-                            i++
+                            if (!detectedWaste.contains(tracker)) {
+                                detectedWaste.add(tracker)
+                            }
                             R.drawable.green_dot
                         } else {
                             R.drawable.red_dot
@@ -89,7 +91,6 @@ class TrackerManager {
                 canvas.drawText(tracker.index.toString(), point[0], point[1], paint)
             }
         }
-        detectedWaste = i;
     }
 
     @Synchronized
