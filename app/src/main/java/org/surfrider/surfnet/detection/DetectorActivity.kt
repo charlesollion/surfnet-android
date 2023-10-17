@@ -191,7 +191,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             toast.show()
             finish()
         }
-
+       trackerManager = TrackerManager()
         val cropSize = detector?.inputSize
         cropSize?.let {
             Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
