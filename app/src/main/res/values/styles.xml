@@ -11,42 +11,47 @@
     <style name="TitleText" parent="TextAppearance.AppCompat">
         <item name="android:fontFamily">@font/montserrat_bold</item>
         <item name="android:textSize">25dp</item>
-        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textColor">#000000</item>
     </style>
     <style name="SubtitleText" parent="TextAppearance.AppCompat">
         <item name="android:fontFamily">@font/montserrat_bold</item>
         <item name="android:textSize">16dp</item>
-        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textColor">#000000</item>
     </style>
     <style name="HomeText" parent="TextAppearance.AppCompat">
         <item name="android:fontFamily">@font/montserrat</item>
         <item name="android:textSize">16dp</item>
-        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textColor">#000000</item>
     </style>
     <style name="TutorialText" parent="TextAppearance.AppCompat">
         <item name="android:fontFamily">@font/montserrat</item>
         <item name="android:textSize">14dp</item>
-        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textColor">#000000</item>
     </style>
     <style name="ItalicText" parent="TextAppearance.AppCompat">
         <item name="android:fontFamily">@font/montserrat</item>
         <item name="android:textSize">13dp</item>
-        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textColor">#000000</item>
     </style>
     <style name="PlaceholderText" parent="TextAppearance.AppCompat">
         <item name="android:fontFamily">@font/montserrat_italic</item>
         <item name="android:textSize">13dp</item>
-        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textColor">#000000</item>
     </style>
     <style name="ButtonText" parent="TextAppearance.AppCompat">
         <item name="android:fontFamily">@font/montserrat</item>
         <item name="android:textSize">15dp</item>
-        <item name="android:textColor">@color/tfe_color_primary</item>
+        <item name="android:textColor">#FFFFFF</item>
     </style>
     <style name="TutorialButtonText" parent="TextAppearance.AppCompat">
         <item name="android:fontFamily">@font/montserrat</item>
         <item name="android:textSize">14dp</item>
-        <item name="android:textColor">@color/tfe_color_primary</item>
+        <item name="android:textColor">#FFFFFF</item>
     </style>
 
+    <style name="CGUText" parent="TextAppearance.AppCompat">
+        <item name="android:fontFamily">@font/montserrat_italic</item>
+        <item name="android:textSize">12dp</item>
+        <item name="android:textColor">#000000</item>
+    </style>
 </resources>

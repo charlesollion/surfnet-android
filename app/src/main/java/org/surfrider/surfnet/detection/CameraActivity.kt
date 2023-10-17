@@ -80,6 +80,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         setContentView(binding.root)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         chronometer = binding.chronometer
+        binding.wasteCounter.text = "0"
         setupPermissions()
         setupBottomSheetLayout()
     }
@@ -348,6 +349,10 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
             binding.bottomSheetLayout.latitudeInfo.text = "null"
             binding.bottomSheetLayout.longitudeInfo.text = "null"
         }
+    }
+
+    protected fun updateCounter(count: String?) {
+        binding.wasteCounter.text = count
     }
 
     protected abstract fun processImage()

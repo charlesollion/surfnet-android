@@ -13,7 +13,8 @@ import kotlin.math.min
 
 class TrackerManager {
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
-    var trackerIndex = 0
+    private var trackerIndex = 0
+    val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
 
     private fun updateTrackers() {
         trackers.forEach { tracker -> tracker.update() }
@@ -62,6 +63,7 @@ class TrackerManager {
             canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
         )
         frameToCanvasTransform.postScale(scale, scale)
+            var i = 0
 
         for (tracker in trackers) {
             val trackedPos = tracker.position
@@ -70,7 +72,14 @@ class TrackerManager {
                 val bmp = context?.let {
                     getBitmap(
                         it,
-                        if (tracker.status == Tracker.TrackerStatus.GREEN) R.drawable.green_dot else R.drawable.red_dot
+                        if (tracker.status == Tracker.TrackerStatus.GREEN) {
+                            if (!detectedWaste.contains(tracker)) {
+                                detectedWaste.add(tracker)
+                            }
+                            R.drawable.green_dot
+                        } else {
+                            R.drawable.red_dot
+                        }
                     )
                 }
 
