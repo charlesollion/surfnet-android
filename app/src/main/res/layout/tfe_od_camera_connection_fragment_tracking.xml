@@ -31,6 +31,27 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 
+    <View
+        android:layout_width="0dp"
+        android:layout_height="4dp"
+        android:background="@drawable/red_line"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintVertical_bias="0.60"
+        app:layout_constraintWidth_percent="0.95"/>
+
+    <Button
+        android:id="@+id/close_button"
+        android:background="@drawable/start"
+        android:layout_width="55dp"
+        android:layout_height="55dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="50dp" />
+
+
+
     <Button
         android:id="@+id/start_button"
         android:background="@drawable/start"
