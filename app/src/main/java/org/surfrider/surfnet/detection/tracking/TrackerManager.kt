@@ -9,13 +9,14 @@ import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import timber.log.Timber
 import java.util.*
+import kotlin.math.min
 
 class TrackerManager {
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
     private var trackerIndex = 0
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
 
-    fun updateTrackers() {
+    private fun updateTrackers() {
         trackers.forEach { tracker -> tracker.update() }
     }
 
@@ -35,7 +36,7 @@ class TrackerManager {
             // Timber.i("Trackers Size = ${trackers.size}")
             // Greedy assignment of trackers
             trackers.forEachIndexed { i, tracker ->
-                if(tracker.status != Tracker.TrackerStatus.INACTIVE && !tracker.alreadyAssociated) {
+                if (tracker.status != Tracker.TrackerStatus.INACTIVE && !tracker.alreadyAssociated) {
                     val dist = tracker.distTo(position)
                     // Timber.i("Distance = $dist")
                     if (dist < minDist) {
@@ -53,12 +54,14 @@ class TrackerManager {
             }
         }
     }
+
     @Synchronized
-    fun draw(canvas: Canvas, context: Context?, previewWidth:Int, previewHeight:Int) {
+    fun draw(canvas: Canvas, context: Context?, previewWidth: Int, previewHeight: Int) {
         // Build transform matrix from canvas and context
         val frameToCanvasTransform = Matrix()
-        val scale = Math.min(canvas!!.width / previewWidth.toFloat(),
-                             canvas!!.height / previewHeight.toFloat())
+        val scale = min(
+            canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
+        )
         frameToCanvasTransform.postScale(scale, scale)
             var i = 0
 
@@ -79,12 +82,35 @@ class TrackerManager {
                         }
                     )
                 }
+
                 val point = floatArrayOf(trackedPos.x, trackedPos.y)
                 frameToCanvasTransform.mapPoints(point)
                 if (bmp != null) {
                     canvas.drawBitmap(bmp, point[0], point[1], null)
                 }
 
+                //Animation drawing
+                if (tracker.animation) {
+                    val shouldShowBottomAnimation = trackedPos.y < canvas.height.div(scale) / 2
+                    val animation = context?.let {
+                        getBitmap(
+                            it, if (shouldShowBottomAnimation) R.drawable.animation_down else R.drawable.animation
+                        )
+                    }
+
+                    if (animation != null && bmp != null) {
+                        val animationWidth = animation.width.div(scale)
+                        val animationHeight = animation.height.div(scale)
+                        val bmpWidth = bmp.width.div(scale)
+                        val bmpHeight = bmp.height.div(scale)
+                        val animationPoint = floatArrayOf(
+                            trackedPos.x - (animationWidth / 2) + (bmpWidth / 2) + 3,
+                            if (shouldShowBottomAnimation) trackedPos.y + bmpHeight else trackedPos.y - (animationHeight)
+                        )
+                        frameToCanvasTransform.mapPoints(animationPoint)
+                        canvas.drawBitmap(animation, animationPoint[0], animationPoint[1], null)
+                    }
+                }
                 //affichage du text avec le numéro du tracker
                 val paint = Paint()
                 paint.textSize = 40.0F
@@ -100,7 +126,7 @@ class TrackerManager {
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
                 val paint = Paint()
                 paint.textSize = 40.0F
-                canvas.drawText(tracker.index.toString(), trackedPos.x, trackedPos.y,paint )
+                canvas.drawText(tracker.index.toString(), trackedPos.x, trackedPos.y, paint)
             }
         }
     }
@@ -108,9 +134,7 @@ class TrackerManager {
     private fun getBitmap(vectorDrawable: VectorDrawable?): Bitmap? {
         vectorDrawable?.let {
             val bitmap = Bitmap.createBitmap(
-                it.intrinsicWidth * 2,
-                it.intrinsicHeight * 2,
-                Bitmap.Config.ARGB_8888
+                it.intrinsicWidth * 2, it.intrinsicHeight * 2, Bitmap.Config.ARGB_8888
             )
             val canvas = Canvas(bitmap)
             it.setBounds(0, 0, canvas.width, canvas.height)
@@ -125,9 +149,11 @@ class TrackerManager {
             is BitmapDrawable -> {
                 BitmapFactory.decodeResource(context.resources, drawableId)
             }
+
             is VectorDrawable -> {
                 getBitmap(drawable as VectorDrawable?)
             }
+
             else -> {
                 throw IllegalArgumentException("unsupported drawable type")
             }
