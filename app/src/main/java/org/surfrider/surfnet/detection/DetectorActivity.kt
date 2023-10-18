@@ -72,7 +72,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     private var timestamp: Long = 0
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
-    private var trackerManager: TrackerManager? = null
     private lateinit var locationManager: LocationManager
     private val modelString = "yolov8n_float16.tflite"
     private val labelFilename = "file:///android_asset/coco.txt"
@@ -220,7 +219,9 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                         trackerManager?.drawDebug(canvas)
                     }
                 }
-                updateCounter(trackerManager!!.detectedWaste.size.toString())
+                if(trackerManager != null) {
+                    updateCounter(trackerManager!!.detectedWaste.size.toString())
+                }
                 //drawDebugScreen(canvas)
             }
         })
@@ -235,27 +236,24 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         val frameToCanvasTransform = Matrix()
         val scale = Math.min(canvas!!.width / previewWidth.toFloat(),
                              canvas!!.height / previewHeight.toFloat())
-        // Scale is doubled because the greyImage to compute the flow was downsampled by a factor 2
-        frameToCanvasTransform.postScale(scale * 2.0F, scale * 2.0F)
+        // Adjust scale whether we downsampled the greyImage to compute the points
+        frameToCanvasTransform.postScale(scale * 1.0F, scale * 1.0F)
         for(line in outputLinesFlow) {
             val points = line.clone()
             frameToCanvasTransform.mapPoints(points)
             //Timber.i(" flow - i, j, dx, dy, $i, $j, $dx, $dy")
+            canvas?.drawCircle(points[0], points[1], 10.0f, paint)
             canvas?.drawLine(points[0], points[1], points[2], points[3], paint)
         }
-
     }
     private fun drawOFLines(canvas: Canvas?) {
-
+        // Draw dense optical flow, not used
         val paint = Paint()
         paint.color = Color.RED
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 4.0f
         val factor = 10
         val gridSize = 8.0F * factor
-        // Timber.i("canvas size: ${canvas?.width} ${canvas?.height}")
-        Timber.i("output flow size: ${outputFlow.rows()} ${outputFlow.cols()}")
-        // Timber.i("preview size: $previewWidth $previewHeight")
         if(outputFlow == null)
             return
 
@@ -263,9 +261,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         val scale = Math.min(canvas!!.width / previewWidth.toFloat(),
             canvas!!.height / previewHeight.toFloat())
         frameToCanvasTransform.postScale(scale, scale)
-        //val rectCam = RectF(90.0F, 90.0F, previewWidth.toFloat()-90.0F, previewHeight.toFloat()-90.0F)
-        //frameToCanvasTransform.mapRect(rectCam)
-        //canvas?.drawRect(rectCam, paint)
         for (i: Int in 4 until outputFlow.rows() / factor- 4) {
             for (j: Int in 1 until outputFlow.cols() / factor-1) {
                 val x: Float = gridSize * i
@@ -276,7 +271,6 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                     val dy: Float = pointFlow[1].toFloat() * 2.0F
                     val points = floatArrayOf(x, y, x + dx, y + dy)
                     frameToCanvasTransform.mapPoints(points)
-                    //Timber.i(" flow - i, j, dx, dy, $i, $j, $dx, $dy")
                     canvas?.drawLine(points[0], points[1], points[2], points[3], paint)
                 }
             }
@@ -286,9 +280,8 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         val avgMV : Scalar = Core.mean(outputFlow)
         val cx = canvas!!.width/2.0F
         val cy = canvas.height/2.0F
-        val factorLine: Float = 10.0F
+        val factorLine = 10.0F
         canvas?.drawLine(cx, cy, cx + avgMV.`val`[0].toFloat() * factorLine, cy + avgMV.`val`[1].toFloat() * factorLine, paint)
-
     }
 
     fun drawDebugScreen(canvas: Canvas?) {
@@ -392,10 +385,9 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                 }
             }
             trackerManager?.processDetections(mappedRecognitions)
-            currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 40)
-            /*runOnUiThread {
-                Timber.i("Mid - ${currROIs?.dump()}")
-            }*/
+            trackerManager?.associateFlowWithTrackers(outputLinesFlow)
+            currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 60)
+
             trackingOverlay?.postInvalidate()
             computingDetection = false
             runOnUiThread {

@@ -14,16 +14,37 @@ class DenseOpticalFlow {
     private var prevPts = MatOfPoint2f()
     private var currPts = MatOfPoint2f()
     private val maxCorners = 50
+    private val minDistance = 10.0
     private var flowPtsCount = 50
     private var status = MatOfByte()
     private var err = MatOfFloat()
 
+
     private fun updatePoints(greyImage: Mat, mask: Mat?) {
-        Timber.i("updating OF points")
         val corners = MatOfPoint()
-        Imgproc.goodFeaturesToTrack(greyImage, corners, maxCorners, 0.1, 5.0, mask?:Mat())
-        prevPts.fromArray(*corners.toArray())
+        Imgproc.goodFeaturesToTrack(greyImage, corners, maxCorners - prevPts.rows(), 0.1, minDistance, mask ?: Mat())
+
+        val newCornersArray = corners.toArray()
+
+        // Combine the new points with the existing ones
+        val combinedCorners = if (!prevPts.empty()) {
+            val prevCorners = prevPts.toList()
+            newCornersArray.toList() + prevCorners
+        } else {
+            newCornersArray.toList()
+        }
+
+        // Ensure we don't exceed maxCorners points
+        val updatedCorners = if (combinedCorners.size > maxCorners) {
+            combinedCorners.take(maxCorners)
+        } else {
+            combinedCorners
+        }
+
+        // Update prevPts with the updated points
+        prevPts.fromList(updatedCorners)
     }
+
 
     fun run(newFrame: Mat, mask:Mat?): ArrayList<FloatArray> {
         return  PyrLK(newFrame, mask)
@@ -34,6 +55,9 @@ class DenseOpticalFlow {
         // convert the frame to Gray
         Imgproc.cvtColor(newFrame, currGreyImage, Imgproc.COLOR_RGBA2GRAY)
         // if this is the first loop, find good features
+        if(mask == null || mask.empty()) {
+            Timber.i("OF mask null or empty")
+        }
         // Timber.i("imgSize: ${currGreyImage.size().toString()} mask size: ${mask?.size().toString()}")
         if (prevGreyImage.empty()) {
             currGreyImage.copyTo(prevGreyImage)

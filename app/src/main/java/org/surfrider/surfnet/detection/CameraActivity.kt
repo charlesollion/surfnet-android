@@ -54,17 +54,14 @@ import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils.convertYUV420ToARGB8888
 import org.surfrider.surfnet.detection.flow.DenseOpticalFlow
 import org.surfrider.surfnet.detection.flow.IMU_estimator
+import org.surfrider.surfnet.detection.tracking.TrackerManager
 import timber.log.Timber
 import java.text.DecimalFormat
 import java.util.*
 
 
 abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
-
-
-    private lateinit var locationManager: LocationManager
     private lateinit var binding: TfeOdActivityCameraBinding
-
 
     @JvmField
     protected var previewWidth = 0
@@ -85,13 +82,15 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private lateinit var df : DecimalFormat;
     private lateinit var imuEstimator : IMU_estimator
     private lateinit var opticalFlow : DenseOpticalFlow
-    public lateinit var outputFlow : Mat
-    public lateinit var outputLinesFlow: ArrayList<FloatArray>
+    protected lateinit var outputFlow : Mat // To be removed
+    protected lateinit var outputLinesFlow: ArrayList<FloatArray>
+    protected var trackerManager: TrackerManager? = null
     protected var currROIs : Mat? = null
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     var detectorPaused = true
     lateinit var chronometer: Chronometer
+    private val flowRefreshRateInMills: Long = 250
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate $this")
@@ -105,7 +104,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         // init IMU_estimator, optical flow
         imuEstimator = IMU_estimator(this.applicationContext)
         opticalFlow = DenseOpticalFlow()
-        outputFlow = Mat()
         outputLinesFlow = arrayListOf()
 
         chronometer = binding.chronometer
@@ -118,13 +116,12 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 while(true) {
                     scheduledOpticalFlow()
-                    delay(250)
+                    scheduledUpdateTrackers()
+                    delay(flowRefreshRateInMills)
                 }
             }
         }
     }
-
-
 
 
     private fun setupBottomSheetLayout() {
@@ -368,7 +365,6 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     }
 
     private suspend fun scheduledOpticalFlow() {
-        // Timber.d("##### background run flow and IMU")
         // get IMU variables
         val velocity: FloatArray = imuEstimator.velocity
         val imuPosition: FloatArray = imuEstimator.position
@@ -396,12 +392,15 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         val currFrame = Mat()
         Utils.bitmapToMat(bmp32, currFrame)
 
-        // outputFlow = opticalFlow.run(currFrame)
         outputLinesFlow = opticalFlow.run(currFrame, currROIs)
 
-        // Timber.i("### flow output: " + df.format(outputFlow.x) + " / " + df.format((outputFlow.y)))
-        // outputFlow.x.toFloat(), outputFlow.y.toFloat()
         showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2], speed, 0.0F, 0.0F))
+    }
+
+    private suspend fun scheduledUpdateTrackers() {
+        trackerManager?.let {
+            it.updateTrackers(flowRefreshRateInMills)
+        }
     }
 
     protected fun readyForNextImage() {
