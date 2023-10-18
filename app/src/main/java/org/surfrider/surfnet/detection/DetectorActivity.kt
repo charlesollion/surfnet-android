@@ -28,7 +28,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.SystemClock
-import android.util.Log
 import android.util.Size
 import android.view.View
 import android.view.WindowInsets
@@ -219,8 +218,9 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                         trackerManager?.drawDebug(canvas)
                     }
                 }
-                if(trackerManager != null) {
-                    updateCounter(trackerManager!!.detectedWaste.size.toString())
+
+                trackerManager?.let {
+                    tracker -> updateCounter(tracker.detectedWaste.size.toString())
                 }
                 //drawDebugScreen(canvas)
             }
