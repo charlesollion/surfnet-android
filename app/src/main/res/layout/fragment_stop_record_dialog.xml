@@ -32,7 +32,7 @@
 
     <Button
         android:id="@+id/stopDialogNo"
-        style="@style/DialogNo"
+        style="@style/DialogBlack"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="@drawable/white_rounded_corner"
@@ -43,7 +43,7 @@
 
     <Button
         android:id="@+id/stopDialogYes"
-        style="@style/DialogYes"
+        style="@style/DialogWhite"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="@drawable/rounded_corner"

@@ -18,4 +18,7 @@
     <string name="stop_dialog_body">Souhaites-tu arrêter le suivi et envoyer tes données ?</string>
     <string name="stop_dialog_yes">Oui</string>
     <string name="stop_dialog_no">Non</string>
+    <string name="send_dialog_title">Merci pour ta contributon !</string>
+    <string name="send_dialog_body">%1$s déchets identifiés pour %2$sm parcourus</string>
+    <string name="send_dialog_button">Lancer un nouveau suivi vidéo</string>
 </resources>

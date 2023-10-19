@@ -70,6 +70,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private var imageConverter: Runnable? = null
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     var detectorPaused = true
+    var wasteCount = 0
     lateinit var chronometer: Chronometer
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -294,6 +295,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         val camera2Fragment = desiredPreviewFrameSize?.let {
             CameraConnectionFragment.newInstance(
                     chronometer,
+                { getCount() },
                 { size: Size?, rotation: Int ->
                     previewHeight = size!!.height
                     previewWidth = size.width
@@ -351,8 +353,15 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         }
     }
 
-    protected fun updateCounter(count: String?) {
-        binding.wasteCounter.text = count
+    protected fun updateCounter(count: Int?) {
+        binding.wasteCounter.text = count.toString()
+        if(count != null) {
+            wasteCount = count
+        }
+    }
+
+    fun getCount() : Int {
+        return wasteCount
     }
 
     protected abstract fun processImage()

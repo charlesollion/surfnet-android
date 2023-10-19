@@ -178,7 +178,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                     assets, modelString, labelFilename, isQuantized, isV8, inputSize
                 )
             }
-            //detector?.useGpu()
+            detector?.useGpu()
             detector?.setNumThreads(numThreads)
             detectorPaused = false
         } catch (e: IOException) {
@@ -213,9 +213,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                         trackerManager?.drawDebug(canvas)
                     }
                 }
-                if(trackerManager != null) {
-                    updateCounter(trackerManager!!.detectedWaste.size.toString())
-                }
+                updateCounter(trackerManager!!.detectedWaste.size)
                 //drawDebugScreen(canvas)
             }
         })
