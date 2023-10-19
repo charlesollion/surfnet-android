@@ -192,8 +192,10 @@ class CameraConnectionFragment private constructor(
             binding.startButton.visibility = View.VISIBLE
             binding.stopButton.visibility = View.INVISIBLE
             endDetector()
-            lastPause = SystemClock.elapsedRealtime();
+            lastPause = SystemClock.elapsedRealtime()
             chrono.stop()
+            val stopRecordDialog = StopRecordDialog()
+            stopRecordDialog.show(parentFragmentManager, "stop_record_dialog")
         }
 
         return binding.root

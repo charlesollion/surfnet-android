@@ -14,4 +14,8 @@
     <string name="tutorial_p2_text">L\'IA détecte et compte\nautomatiquement les\ndéchets sur la berge.</string>
     <string name="tutorial_button_text">Je suis prêt</string>
     <string name="home_cgu">En saisissant votre adresse mail ci-dessous, vous acceptez nos CGU. Les données collectées vous seront attribuées.</string>
+    <string name="stop_dialog_title">Ta vidéo est en pause</string>
+    <string name="stop_dialog_body">Souhaites-tu arrêter le suivi et envoyer tes données ?</string>
+    <string name="stop_dialog_yes">Oui</string>
+    <string name="stop_dialog_no">Non</string>
 </resources>
