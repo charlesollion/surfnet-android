@@ -53,7 +53,7 @@ class TrackerManager {
             if (det.associatedId != -1) {
                 trackers[det.associatedId].addDetection(det)
             } else {
-                trackers.addLast(Tracker(det, trackerIndex))
+                trackers.addLast(Tracker(det, trackerIndex, 0.1))
                 trackerIndex++
             }
         }

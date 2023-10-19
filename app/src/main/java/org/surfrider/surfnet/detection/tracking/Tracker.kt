@@ -2,14 +2,24 @@ package org.surfrider.surfnet.detection.tracking
 
 import android.graphics.PointF
 import android.graphics.RectF
+import org.opencv.core.Core
+import org.opencv.core.Core.*
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import org.opencv.core.Scalar
+import org.opencv.core.times
+import org.opencv.video.KalmanFilter
 import org.surfrider.surfnet.detection.tflite.Detector
 import java.util.*
 import kotlin.math.abs
 
-public class Tracker(det: TrackedDetection, idx: Int) {
+public class Tracker(det: TrackedDetection, idx: Int, dt: Double) {
     private val MAX_TIMESTAMP = 3000
     private val MAX_ANIMATION_TIMESTAMP = 1000
     private val NUM_CONSECUTIVE_DET = 5
+
+    private var kalmanFilter: KalmanFilter
+    private var state: Mat
 
     var index = idx
     var status : TrackerStatus = TrackerStatus.RED
@@ -25,6 +35,31 @@ public class Tracker(det: TrackedDetection, idx: Int) {
     var speed = PointF(0.0F, 0.0F)
 
     init {
+        kalmanFilter = KalmanFilter(4, 4, 0, CvType.CV_32F)
+        // Initialize with first position, and 0 speed
+        state = Mat.zeros(4, 1, CvType.CV_32F)
+        state.put(0, 0, position.x.toDouble())
+        state.put(1, 0, position.y.toDouble())
+
+        // Define transition matrix (A) - movement equation
+        val A = Mat.eye(4, 4, CvType.CV_32F)
+        A.put(0, 2, dt)
+        A.put(1, 3, dt)
+        kalmanFilter._transitionMatrix = A
+
+        // Define measurement matrix (H) - observe position and velocity
+        kalmanFilter._measurementMatrix = Mat.eye(4, 4, CvType.CV_32F)
+
+        // Define process noise covariance (Q) - tune this based on your problem
+        val Q = Mat(4, 4, CvType.CV_32F)
+        setIdentity(Q, Scalar(0.1))
+        kalmanFilter._processNoiseCov = Q
+
+        // Define measurement noise covariance (R) - tune this based on your problem
+        val R = Mat(4, 4, CvType.CV_32F))
+        setIdentity(R, Scalar(0.1))
+        kalmanFilter._measurementNoiseCov = R
+
         trackedObjects.addLast(firstDetection)
     }
     
