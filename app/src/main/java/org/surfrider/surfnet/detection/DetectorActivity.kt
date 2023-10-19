@@ -213,7 +213,9 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                         trackerManager?.drawDebug(canvas)
                     }
                 }
-                updateCounter(trackerManager!!.detectedWaste.size)
+                trackerManager?.let {
+                    tracker -> updateCounter(tracker.detectedWaste.size)
+                }
                 //drawDebugScreen(canvas)
             }
         })
