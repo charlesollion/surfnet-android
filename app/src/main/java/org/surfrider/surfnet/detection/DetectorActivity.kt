@@ -207,6 +207,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
         frameToCropTransform?.invert(cropToFrameTransform)
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
         trackingOverlay?.addCallback(object : DrawCallback {
+            @Synchronized
             override fun drawCallback(canvas: Canvas?) {
                 if (canvas != null) {
                     trackerManager?.draw(canvas, context, previewWidth, previewHeight)
@@ -218,9 +219,10 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                         trackerManager?.drawDebug(canvas)
                     }
                 }
-
-                trackerManager?.let {
-                    tracker -> updateCounter(tracker.detectedWaste.size.toString())
+                synchronized(lock) {
+                    trackerManager?.let {
+                            tracker -> updateCounter(tracker.detectedWaste.size.toString())
+                    }
                 }
                 //drawDebugScreen(canvas)
             }
@@ -384,8 +386,9 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                     }
                 }
             }
+            // Should we care about synchronizing this one?
             trackerManager?.processDetections(mappedRecognitions)
-            trackerManager?.associateFlowWithTrackers(outputLinesFlow)
+
             currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 60)
 
             trackingOverlay?.postInvalidate()

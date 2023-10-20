@@ -10,6 +10,7 @@ import org.opencv.core.Scalar
 import org.opencv.core.times
 import org.opencv.video.KalmanFilter
 import org.surfrider.surfnet.detection.tflite.Detector
+import timber.log.Timber
 import java.util.*
 import kotlin.math.abs
 
@@ -52,13 +53,27 @@ public class Tracker(det: TrackedDetection, idx: Int, dt: Double) {
 
         // Define process noise covariance (Q) - tune this based on your problem
         val Q = Mat(4, 4, CvType.CV_32F)
-        setIdentity(Q, Scalar(0.1))
+        setIdentity(Q, Scalar(1.0))
         kalmanFilter._processNoiseCov = Q
 
         // Define measurement noise covariance (R) - tune this based on your problem
-        val R = Mat(4, 4, CvType.CV_32F))
-        setIdentity(R, Scalar(0.1))
+        val R = Mat(4, 4, CvType.CV_32F)
+        setIdentity(R, Scalar(1.0))
         kalmanFilter._measurementNoiseCov = R
+
+        state.copyTo(kalmanFilter._statePre)
+
+        /*val newPosition = firstDetection.getCenter()
+        val measurement = Mat.zeros(4, 1, CvType.CV_32F)
+        measurement.put(0, 0, newPosition.x.toDouble())
+        measurement.put(1, 0, newPosition.y.toDouble())
+
+        // Set the velocity components in the state vector to their current values
+        measurement.put(2, 0, state.get(2, 0)[0]) // Keep the current vx
+        measurement.put(3, 0, state.get(3, 0)[0]) // Keep the current vy
+
+        // Update the state with the measurement
+        kalmanFilter.correct(measurement)*/
 
         trackedObjects.addLast(firstDetection)
     }
@@ -73,7 +88,19 @@ public class Tracker(det: TrackedDetection, idx: Int, dt: Double) {
 
     fun addDetection(newDet: TrackedDetection) {
         trackedObjects.addLast(newDet)
-        position = newDet.getCenter()
+        val newPosition = newDet.getCenter()
+        val measurement = Mat.zeros(4, 1, CvType.CV_32F)
+        measurement.put(0, 0, newPosition.x.toDouble())
+        measurement.put(1, 0, newPosition.y.toDouble())
+
+        // Set the velocity components in the state vector to their current values
+        measurement.put(2, 0, state.get(2, 0)[0]) // Keep the current vx
+        measurement.put(3, 0, state.get(3, 0)[0]) // Keep the current vy
+
+        // Update the state with the measurement
+        kalmanFilter.correct(measurement)
+        kalmanFilter.predict()
+
         alreadyAssociated = true
 
         if(trackedObjects.size > NUM_CONSECUTIVE_DET && status == TrackerStatus.RED) {
@@ -83,7 +110,26 @@ public class Tracker(det: TrackedDetection, idx: Int, dt: Double) {
         }
     }
 
-    fun update(flowRefreshRateInMillis: Long) {
+    fun updateSpeed(measuredSpeed: PointF) {
+        // Create a measurement vector
+        val measurement = Mat.zeros(4, 1, CvType.CV_32F)
+
+        measurement.put(0, 0, state.get(0, 0)[0]) // Keep the current x
+        measurement.put(1, 0, state.get(1, 0)[0]) // Keep the current y
+
+        // Set the velocity components in the state vector to their current values
+        measurement.put(2, 0, measuredSpeed.x.toDouble()) // Keep the current vx
+        measurement.put(3, 0, measuredSpeed.y.toDouble()) // Keep the current vy
+
+        Timber.i("#${index} - Updating speed: ${measurement.dump()}")
+
+        // Update the state with the measurement
+        kalmanFilter.correct(measurement)
+    }
+
+
+
+    fun update() {
         alreadyAssociated = false
 
         val currTimeStamp = System.currentTimeMillis()
@@ -107,9 +153,21 @@ public class Tracker(det: TrackedDetection, idx: Int, dt: Double) {
 
         // Move tracker
         if(lastUpdatedTimestamp > 0) {
-            val elapsedTime = compareTimeDifferenceInMilliseconds(currTimeStamp, lastUpdatedTimestamp)
-            position.x += speed.x * (elapsedTime / flowRefreshRateInMillis)
-            position.y += speed.y * (elapsedTime / flowRefreshRateInMillis)
+            val dt = compareTimeDifferenceInMilliseconds(currTimeStamp, lastUpdatedTimestamp) / 1000.0
+            val A = Mat.eye(4, 4, CvType.CV_32F)
+            A.put(0, 2, dt)
+            A.put(1, 3, dt)
+            kalmanFilter._transitionMatrix = A
+            val outputPredict = kalmanFilter.predict()
+            outputPredict.copyTo(state)
+            Timber.i("#${index} - output of predict: ${outputPredict.dump()}")
+
+
+            position.x = state.get(0, 0)[0].toFloat() // Estimated x
+            position.y = state.get(1, 0)[0].toFloat() // Estimated x
+            speed.x = state.get(2, 0)[0].toFloat() // Estimated vx
+            speed.y = state.get(3, 0)[0].toFloat() // Estimated vy
+            // Timber.i("Updating state: ${position} $speed")
         }
         lastUpdatedTimestamp = currTimeStamp
     }

@@ -46,6 +46,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.sync.Mutex
 import org.opencv.android.Utils
 import org.opencv.core.CvType.*
 import org.opencv.core.Mat
@@ -91,6 +93,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     var detectorPaused = true
     lateinit var chronometer: Chronometer
     private val flowRefreshRateInMills: Long = 250
+    private val updateRefreshRateInMillis: Long = 25
+    val lock = Mutex()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate $this")
@@ -112,12 +116,27 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         setupPermissions()
         setupBottomSheetLayout()
 
-        lifecycleScope.launch(Dispatchers.Default) {
+        val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
+        val threadUpdate = newSingleThreadContext("TrackerUpdateThread")
+
+
+        lifecycleScope.launch(threadOpticalFlow) {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 while(true) {
-                    scheduledOpticalFlow()
-                    scheduledUpdateTrackers()
+                    synchronized(lock) {
+                        scheduledOpticalFlow()
+                    }
                     delay(flowRefreshRateInMills)
+                }
+            }
+        }
+        lifecycleScope.launch(threadUpdate) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while(true) {
+                    synchronized(lock) {
+                        scheduledUpdateTrackers()
+                    }
+                    delay(updateRefreshRateInMillis)
                 }
             }
         }
@@ -364,7 +383,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         }
     }
 
-    private suspend fun scheduledOpticalFlow() {
+    @Synchronized
+    private fun scheduledOpticalFlow() {
         // get IMU variables
         val velocity: FloatArray = imuEstimator.velocity
         val imuPosition: FloatArray = imuEstimator.position
@@ -393,13 +413,17 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         Utils.bitmapToMat(bmp32, currFrame)
 
         outputLinesFlow = opticalFlow.run(currFrame, currROIs)
+        trackerManager?.let {
+            it.associateFlowWithTrackers(outputLinesFlow, flowRefreshRateInMills)
+        }
 
         showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2], speed, 0.0F, 0.0F))
     }
 
-    private suspend fun scheduledUpdateTrackers() {
+    @Synchronized
+    private fun scheduledUpdateTrackers() {
         trackerManager?.let {
-            it.updateTrackers(flowRefreshRateInMills)
+            it.updateTrackers()
         }
     }
 

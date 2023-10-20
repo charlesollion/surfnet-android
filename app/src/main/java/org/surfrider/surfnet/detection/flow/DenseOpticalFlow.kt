@@ -22,7 +22,10 @@ class DenseOpticalFlow {
 
     private fun updatePoints(greyImage: Mat, mask: Mat?) {
         val corners = MatOfPoint()
-        Imgproc.goodFeaturesToTrack(greyImage, corners, maxCorners - prevPts.rows(), 0.1, minDistance, mask ?: Mat())
+        var numberCorners = maxCorners
+        if(!prevPts.empty())
+            numberCorners -= prevPts.rows()
+        Imgproc.goodFeaturesToTrack(greyImage, corners, numberCorners, 0.1, minDistance, mask ?: Mat())
 
         val newCornersArray = corners.toArray()
 

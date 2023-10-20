@@ -23,8 +23,8 @@ class TrackerManager {
     private var trackerIndex = 0
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
 
-    fun updateTrackers(flowRefreshRateInMillis: Long) {
-        trackers.forEach { tracker -> tracker.update(flowRefreshRateInMillis) }
+    fun updateTrackers() {
+        trackers.forEach { tracker -> tracker.update() }
     }
 
     @Synchronized
@@ -159,21 +159,22 @@ class TrackerManager {
         return currRois
     }
 
-    fun associateFlowWithTrackers(listOfFlowLines: ArrayList<FloatArray>) {
+    fun associateFlowWithTrackers(listOfFlowLines: ArrayList<FloatArray>, flowRefreshRateInMillis: Long) {
         // Associate each tracker with flow speed
         // V1: just take the average flow
-        var motionSpeed: PointF = PointF(0.0F, 0.0F)
+        var motionSpeed = PointF(0.0F, 0.0F)
         if(listOfFlowLines.size > 0) {
             for (line in listOfFlowLines) {
                 motionSpeed.x += (line[2] - line[0])
                 motionSpeed.y += (line[3] - line[1])
             }
-            motionSpeed.x /= listOfFlowLines.size
-            motionSpeed.y /= listOfFlowLines.size
+            motionSpeed.x /= listOfFlowLines.size * 1000.0F / flowRefreshRateInMillis
+            motionSpeed.y /= listOfFlowLines.size * 1000.0F / flowRefreshRateInMillis
         }
 
+        // Timber.i("Motion Speed: ${motionSpeed.x} ${motionSpeed.y}")
         for(tracker in trackers) {
-            tracker.speed = motionSpeed
+            tracker.updateSpeed(motionSpeed)
         }
     }
 
