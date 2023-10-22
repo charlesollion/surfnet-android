@@ -189,8 +189,7 @@ class CameraConnectionFragment private constructor(
             binding.stopButton.visibility = View.VISIBLE
             chrono.visibility = View.VISIBLE
             binding.closeButton.visibility = View.INVISIBLE
-            //binding.
-            //binding.closeButton.visibility = View.INVISIBLE
+            binding.redLine.visibility = View.INVISIBLE
             startDetector()
             if (lastPause == 0L) {
                 chronometerText.base = SystemClock.elapsedRealtime()
@@ -205,6 +204,7 @@ class CameraConnectionFragment private constructor(
         binding.stopButton.setOnClickListener {
             binding.startButton.visibility = View.VISIBLE
             binding.stopButton.visibility = View.INVISIBLE
+            binding.redLine.visibility = View.VISIBLE
             endDetector()
             lastPause = SystemClock.elapsedRealtime();
             chrono.findViewById<Chronometer>(R.id.chronometer).stop()
