@@ -70,8 +70,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private var imageConverter: Runnable? = null
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     var detectorPaused = true
-    var wasteCount = 0
-    lateinit var chronometer: Chronometer
+    private var wasteCount = 0
+    private lateinit var chronometer: Chronometer
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate $this")
@@ -353,8 +353,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         }
     }
 
-    protected fun updateCounter(count: Int?) {
-        binding.wasteCounter.text = count.toString()
+    protected fun updateCounter(count: Int, lastCounter: Int) {
+        binding.wasteCounter.text = (count + lastCounter).toString()
         if(count != null) {
             wasteCount = count
         }

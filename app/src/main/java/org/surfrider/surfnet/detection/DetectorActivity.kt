@@ -78,6 +78,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     private val numThreads = 1
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val locationHandler = Handler()
+    private var lastCounter = 0
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -158,6 +159,9 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     }
 
     public override fun endDetector() {
+        trackerManager?.let {
+            tracker -> lastCounter += tracker.detectedWaste.size
+        }
         detectorPaused = true
         //removes all drawings of the trackingOverlay from the screen
         trackingOverlay?.invalidate()
@@ -214,7 +218,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                     }
                 }
                 trackerManager?.let {
-                    tracker -> updateCounter(tracker.detectedWaste.size)
+                    tracker -> updateCounter(tracker.detectedWaste.size, lastCounter)
                 }
                 //drawDebugScreen(canvas)
             }
