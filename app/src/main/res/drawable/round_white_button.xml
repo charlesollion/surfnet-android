@@ -1,0 +1,5 @@
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#FFFFFF" /> <!-- Couleur de fond (blanc) -->
+    <size android:width="55dp" android:height="55dp" /> <!-- Taille du cercle -->
+    <corners android:radius="27.5dp" /> <!-- Rayon des coins pour faire un cercle -->
+</shape>
