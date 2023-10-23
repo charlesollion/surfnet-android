@@ -16,6 +16,7 @@ package org.surfrider.surfnet.detection.env
 
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.media.Image
 import android.os.Environment
 import timber.log.Timber
 import java.io.File
@@ -177,4 +178,17 @@ object ImageUtils {
         }
         return matrix
     }
+    public fun fillBytes(planes: Array<Image.Plane>, yuvBytes: Array<ByteArray?>) {
+        // Because of the variable row stride it's not possible to know in
+        // advance the actual necessary dimensions of the yuv planes.
+        for (i in planes.indices) {
+            val buffer = planes[i].buffer
+            if (yuvBytes[i] == null) {
+                Timber.d("Initializing buffer %d at size %d", i, buffer.capacity())
+                yuvBytes[i] = ByteArray(buffer.capacity())
+            }
+            buffer[yuvBytes[i]]
+        }
+    }
+
 }
