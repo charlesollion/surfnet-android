@@ -20,7 +20,6 @@ import android.graphics.Bitmap;
 import android.graphics.RectF;
 import android.os.Build;
 
-import org.surfrider.surfnet.detection.DetectorActivity;
 import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.Tensor;
 import org.surfrider.surfnet.detection.env.Utils;
@@ -68,6 +67,7 @@ public class YoloDetector implements Detector {
             final AssetManager assetManager,
             final String modelFilename,
             final String labelFilename,
+            final float confThreshold,
             final boolean isQuantized,
             final boolean isV8,
             final int inputSize)
@@ -115,6 +115,7 @@ public class YoloDetector implements Detector {
             throw new RuntimeException(e);
         }
 
+        d.confThreshold = confThreshold;
         d.isModelQuantized = isQuantized;
         d.isV8 = isV8;
         // Pre-allocate buffers.
@@ -223,11 +224,6 @@ public class YoloDetector implements Detector {
         recreateInterpreter();
     }
 
-    @Override
-    public float getObjThresh() {
-        return DetectorActivity.MINIMUM_CONFIDENCE_TF_OD_API;
-    }
-
     // Float model
     private final float IMAGE_MEAN = 0;
 
@@ -250,6 +246,8 @@ public class YoloDetector implements Detector {
     private boolean isModelQuantized;
 
     private boolean isV8;
+
+    private float confThreshold;
 
     /** holds a gpu delegate */
     GpuDelegate gpuDelegate = null;
@@ -460,7 +458,7 @@ public class YoloDetector implements Detector {
             }
 
             final float confidenceInClass = maxClass * confidence;
-            if (confidenceInClass > getObjThresh()) {
+            if (confidenceInClass > confThreshold) {
                 final float xPos = out[0][i][0];
                 final float yPos = out[0][i][1];
 
