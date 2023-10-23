@@ -385,8 +385,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                 }
             }
             trackerManager?.processDetections(mappedRecognitions)
-            trackerManager?.associateFlowWithTrackers(outputLinesFlow)
-            currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 60)
+            flowRegionUpdateNeeded = true
 
             trackingOverlay?.postInvalidate()
             computingDetection = false

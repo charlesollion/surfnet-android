@@ -86,6 +86,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     protected lateinit var outputLinesFlow: ArrayList<FloatArray>
     protected var trackerManager: TrackerManager? = null
     protected var currROIs : Mat? = null
+    protected var flowRegionUpdateNeeded = false
 
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     var detectorPaused = true
@@ -380,6 +381,11 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
             kotlin.math.sqrt((xVelocity * xVelocity + yVelocity * yVelocity + zVelocity * zVelocity).toDouble())
                 .toFloat()
 
+        if(flowRegionUpdateNeeded) {
+            flowRegionUpdateNeeded = false
+            trackerManager?.associateFlowWithTrackers(outputLinesFlow)
+            currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 60)
+        }
 
         if(rgbBytes == null) {
             return
