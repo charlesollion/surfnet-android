@@ -56,6 +56,7 @@ import kotlin.math.min
 @SuppressLint("ValidFragment")
 class CameraConnectionFragment private constructor(
         private var chrono: Chronometer,
+        private var wasteCount: () -> Int,
     private val cameraConnectionCallback: (Size?, Int) -> Unit,
     private val startDetector: () -> Unit,
     private val endDetector: () -> Unit,
@@ -192,8 +193,10 @@ class CameraConnectionFragment private constructor(
             binding.startButton.visibility = View.VISIBLE
             binding.stopButton.visibility = View.INVISIBLE
             endDetector()
-            lastPause = SystemClock.elapsedRealtime();
+            lastPause = SystemClock.elapsedRealtime()
             chrono.stop()
+            val stopRecordDialog = StopRecordDialog(wasteCount(), 2F )
+            stopRecordDialog.show(parentFragmentManager, "stop_record_dialog")
         }
 
         return binding.root
@@ -539,13 +542,14 @@ class CameraConnectionFragment private constructor(
 
         fun newInstance(
                 chrono: Chronometer,
+                wasteCount: () -> Int,
                 callback: (Size?, Int) -> Unit,
                 startDetector: () -> Unit,
                 endDetector: () -> Unit,
                 imageListener: OnImageAvailableListener,
                 inputSize: Size,
         ): CameraConnectionFragment {
-            return CameraConnectionFragment(chrono, callback, startDetector, endDetector, imageListener, inputSize)
+            return CameraConnectionFragment(chrono, wasteCount, callback, startDetector, endDetector, imageListener, inputSize)
         }
     }
 }
