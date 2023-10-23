@@ -15,12 +15,19 @@ limitations under the License.
 package org.surfrider.surfnet.detection.env
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.RectF
 import android.media.Image
 import android.os.Environment
+import org.surfrider.surfnet.detection.TrackingActivity
+import org.surfrider.surfnet.detection.tflite.Detector
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
+import java.util.LinkedList
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -178,7 +185,9 @@ object ImageUtils {
         }
         return matrix
     }
-    public fun fillBytes(planes: Array<Image.Plane>, yuvBytes: Array<ByteArray?>) {
+
+    @JvmStatic
+    fun fillBytes(planes: Array<Image.Plane>, yuvBytes: Array<ByteArray?>) {
         // Because of the variable row stride it's not possible to know in
         // advance the actual necessary dimensions of the yuv planes.
         for (i in planes.indices) {
@@ -191,4 +200,62 @@ object ImageUtils {
         }
     }
 
+    fun drawDebugScreen(canvas: Canvas?, previewWidth: Int, previewHeight: Int, cropToFrameTransform: Matrix?) {
+        // Debug function to show frame size and crop size
+        val paint = Paint()
+        paint.color = Color.RED
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 4.0f
+        val rectCrop = RectF(0.0F, 0.0F, 640.0F, 640.0F)
+        // Slightly smaller than Camera frame width to see all borders
+        val rectCam = RectF(90.0F, 90.0F, previewWidth.toFloat()-90.0F, previewHeight.toFloat()-90.0F)
+
+        val frameToCanvasTransform = Matrix()
+        val scale = Math.min(canvas!!.width / previewWidth.toFloat(), canvas!!.height / previewHeight.toFloat())
+        frameToCanvasTransform.postScale(scale, scale)
+
+        // Draw Camera frame
+        frameToCanvasTransform.mapRect(rectCam)
+        canvas?.drawRect(rectCam, paint)
+
+        // Draw Crop
+        paint.color = Color.GREEN
+        cropToFrameTransform?.mapRect(rectCrop)
+        frameToCanvasTransform.mapRect(rectCrop)
+        canvas?.drawRect(rectCrop, paint)
+    }
+
+    fun drawDetections(results: List<Detector.Recognition>?, croppedBitmap: Bitmap?, cropToFrameTransform: Matrix?) {
+        val cropCopyBitmap = croppedBitmap?.let { Bitmap.createBitmap(it) }
+        val canvas = cropCopyBitmap?.let { Canvas(it) }
+        val paint = Paint()
+        paint.color = Color.RED
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2.0f
+        if (results != null) {
+            for (result in results) {
+                val location = result.location
+                if (location != null) {
+                    canvas?.drawRect(location, paint)
+                    cropToFrameTransform?.mapRect(location)
+                    result.location = location
+                }
+            }
+        }
+    }
+
+    fun mapDetectionsWithTransform(results: List<Detector.Recognition>?, cropToFrameTransform: Matrix?): MutableList<Detector.Recognition> {
+        val mappedRecognitions: MutableList<Detector.Recognition> = LinkedList()
+        if (results != null) {
+            for (result in results) {
+                val location = result.location
+                if (location != null) {
+                    cropToFrameTransform?.mapRect(location)
+                    result.location = location
+                    mappedRecognitions.add(result)
+                }
+            }
+        }
+        return mappedRecognitions
+    }
 }

@@ -9,6 +9,7 @@ import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 
 class BottomSheet(binding: TfeOdActivityCameraBinding) {
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
+    private var bottomSheetLayout = binding.bottomSheetLayout
 
     init {
         val bottomSheetLayout = binding.bottomSheetLayout
@@ -44,5 +45,19 @@ class BottomSheet(binding: TfeOdActivityCameraBinding) {
             }
             override fun onSlide(bottomSheet: View, slideOffset: Float) {}
         })
+    }
+
+    fun showInference(inferenceTime: String?) {
+        bottomSheetLayout.inferenceInfo.text = inferenceTime
+    }
+
+    fun showGPSCoordinates(coordinates: Array<String>?) {
+        if (coordinates != null && coordinates.size == 2) {
+            bottomSheetLayout.latitudeInfo.text = coordinates[0]
+            bottomSheetLayout.longitudeInfo.text = coordinates[1]
+        } else {
+            bottomSheetLayout.latitudeInfo.text = "null"
+            bottomSheetLayout.longitudeInfo.text = "null"
+        }
     }
 }
