@@ -72,6 +72,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     var detectorPaused = true
     lateinit var chronometer: TableRow
+    var wasteCount = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         Timber.d("onCreate $this")
@@ -81,6 +82,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         setContentView(binding.root)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         chronometer = binding.chronoContainer
+        binding.wasteCounter.text = "0"
         setupPermissions()
         setupBottomSheetLayout()
     }
@@ -294,6 +296,7 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         val camera2Fragment = desiredPreviewFrameSize?.let {
             CameraConnectionFragment.newInstance(
                     chronometer,
+                { getCount() },
                 { size: Size?, rotation: Int ->
                     previewHeight = size!!.height
                     previewWidth = size.width
@@ -356,6 +359,17 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
             binding.bottomSheetLayout.latitudeInfo.text = "null"
             binding.bottomSheetLayout.longitudeInfo.text = "null"
         }
+    }
+
+    protected fun updateCounter(count: Int?) {
+        binding.wasteCounter.text = count.toString()
+        if(count != null) {
+            wasteCount = count
+        }
+    }
+
+    fun getCount() : Int {
+        return wasteCount
     }
 
     protected abstract fun processImage()
