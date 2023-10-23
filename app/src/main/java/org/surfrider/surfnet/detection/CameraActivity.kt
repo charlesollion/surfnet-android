@@ -361,8 +361,8 @@ abstract class CameraActivity : AppCompatActivity(), OnImageAvailableListener {
         }
     }
 
-    protected fun updateCounter(count: Int, lastCounter: Int) {
-        binding.wasteCounter.text = (count + lastCounter).toString()
+    protected fun updateCounter(count: Int) {
+        binding.wasteCounter.text = count.toString()
         if(count != null) {
             wasteCount = count
         }

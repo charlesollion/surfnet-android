@@ -78,7 +78,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
     private val numThreads = 1
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val locationHandler = Handler()
-    private var lastCounter = 0
+    private var lastTrackerManager: TrackerManager? = null
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -160,7 +160,7 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
 
     public override fun endDetector() {
         trackerManager?.let {
-            tracker -> lastCounter += tracker.detectedWaste.size
+            tracker -> lastTrackerManager = tracker
         }
         detectorPaused = true
         //removes all drawings of the trackingOverlay from the screen
@@ -194,7 +194,10 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
             toast.show()
             finish()
         }
-       trackerManager = TrackerManager()
+        trackerManager = if (lastTrackerManager != null)
+            lastTrackerManager
+        else
+            TrackerManager()
         val cropSize = detector?.inputSize
         cropSize?.let {
             Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
@@ -218,8 +221,9 @@ class DetectorActivity : CameraActivity(), OnImageAvailableListener, LocationLis
                     }
                 }
                 trackerManager?.let {
-                    tracker -> updateCounter(tracker.detectedWaste.size, lastCounter)
+                   tracker -> updateCounter(tracker.detectedWaste.size)
                 }
+
                 //drawDebugScreen(canvas)
             }
         })
