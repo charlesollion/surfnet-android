@@ -21,6 +21,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
+import android.graphics.PointF
 import android.hardware.camera2.CameraManager
 import android.location.Location
 import android.location.LocationListener
@@ -62,6 +63,7 @@ import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageProcessor
 import org.surfrider.surfnet.detection.env.ImageUtils
+import org.surfrider.surfnet.detection.env.ImageUtils.drawDetections
 import org.surfrider.surfnet.detection.env.ImageUtils.drawOFLinesPRK
 import org.surfrider.surfnet.detection.env.Utils.chooseCamera
 import org.surfrider.surfnet.detection.flow.DenseOpticalFlow
@@ -94,7 +96,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var flowRegionUpdateNeeded = false
     private var wasteCount = 0
 
-    private val threadImageProcessor = newSingleThreadContext("ImageProcessorThread")
+    private val threadImageProcessor = newSingleThreadContext("InferenceThread")
     private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
 
     private var trackingOverlay: OverlayView? = null
@@ -107,6 +109,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
     private var trackerManager: TrackerManager? = null
+    private var latestDetections: List<Detector.Recognition>? = null
     private var currROIs : Mat? = null
     private val mutex = Mutex()
     private val modelString = "yolov8n_float16.tflite"
@@ -378,7 +381,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             TrackerManager()
         val cropSize = detector?.inputSize
         cropSize?.let {
-            // Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
             croppedBitmap = Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888)
             frameToCropTransform = ImageUtils.getTransformationMatrix(
                 previewWidth,
@@ -399,6 +401,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                     trackerManager?.draw(canvas, context, previewWidth, previewHeight)
                     // drawOFLines(canvas)
                     drawOFLinesPRK(canvas, outputLinesFlow, previewWidth, previewHeight)
+                    drawDetections(canvas, latestDetections, previewWidth, previewHeight)
                 }
                 if (isDebug) {
                     if (canvas != null) {
@@ -418,7 +421,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 while(true) {
                     if(!detectorPaused) {
                         scheduledOpticalFlow()
-                        //scheduledUpdateTrackers()
+                        scheduledUpdateTrackers()
                         delay(FLOW_REFRESH_RATE_MILLIS)
                     }
                 }
@@ -434,6 +437,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         val xVelocity = velocity[0] * 3.6f
         val yVelocity = velocity[1] * 3.6f
         val zVelocity = velocity[2] * 3.6f
+        var avgFlowSpeed: PointF? = null
 
         // Get the magnitude of the velocity vector
         val speed =
@@ -443,7 +447,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         if(flowRegionUpdateNeeded) {
             flowRegionUpdateNeeded = false
             mutex.withLock {
-                trackerManager?.associateFlowWithTrackers(outputLinesFlow, FLOW_REFRESH_RATE_MILLIS)
+                avgFlowSpeed = trackerManager?.associateFlowWithTrackers(outputLinesFlow, FLOW_REFRESH_RATE_MILLIS)
                 currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 60)
             }
         }
@@ -454,7 +458,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             outputLinesFlow = opticalFlow.run(it, currROIs)
         }
 
-        bottomSheet.showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2], speed, 0.0F, 0.0F))
+        bottomSheet.showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2],
+                                         speed, avgFlowSpeed?.x?:0.0F, avgFlowSpeed?.y?:0.0F))
     }
 
     private suspend fun scheduledUpdateTrackers() {
@@ -517,6 +522,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 val results: List<Detector.Recognition>? = croppedBitmap?.let {
                     detector?.recognizeImage(croppedBitmap)
                 }
+                latestDetections = results
 
                 lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
                 val mappedRecognitions = ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)

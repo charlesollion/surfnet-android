@@ -34,6 +34,7 @@ import java.util.ArrayList
 import java.util.LinkedList
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 
 /** Utility class for manipulating images.  */
 object ImageUtils {
@@ -229,20 +230,22 @@ object ImageUtils {
         canvas?.drawRect(rectCrop, paint)
     }
 
-    fun drawDetections(results: List<Detector.Recognition>?, croppedBitmap: Bitmap?, cropToFrameTransform: Matrix?) {
-        val cropCopyBitmap = croppedBitmap?.let { Bitmap.createBitmap(it) }
-        val canvas = cropCopyBitmap?.let { Canvas(it) }
+    fun drawDetections(canvas: Canvas?, results: List<Detector.Recognition>?, previewWidth: Int, previewHeight: Int) {
         val paint = Paint()
         paint.color = Color.RED
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2.0f
+        val frameToCanvasTransform = Matrix()
+        val scale = min(
+            canvas!!.width / previewWidth.toFloat(), canvas!!.height / previewHeight.toFloat()
+        )
+        frameToCanvasTransform.postScale(scale, scale)
         if (results != null) {
             for (result in results) {
                 val location = result.location
                 if (location != null) {
+                    frameToCanvasTransform?.mapRect(location)
                     canvas?.drawRect(location, paint)
-                    cropToFrameTransform?.mapRect(location)
-                    result.location = location
                 }
             }
         }

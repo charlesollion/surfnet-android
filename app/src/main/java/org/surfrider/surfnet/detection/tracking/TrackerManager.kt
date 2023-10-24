@@ -172,7 +172,7 @@ class TrackerManager {
         return currRois
     }
 
-    fun associateFlowWithTrackers(listOfFlowLines: ArrayList<FloatArray>, flowRefreshRateInMillis: Long) {
+    fun associateFlowWithTrackers(listOfFlowLines: ArrayList<FloatArray>, flowRefreshRateInMillis: Long): PointF {
         // Associate each tracker with flow speed
         // V1: just take the average flow
         var motionSpeed = PointF(0.0F, 0.0F)
@@ -189,6 +189,7 @@ class TrackerManager {
         for(tracker in trackers) {
             tracker.updateSpeed(motionSpeed)
         }
+        return motionSpeed
     }
 
     @Synchronized
