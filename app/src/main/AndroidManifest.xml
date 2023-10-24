@@ -45,7 +45,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".DetectorActivity"
+            android:name=".TrackingActivity"
             android:exported="true"
             android:label="@string/tfe_od_app_name"
             android:screenOrientation="landscape"
