@@ -19,6 +19,7 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.ImageFormat
 import android.graphics.Matrix
@@ -42,7 +43,9 @@ import android.view.TextureView.SurfaceTextureListener
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Chronometer
+import android.widget.TableRow
 import android.widget.Toast
+import androidx.core.view.get
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
 import org.surfrider.surfnet.detection.databinding.TfeOdCameraConnectionFragmentTrackingBinding
@@ -55,7 +58,8 @@ import kotlin.math.min
 
 @SuppressLint("ValidFragment")
 class CameraConnectionFragment private constructor(
-        private var chrono: Chronometer,
+        private var chrono: TableRow,
+        private var wasteCount: () -> Int,
     private val cameraConnectionCallback: (Size?, Int) -> Unit,
     private val startDetector: () -> Unit,
     private val endDetector: () -> Unit,
@@ -174,26 +178,39 @@ class CameraConnectionFragment private constructor(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         binding = TfeOdCameraConnectionFragmentTrackingBinding.inflate(inflater, container, false)
+        val chronometerText = chrono.findViewById<Chronometer>(R.id.chronometer)
+
+        binding.closeButton.setOnClickListener {
+            val intent = Intent(requireContext(), TutorialActivity::class.java)
+            startActivity(intent)
+        }
 
         binding.startButton.setOnClickListener {
             binding.startButton.visibility = View.INVISIBLE
             binding.stopButton.visibility = View.VISIBLE
+            chrono.visibility = View.VISIBLE
+            binding.closeButton.visibility = View.INVISIBLE
+            binding.redLine.visibility = View.INVISIBLE
             startDetector()
             if (lastPause == 0L) {
-                chrono.setBase(SystemClock.elapsedRealtime())
+                chronometerText.base = SystemClock.elapsedRealtime()
             } else {
                 val interval = SystemClock.elapsedRealtime() - lastPause
-                chrono.setBase(chrono.getBase() + interval)
+                chronometerText.base = chronometerText.getBase() + interval
             }
-            chrono.start()
+            chronometerText.start()
+
         }
 
         binding.stopButton.setOnClickListener {
             binding.startButton.visibility = View.VISIBLE
             binding.stopButton.visibility = View.INVISIBLE
+            binding.redLine.visibility = View.VISIBLE
             endDetector()
             lastPause = SystemClock.elapsedRealtime();
-            chrono.stop()
+            chrono.findViewById<Chronometer>(R.id.chronometer).stop()
+            val stopRecordDialog = StopRecordDialog(wasteCount(), 2F )
+            stopRecordDialog.show(parentFragmentManager, "stop_record_dialog")
         }
 
         return binding.root
@@ -538,14 +555,15 @@ class CameraConnectionFragment private constructor(
         }
 
         fun newInstance(
-                chrono: Chronometer,
+                chrono: TableRow,
+                wasteCount: () -> Int,
                 callback: (Size?, Int) -> Unit,
                 startDetector: () -> Unit,
                 endDetector: () -> Unit,
                 imageListener: OnImageAvailableListener,
                 inputSize: Size,
         ): CameraConnectionFragment {
-            return CameraConnectionFragment(chrono, callback, startDetector, endDetector, imageListener, inputSize)
+            return CameraConnectionFragment(chrono, wasteCount, callback, startDetector, endDetector, imageListener, inputSize)
         }
     }
 }
