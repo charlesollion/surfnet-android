@@ -1,6 +1,13 @@
 package org.surfrider.surfnet.detection.env
 
+import android.content.Context.*
 import android.content.res.AssetManager
+import android.hardware.camera2.CameraAccessException
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import timber.log.Timber
 import java.io.*
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
@@ -20,21 +27,25 @@ object Utils {
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
     }
 
-    //    public static Bitmap scale(Context context, String filePath) {
-    //        AssetManager assetManager = context.getAssets();
-    //
-    //        InputStream istr;
-    //        Bitmap bitmap = null;
-    //        try {
-    //            istr = assetManager.open(filePath);
-    //            bitmap = BitmapFactory.decodeStream(istr);
-    //            bitmap = Bitmap.createScaledBitmap(bitmap, MainActivity.TF_OD_API_INPUT_SIZE, MainActivity.TF_OD_API_INPUT_SIZE, false);
-    //        } catch (IOException e) {
-    //            // handle exception
-    //            Log.e("getBitmapFromAsset", "getBitmapFromAsset: " + e.getMessage());
-    //        }
-    //
-    //        return bitmap;
-    //    }
+    fun chooseCamera(cameraManager: CameraManager): String? {
+        try {
+            for (cameraId in cameraManager.cameraIdList) {
+                val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+
+                // We don't use a front facing camera in this sample.
+                val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
+                if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
+                    continue
+                }
+                characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                        ?: continue
+
+                return cameraId
+            }
+        } catch (e: CameraAccessException) {
+            Timber.e(e, "Not allowed to access camera")
+        }
+        return null
+    }
 
 }

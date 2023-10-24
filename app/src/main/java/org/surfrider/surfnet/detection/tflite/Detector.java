@@ -36,8 +36,6 @@ public interface Detector {
 
     void setUseNNAPI(boolean isChecked);
 
-    abstract float getObjThresh();
-
     /**
      * An immutable result returned by a Classifier describing what was recognized.
      */
