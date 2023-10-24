@@ -82,6 +82,7 @@ class ImageProcessor {
                 it, 0, previewWidth, 0, 0, previewWidth, previewHeight
             )
         }
+        readyForNextImage()
         val bmp32: Bitmap = rgbFrameBitmap.copy(Bitmap.Config.ARGB_8888, true)
         val currFrame = Mat()
         Utils.bitmapToMat(bmp32, currFrame)

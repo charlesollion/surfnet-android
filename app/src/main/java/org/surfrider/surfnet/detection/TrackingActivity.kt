@@ -30,7 +30,6 @@ import android.media.ImageReader.OnImageAvailableListener
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
-import android.os.HandlerThread
 import android.os.SystemClock
 import android.util.Size
 import android.view.Surface
@@ -51,14 +50,12 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.opencv.android.OpenCVLoader
-import org.opencv.android.Utils
 import org.opencv.core.*
 import org.surfrider.surfnet.detection.customview.BottomSheet
 import org.surfrider.surfnet.detection.customview.OverlayView
@@ -74,7 +71,6 @@ import org.surfrider.surfnet.detection.tflite.YoloDetector
 import org.surfrider.surfnet.detection.tracking.TrackerManager
 import timber.log.Timber
 import java.io.IOException
-import java.text.DecimalFormat
 import java.util.*
 
 
@@ -149,18 +145,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         imuEstimator = IMU_estimator(this.applicationContext)
         opticalFlow = DenseOpticalFlow()
         outputLinesFlow = arrayListOf()
-
-
-
-        lifecycleScope.launch(threadOpticalFlow) {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                while(true) {
-                    scheduledOpticalFlow()
-                    scheduledUpdateTrackers()
-                    delay(FLOW_REFRESH_RATE_MILLIS)
-                }
-            }
-        }
     }
 
     private fun hideSystemUI() {
@@ -179,6 +163,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                     View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         }
     }
+
     @RequiresApi(Build.VERSION_CODES.R)
     private fun hideNavigationBar() {
         val windowInsetsController =
@@ -189,6 +174,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             view.onApplyWindowInsets(windowInsets)
         }
     }
+
     private fun getLocation() {
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         if ((ActivityCompat.checkSelfPermission(
@@ -250,8 +236,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         return true
     }
 
-
-
     /** Callback for Camera2 API  */
     override fun onImageAvailable(reader: ImageReader) {
         try {
@@ -262,7 +246,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 processImage()
             }
         } catch (e: Exception) {
-            Timber.e(e, "Exception!")
+            Timber.e(e, "Exception in ImageListener!")
             return
         }
     }
@@ -387,7 +371,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         trackerManager = TrackerManager()
         val cropSize = detector?.inputSize
         cropSize?.let {
-            Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
+            // Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
             croppedBitmap = Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888)
             frameToCropTransform = ImageUtils.getTransformationMatrix(
                 previewWidth,
@@ -421,6 +405,18 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 // ImageUtils.drawDebugScreen(canvas, previewWidth, previewHeight, cropToFrameTransform)
             }
         })
+
+        lifecycleScope.launch(threadOpticalFlow) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while(true) {
+                    if(!detectorPaused) {
+                        scheduledOpticalFlow()
+                        scheduledUpdateTrackers()
+                        delay(FLOW_REFRESH_RATE_MILLIS)
+                    }
+                }
+            }
+        }
     }
 
     private suspend fun scheduledOpticalFlow() {
@@ -439,8 +435,10 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
         if(flowRegionUpdateNeeded) {
             flowRegionUpdateNeeded = false
-            // trackerManager?.associateFlowWithTrackers(outputLinesFlow)
-            // currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 60)
+            mutex.withLock {
+                trackerManager?.associateFlowWithTrackers(outputLinesFlow)
+                currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 60)
+            }
         }
 
         val currFrame = imageProcessor.getMatFromRGB(previewWidth, previewHeight)
@@ -453,8 +451,10 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     }
 
     private suspend fun scheduledUpdateTrackers() {
-        trackerManager?.let {
-            it.updateTrackers(FLOW_REFRESH_RATE_MILLIS)
+        mutex.withLock {
+            trackerManager?.let {
+                it.updateTrackers(FLOW_REFRESH_RATE_MILLIS)
+            }
         }
     }
 
@@ -484,16 +484,13 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         }
         computingDetection = true
 
-        lifecycleScope.launch(threadImageProcessor) {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                imageProcessor.getRgbBytes()?.let {
-                    rgbFrameBitmap?.setPixels(
-                        it, 0, previewWidth, 0, 0, previewWidth, previewHeight
-                    )
-                }
-                imageProcessor.readyForNextImage()
-            }
+        imageProcessor.getRgbBytes()?.let {
+            rgbFrameBitmap?.setPixels(
+                it, 0, previewWidth, 0, 0, previewWidth, previewHeight
+            )
         }
+        imageProcessor.readyForNextImage()
+
 
         if (croppedBitmap != null && rgbFrameBitmap != null && frameToCropTransform != null) {
             val canvas = Canvas(croppedBitmap!!)
@@ -513,7 +510,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
                 lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
                 val mappedRecognitions = ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
-                trackerManager?.processDetections(mappedRecognitions)
+                mutex.withLock {
+                    trackerManager?.processDetections(mappedRecognitions)
+                }
                 flowRegionUpdateNeeded = true
 
                 trackingOverlay?.postInvalidate()

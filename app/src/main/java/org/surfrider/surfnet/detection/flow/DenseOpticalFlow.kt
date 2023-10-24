@@ -55,15 +55,14 @@ class DenseOpticalFlow {
         // convert the frame to Gray
         Imgproc.cvtColor(newFrame, currGreyImage, Imgproc.COLOR_RGBA2GRAY)
         // if this is the first loop, find good features
-        if(mask == null || mask.empty()) {
+        /*if(mask == null || mask.empty()) {
             Timber.i("OF mask null or empty")
-        }
+        }*/
         // Timber.i("imgSize: ${currGreyImage.size().toString()} mask size: ${mask?.size().toString()}")
         if (prevGreyImage.empty()) {
             currGreyImage.copyTo(prevGreyImage)
             updatePoints(currGreyImage, mask)
             return arrayListOf()
-            // return Point(0.0, 0.0)
         }
         // If the number of flow points is too low, find new good features
         if (flowPtsCount < maxCorners / 2) {
@@ -72,7 +71,7 @@ class DenseOpticalFlow {
         }
         // Run the KLT algorithm for Optical Flow
         Video.calcOpticalFlowPyrLK(prevGreyImage, currGreyImage, prevPts, currPts, status, err)
-        Timber.i("output of flow -- prevPts: ${prevPts.size()} currPts: ${currPts.size()} status: ${status.size()}")
+        //Timber.i("output of flow -- prevPts: ${prevPts.size()} currPts: ${currPts.size()} status: ${status.size()}")
         flowPtsCount = 0
         val lines = createLines()
 
