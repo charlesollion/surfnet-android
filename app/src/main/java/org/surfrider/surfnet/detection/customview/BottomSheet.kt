@@ -16,6 +16,10 @@ class BottomSheet(binding: TfeOdActivityCameraBinding) {
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     private var bottomSheetLayout = binding.bottomSheetLayout
     private var df = DecimalFormat("#.##")
+    var switchOF = bottomSheetLayout.switch1
+    var switchBoxes = bottomSheetLayout.switch2
+    var showOF = false
+    var showBoxes = false
 
     init {
         val bottomSheetLayout = binding.bottomSheetLayout
@@ -51,7 +55,16 @@ class BottomSheet(binding: TfeOdActivityCameraBinding) {
             }
             override fun onSlide(bottomSheet: View, slideOffset: Float) {}
         })
+
         bottomSheetLayout.materialSwitch.setChecked(true);
+
+        switchOF.setOnCheckedChangeListener {
+                _, isChecked -> showOF = isChecked
+        }
+        switchBoxes.setOnCheckedChangeListener {
+                _, isChecked -> showBoxes = isChecked
+        }
+
     }
 
     fun showInference(inferenceTime: String?) {
