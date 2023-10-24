@@ -50,11 +50,13 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
+import kotlinx.coroutines.sync.Mutex
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.*
@@ -76,6 +78,7 @@ import java.text.DecimalFormat
 import java.util.*
 
 
+@OptIn(DelicateCoroutinesApi::class)
 class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, LocationListener {
 
     private lateinit var locationManager: LocationManager
@@ -94,6 +97,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var detectorPaused = true
     private var flowRegionUpdateNeeded = false
     private var wasteCount = 0
+
     private val threadImageProcessor = newSingleThreadContext("ImageProcessorThread")
     private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
 
@@ -108,6 +112,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var cropToFrameTransform: Matrix? = null
     private var trackerManager: TrackerManager? = null
     private var currROIs : Mat? = null
+    private val mutex = Mutex()
     private val modelString = "yolov8n_float16.tflite"
     private val labelFilename = "file:///android_asset/coco.txt"
     private val inputSize = 640
@@ -118,7 +123,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
     private val isDebug = false
 
-    @OptIn(ExperimentalCoroutinesApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(null) // Changed
         Timber.d("onCreate $this")
@@ -136,6 +140,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         hideSystemUI()
 
         setupPermissions()
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        updateLocation()
 
         imageProcessor = ImageProcessor()
         // init IMU_estimator, optical flow
