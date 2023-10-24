@@ -130,14 +130,14 @@ public class YoloDetector implements Detector {
         d.imgData.order(ByteOrder.nativeOrder());
         d.intValues = new int[d.INPUT_SIZE * d.INPUT_SIZE];
 
-        if(!isV8) {
+        if (!isV8) {
             // yolov5 case (20² + 40² + 80²)*3 = 25200
             d.output_box = (int) ((Math.pow((inputSize / 32), 2) + Math.pow((inputSize / 16), 2) + Math.pow((inputSize / 8), 2)) * 3);
         } else {
             // yolov8 case (20² + 40² + 80²) = 8400
             d.output_box = (int) (Math.pow((inputSize / 32), 2) + Math.pow((inputSize / 16), 2) + Math.pow((inputSize / 8), 2));
         }
-        if (d.isModelQuantized){
+        if (d.isModelQuantized) {
             Tensor inpten = d.tfLite.getInputTensor(0);
             d.inp_scale = inpten.quantizationParams().getScale();
             d.inp_zero_point = inpten.quantizationParams().getZeroPoint();
@@ -147,9 +147,9 @@ public class YoloDetector implements Detector {
         }
 
         int[] shape = d.tfLite.getOutputTensor(0).shape();
-        Timber.i("out shape ==== "+Arrays.toString(shape));
+        Timber.i("out shape ==== " + Arrays.toString(shape));
         int numClass = 0;
-        if(!isV8) {
+        if (!isV8) {
             // yolov5 case: (1, num_anchors, num_class+5)
             numClass = shape[shape.length - 1] - 5;
             d.outData = ByteBuffer.allocateDirect(d.output_box * (numClass + 5) * numBytesPerChannel);
@@ -167,6 +167,7 @@ public class YoloDetector implements Detector {
     public int getInputSize() {
         return INPUT_SIZE;
     }
+
     @Override
     public void enableStatLogging(final boolean logStats) {
     }
@@ -232,7 +233,7 @@ public class YoloDetector implements Detector {
     //config yolo
     private int INPUT_SIZE = -1;
 
-    private  int output_box;
+    private int output_box;
 
     private static final float[] XYSCALE = new float[]{1.2f, 1.1f, 1.05f};
 
@@ -249,15 +250,23 @@ public class YoloDetector implements Detector {
 
     private float confThreshold;
 
-    /** holds a gpu delegate */
+    /**
+     * holds a gpu delegate
+     */
     GpuDelegate gpuDelegate = null;
-    /** holds an nnapi delegate */
+    /**
+     * holds an nnapi delegate
+     */
     NnApiDelegate nnapiDelegate = null;
 
-    /** The loaded TensorFlow Lite model. */
+    /**
+     * The loaded TensorFlow Lite model.
+     */
     private MappedByteBuffer tfliteModel;
 
-    /** Options for configuring the Interpreter. */
+    /**
+     * Options for configuring the Interpreter.
+     */
     private final Interpreter.Options tfliteOptions = new Interpreter.Options();
 
     // Config values.
@@ -275,6 +284,7 @@ public class YoloDetector implements Detector {
     private float oup_scale;
     private int oup_zero_point;
     private int numClass;
+
     private YoloDetector() {
     }
 
@@ -402,7 +412,7 @@ public class YoloDetector implements Detector {
         ArrayList<Recognition> detections = new ArrayList<Recognition>();
 
         float[][][] out = new float[1][output_box][numClass + 5];
-        if(!isV8) {
+        if (!isV8) {
             // Timber.tag("YoloDetector").d("out[0] detect start");
             for (int i = 0; i < output_box; ++i) {
                 for (int j = 0; j < numClass + 5; ++j) {
@@ -434,7 +444,7 @@ public class YoloDetector implements Detector {
         for (int i = 0; i < output_box; ++i) {
             final int offset = 0;
             float confidence = 1.0f;
-            if(!isV8) {
+            if (!isV8) {
                 // confidence only valid for yolov5
                 confidence = out[0][i][4];
             }
@@ -443,7 +453,7 @@ public class YoloDetector implements Detector {
 
             final float[] classes = new float[labels.size()];
             for (int c = 0; c < labels.size(); ++c) {
-                if(!isV8) {
+                if (!isV8) {
                     classes[c] = out[0][i][5 + c];
                 } else {
                     classes[c] = out[0][i][4 + c];
