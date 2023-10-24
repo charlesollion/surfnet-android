@@ -25,7 +25,7 @@ class TutorialActivity : AppCompatActivity() {
         }
 
         binding.readyButton.setOnClickListener {
-            val intent = Intent(this, DetectorActivity::class.java)
+            val intent = Intent(this, TrackingActivity::class.java)
             startActivity(intent)
         }
     }
