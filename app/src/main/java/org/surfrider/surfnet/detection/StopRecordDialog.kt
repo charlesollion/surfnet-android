@@ -7,7 +7,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.DialogFragment
 import org.surfrider.surfnet.detection.databinding.FragmentStopRecordDialogBinding
 
-class StopRecordDialog(private var wasteCount: Int, private var metersTravelled: Float) : DialogFragment() {
+class StopRecordDialog(private var wasteCount: Unit, private var metersTravelled: Float) : DialogFragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setStyle(STYLE_NORMAL, R.style.CustomDialogTheme)
