@@ -45,7 +45,6 @@ import android.view.ViewGroup
 import android.widget.Chronometer
 import android.widget.TableRow
 import android.widget.Toast
-import androidx.core.view.get
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
 import org.surfrider.surfnet.detection.databinding.TfeOdCameraConnectionFragmentTrackingBinding
@@ -59,13 +58,13 @@ import kotlin.math.min
 @SuppressLint("ValidFragment")
 class CameraConnectionFragment private constructor(
         private var chrono: TableRow,
-        private var wasteCount: () -> Int,
-    private val cameraConnectionCallback: (Size?, Int) -> Unit,
-    private val startDetector: () -> Unit,
-    private val endDetector: () -> Unit,
-    /** A [OnImageAvailableListener] to receive frames as they are available.  */
+        private var wasteCount: () -> Unit,
+        private val cameraConnectionCallback: (Size?, Int) -> Unit,
+        private val startDetector: () -> Unit,
+        private val endDetector: () -> Unit,
+        /** A [OnImageAvailableListener] to receive frames as they are available.  */
     private val imageListener: OnImageAvailableListener,
-    /** The input size in pixels desired by TensorFlow (width and height of a square bitmap).  */
+        /** The input size in pixels desired by TensorFlow (width and height of a square bitmap).  */
     private val inputSize: Size
 
 ) : Fragment() {
@@ -556,7 +555,7 @@ class CameraConnectionFragment private constructor(
 
         fun newInstance(
                 chrono: TableRow,
-                wasteCount: () -> Int,
+                wasteCount: () -> Unit,
                 callback: (Size?, Int) -> Unit,
                 startDetector: () -> Unit,
                 endDetector: () -> Unit,
