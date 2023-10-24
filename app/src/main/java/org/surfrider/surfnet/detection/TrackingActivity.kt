@@ -95,6 +95,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private val isQuantized = false
     private val numThreads = 1
     private val locationHandler = Handler()
+    private var lastTrackerManager: TrackerManager? = null
+
     private val isDebug = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -323,6 +325,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     }
 
     private fun endDetector() {
+        trackerManager?.let {
+            tracker -> lastTrackerManager = tracker
+        }
         detectorPaused = true
         //removes all drawings of the trackingOverlay from the screen
         trackingOverlay?.invalidate()
@@ -355,7 +360,10 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             toast.show()
             finish()
         }
-        trackerManager = TrackerManager()
+        trackerManager = if (lastTrackerManager != null)
+            lastTrackerManager
+        else
+            TrackerManager()
         val cropSize = detector?.inputSize
         cropSize?.let {
             Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
