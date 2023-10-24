@@ -60,7 +60,7 @@ class TrackerManager {
     }
 
     @Synchronized
-    fun draw(canvas: Canvas, context: Context?, previewWidth: Int, previewHeight: Int) {
+    fun draw(canvas: Canvas, context: Context?, previewWidth: Int, previewHeight: Int, showOF: Boolean) {
         // Build transform matrix from canvas and context
         val frameToCanvasTransform = Matrix()
         val scale = min(
@@ -97,17 +97,19 @@ class TrackerManager {
 
 
                 // Draw the speed line to show displacement of the tracker depending on camera motion
-                val speedLine = floatArrayOf(
-                    trackedPos.x,
-                    trackedPos.y,
-                    trackedPos.x + tracker.speed.x,
-                    trackedPos.y + tracker.speed.y
-                )
-                frameToCanvasTransform.mapPoints(speedLine)
-                val paintLine = Paint()
-                paintLine.color = Color.GREEN
-                paintLine.strokeWidth = 8.0F
-                canvas.drawLines(speedLine, paintLine)
+                if(showOF) {
+                    val speedLine = floatArrayOf(
+                        trackedPos.x,
+                        trackedPos.y,
+                        trackedPos.x + tracker.speed.x,
+                        trackedPos.y + tracker.speed.y
+                    )
+                    frameToCanvasTransform.mapPoints(speedLine)
+                    val paintLine = Paint()
+                    paintLine.color = Color.GREEN
+                    paintLine.strokeWidth = 8.0F
+                    canvas.drawLines(speedLine, paintLine)
+                }
 
                 //Animation drawing
                 if (tracker.animation) {

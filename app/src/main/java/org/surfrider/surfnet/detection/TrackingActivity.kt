@@ -149,6 +149,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         imuEstimator = IMU_estimator(this.applicationContext)
         opticalFlow = DenseOpticalFlow()
         outputLinesFlow = arrayListOf()
+
     }
 
     private fun hideSystemUI() {
@@ -398,10 +399,14 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
                 if (canvas != null) {
-                    trackerManager?.draw(canvas, context, previewWidth, previewHeight)
+                    trackerManager?.draw(canvas, context, previewWidth, previewHeight, showOF)
                     // drawOFLines(canvas)
-                    drawOFLinesPRK(canvas, outputLinesFlow, previewWidth, previewHeight)
-                    drawDetections(canvas, latestDetections, previewWidth, previewHeight)
+                    if(bottomSheet.showOF) {
+                        drawOFLinesPRK(canvas, outputLinesFlow, previewWidth, previewHeight)
+                    }
+                    if(bottomSheet.showBoxes) {
+                        drawDetections(canvas, latestDetections, previewWidth, previewHeight)
+                    }
                 }
                 if (isDebug) {
                     if (canvas != null) {
