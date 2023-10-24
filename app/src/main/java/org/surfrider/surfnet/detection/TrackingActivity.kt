@@ -51,8 +51,10 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.newSingleThreadContext
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.*
@@ -89,12 +91,11 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var previewWidth = 0
 
     private var previewHeight = 0
-    private var handler: Handler? = null
-    private var handlerThread: HandlerThread? = null
     private var detectorPaused = true
     private var flowRegionUpdateNeeded = false
     private var wasteCount = 0
-
+    private val threadImageProcessor = newSingleThreadContext("ImageProcessorThread")
+    private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
 
     private var trackingOverlay: OverlayView? = null
     private var sensorOrientation: Int = 0
@@ -117,6 +118,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
     private val isDebug = false
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(null) // Changed
         Timber.d("onCreate $this")
@@ -141,7 +143,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         opticalFlow = DenseOpticalFlow()
         outputLinesFlow = arrayListOf()
 
-        lifecycleScope.launch(Dispatchers.Default) {
+
+
+        lifecycleScope.launch(threadOpticalFlow) {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 while(true) {
                     scheduledOpticalFlow()
@@ -266,22 +270,11 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     public override fun onResume() {
         Timber.d("onResume $this")
         super.onResume()
-        handlerThread = HandlerThread("inference")
-        handlerThread!!.start()
-        handler = Handler(handlerThread!!.looper)
     }
 
     @Synchronized
     public override fun onPause() {
         Timber.d("onPause $this")
-        handlerThread!!.quitSafely()
-        try {
-            handlerThread!!.join()
-            handlerThread = null
-            handler = null
-        } catch (e: InterruptedException) {
-            Timber.e(e, "Exception!")
-        }
         super.onPause()
     }
 
@@ -296,13 +289,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         Timber.d("onDestroy $this")
         super.onDestroy()
         locationHandler.removeCallbacksAndMessages(null)
-    }
-
-    @Synchronized
-    private fun runInBackground(r: Runnable?) {
-        if (handler != null) {
-            handler!!.post(r!!)
-        }
     }
 
     override fun onRequestPermissionsResult(
@@ -446,8 +432,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
         if(flowRegionUpdateNeeded) {
             flowRegionUpdateNeeded = false
-            trackerManager?.associateFlowWithTrackers(outputLinesFlow)
-            currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 60)
+            // trackerManager?.associateFlowWithTrackers(outputLinesFlow)
+            // currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 60)
         }
 
         val currFrame = imageProcessor.getMatFromRGB(previewWidth, previewHeight)
@@ -491,12 +477,17 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         }
         computingDetection = true
 
-        imageProcessor.getRgbBytes()?.let {
-            rgbFrameBitmap?.setPixels(
-                it, 0, previewWidth, 0, 0, previewWidth, previewHeight
-            )
+        lifecycleScope.launch(threadImageProcessor) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                imageProcessor.getRgbBytes()?.let {
+                    rgbFrameBitmap?.setPixels(
+                        it, 0, previewWidth, 0, 0, previewWidth, previewHeight
+                    )
+                }
+                imageProcessor.readyForNextImage()
+            }
         }
-        imageProcessor.readyForNextImage()
+
         if (croppedBitmap != null && rgbFrameBitmap != null && frameToCropTransform != null) {
             val canvas = Canvas(croppedBitmap!!)
             canvas.drawBitmap(rgbFrameBitmap!!, frameToCropTransform!!, null)
@@ -505,21 +496,24 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 ImageUtils.saveBitmap(croppedBitmap!!)
             }
         }
-        runInBackground {
-            val startTime = SystemClock.uptimeMillis()
-            val results: List<Detector.Recognition>? = croppedBitmap?.let {
-                detector?.recognizeImage(croppedBitmap)
-            }
 
-            lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
-            val mappedRecognitions = ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
-            trackerManager?.processDetections(mappedRecognitions)
-            flowRegionUpdateNeeded = true
+        lifecycleScope.launch(threadImageProcessor) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                val startTime = SystemClock.uptimeMillis()
+                val results: List<Detector.Recognition>? = croppedBitmap?.let {
+                    detector?.recognizeImage(croppedBitmap)
+                }
 
-            trackingOverlay?.postInvalidate()
-            computingDetection = false
-            runOnUiThread {
-                bottomSheet.showInference(lastProcessingTimeMs.toString() + "ms")
+                lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
+                val mappedRecognitions = ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
+                trackerManager?.processDetections(mappedRecognitions)
+                flowRegionUpdateNeeded = true
+
+                trackingOverlay?.postInvalidate()
+                computingDetection = false
+                runOnUiThread {
+                    bottomSheet.showInference(lastProcessingTimeMs.toString() + "ms")
+                }
             }
         }
     }
