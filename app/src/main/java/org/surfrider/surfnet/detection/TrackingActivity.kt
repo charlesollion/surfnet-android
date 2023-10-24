@@ -360,7 +360,10 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             toast.show()
             finish()
         }
-        trackerManager = TrackerManager()
+        trackerManager = if (lastTrackerManager != null)
+            lastTrackerManager
+        else
+            TrackerManager()
         val cropSize = detector?.inputSize
         cropSize?.let {
             Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
