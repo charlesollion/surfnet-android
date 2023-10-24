@@ -45,7 +45,8 @@ object ImageUtils {
     @JvmStatic
     fun saveBitmap(bitmap: Bitmap) {
         var filename = "preview.png"
-        val root = Environment.getExternalStorageDirectory().absolutePath + File.separator + "tensorflow"
+        val root =
+            Environment.getExternalStorageDirectory().absolutePath + File.separator + "tensorflow"
         Timber.i("Saving %dx%d bitmap to %s.", bitmap.width, bitmap.height, root)
         val myDir = File(root)
         if (!myDir.mkdirs()) {
@@ -92,7 +93,16 @@ object ImageUtils {
     }
 
     @JvmStatic
-    fun convertYUV420ToARGB8888(yData: ByteArray, uData: ByteArray, vData: ByteArray, width: Int, height: Int, yRowStride: Int, uvRowStride: Int, uvPixelStride: Int, out: IntArray
+    fun convertYUV420ToARGB8888(
+        yData: ByteArray,
+        uData: ByteArray,
+        vData: ByteArray,
+        width: Int,
+        height: Int,
+        yRowStride: Int,
+        uvRowStride: Int,
+        uvPixelStride: Int,
+        out: IntArray
     ) {
         var yp = 0
         for (j in 0 until height) {
@@ -100,7 +110,10 @@ object ImageUtils {
             val pUV = uvRowStride * (j shr 1)
             for (i in 0 until width) {
                 val uv_offset = pUV + (i shr 1) * uvPixelStride
-                out[yp++] = YUV2RGB(0xff and yData[pY + i].toInt(), 0xff and uData[uv_offset].toInt(), 0xff and vData[uv_offset].toInt()
+                out[yp++] = YUV2RGB(
+                    0xff and yData[pY + i].toInt(),
+                    0xff and uData[uv_offset].toInt(),
+                    0xff and vData[uv_offset].toInt()
                 )
             }
         }
@@ -121,7 +134,13 @@ object ImageUtils {
      * @return The transformation fulfilling the desired requirements.
      */
     @JvmStatic
-    fun getTransformationMatrix(srcWidth: Int, srcHeight: Int, dstWidth: Int, dstHeight: Int, applyRotation: Int, maintainAspectRatio: Boolean
+    fun getTransformationMatrix(
+        srcWidth: Int,
+        srcHeight: Int,
+        dstWidth: Int,
+        dstHeight: Int,
+        applyRotation: Int,
+        maintainAspectRatio: Boolean
     ): Matrix {
         val matrix = Matrix()
         if (applyRotation != 0) {

@@ -37,8 +37,9 @@ object Utils {
                 if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
                     continue
                 }
-                characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: continue
-                
+                characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                    ?: continue
+
                 return cameraId
             }
         } catch (e: CameraAccessException) {

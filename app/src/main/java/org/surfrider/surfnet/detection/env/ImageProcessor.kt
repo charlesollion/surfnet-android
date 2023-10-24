@@ -35,15 +35,15 @@ class ImageProcessor {
             val uvPixelStride = planes[1].pixelStride
             imageConverter = Runnable {
                 ImageUtils.convertYUV420ToARGB8888(
-                        yuvBytes[0]!!,
-                        yuvBytes[1]!!,
-                        yuvBytes[2]!!,
-                        previewWidth,
-                        previewHeight,
-                        luminanceStride,
-                        uvRowStride,
-                        uvPixelStride,
-                        rgbBytes!!
+                    yuvBytes[0]!!,
+                    yuvBytes[1]!!,
+                    yuvBytes[2]!!,
+                    previewWidth,
+                    previewHeight,
+                    luminanceStride,
+                    uvRowStride,
+                    uvPixelStride,
+                    rgbBytes!!
                 )
             }
             postInferenceCallback = Runnable {
