@@ -25,7 +25,6 @@ import android.os.Environment
 import org.opencv.core.Core
 import org.opencv.core.Mat
 import org.opencv.core.Scalar
-import org.surfrider.surfnet.detection.TrackingActivity
 import org.surfrider.surfnet.detection.tflite.Detector
 import timber.log.Timber
 import java.io.File
@@ -205,6 +204,19 @@ object ImageUtils {
         }
     }
 
+    @JvmStatic
+    fun downsampleRGBInts(rgbInts: IntArray, originalWidth: Int, originalHeight: Int, downsampleFactor: Int): IntArray {
+        val newWidth = originalWidth / downsampleFactor
+        val newHeight = originalHeight / downsampleFactor
+        var outputInts = IntArray(newWidth * newHeight)
+        for(i: Int in 0..<newHeight) {
+            for (j: Int in 0..<newWidth) {
+                outputInts[i*newWidth+j] = rgbInts[i*originalWidth+j*downsampleFactor]
+            }
+        }
+        return outputInts
+    }
+
     fun drawDebugScreen(canvas: Canvas?, previewWidth: Int, previewHeight: Int, cropToFrameTransform: Matrix?) {
         // Debug function to show frame size and crop size
         val paint = Paint()
@@ -260,8 +272,7 @@ object ImageUtils {
         val frameToCanvasTransform = Matrix()
         val scale = Math.min(canvas!!.width / previewWidth.toFloat(),
             canvas!!.height / previewHeight.toFloat())
-        // Adjust scale whether we downsampled the greyImage to compute the points
-        frameToCanvasTransform.postScale(scale * 1.0F, scale * 1.0F)
+        frameToCanvasTransform.postScale(scale, scale)
         for(line in outputLinesFlow) {
             val points = line.clone()
             frameToCanvasTransform.mapPoints(points)

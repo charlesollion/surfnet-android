@@ -399,7 +399,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
                 if (canvas != null) {
-                    trackerManager?.draw(canvas, context, previewWidth, previewHeight, showOF)
+                    trackerManager?.draw(canvas, context, previewWidth, previewHeight, bottomSheet.showOF)
                     // drawOFLines(canvas)
                     if(bottomSheet.showOF) {
                         drawOFLinesPRK(canvas, outputLinesFlow, previewWidth, previewHeight)
@@ -453,14 +453,14 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             flowRegionUpdateNeeded = false
             mutex.withLock {
                 avgFlowSpeed = trackerManager?.associateFlowWithTrackers(outputLinesFlow, FLOW_REFRESH_RATE_MILLIS)
-                currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 60)
+                currROIs = trackerManager?.getCurrentRois(1280, 720, DOWNSAMPLING_FACTOR_FLOW, 60)
             }
         }
 
-        val currFrame = imageProcessor.getMatFromRGB(previewWidth, previewHeight)
+        val currFrame = imageProcessor.getMatFromRGB(previewWidth, previewHeight, DOWNSAMPLING_FACTOR_FLOW)
 
         currFrame?.let {
-            outputLinesFlow = opticalFlow.run(it, currROIs)
+            outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
         }
 
         bottomSheet.showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2],
@@ -549,7 +549,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         get() = Size(1280, 720)
 
     companion object {
-        private const val FLOW_REFRESH_RATE_MILLIS: Long = 250
+        private const val FLOW_REFRESH_RATE_MILLIS: Long = 100
+        private const val DOWNSAMPLING_FACTOR_FLOW: Int = 2
 
         private const val CONFIDENCE_THRESHOLD = 0.3f
         private const val MAINTAIN_ASPECT = true
