@@ -76,9 +76,7 @@ class TrackerManager {
                             if (!detectedWaste.contains(tracker)) {
                                 detectedWaste.add(tracker)
                             }
-                            //if (displayDetection) {
                                 R.drawable.green_dot
-                          //  }
                         } else {
                             R.drawable.red_dot
                         }
