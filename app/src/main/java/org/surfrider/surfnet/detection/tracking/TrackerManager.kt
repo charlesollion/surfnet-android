@@ -15,6 +15,7 @@ class TrackerManager {
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
     private var trackerIndex = 0
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
+    var displayDetection = true
 
     private fun updateTrackers() {
         trackers.forEach { tracker -> tracker.update() }
@@ -75,7 +76,9 @@ class TrackerManager {
                             if (!detectedWaste.contains(tracker)) {
                                 detectedWaste.add(tracker)
                             }
-                            R.drawable.green_dot
+                            //if (displayDetection) {
+                                R.drawable.green_dot
+                          //  }
                         } else {
                             R.drawable.red_dot
                         }
@@ -84,7 +87,7 @@ class TrackerManager {
 
 
 
-                if (bmp != null) {
+                if (bmp != null && displayDetection) {
                     val bmpWidth = bmp.width.div(scale)
                     val bmpHeight = bmp.height.div(scale)
 

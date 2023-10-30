@@ -1,11 +1,13 @@
 package org.surfrider.surfnet.detection.customview
 
+import android.util.Log
 import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.LinearLayout
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
+import org.surfrider.surfnet.detection.tracking.TrackerManager
 
 class BottomSheet(binding: TfeOdActivityCameraBinding) {
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
@@ -45,6 +47,7 @@ class BottomSheet(binding: TfeOdActivityCameraBinding) {
             }
             override fun onSlide(bottomSheet: View, slideOffset: Float) {}
         })
+        bottomSheetLayout.materialSwitch.setChecked(true);
     }
 
     fun showInference(inferenceTime: String?) {
@@ -60,4 +63,11 @@ class BottomSheet(binding: TfeOdActivityCameraBinding) {
             bottomSheetLayout.longitudeInfo.text = "null"
         }
     }
+
+    fun displayDetection(tracker: TrackerManager) {
+        bottomSheetLayout.materialSwitch.setOnCheckedChangeListener { _, isChecked ->
+            tracker.displayDetection = isChecked
+        }
+    }
+
 }
