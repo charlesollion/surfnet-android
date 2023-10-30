@@ -80,9 +80,8 @@ public class Tracker(det: TrackedDetection, idx: Int, dt: Double) {
                 age
             ) / 1000.0F
 
-            position.x += dt * speed.x * 10 // Estimated x
-            position.y += dt * speed.y * 10 // Estimated y
-
+            position.x += dt * speed.x // Estimated x
+            position.y += dt * speed.y // Estimated y
         }
         lastUpdatedTimestamp = currTimeStamp
     }

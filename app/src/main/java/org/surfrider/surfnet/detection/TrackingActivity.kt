@@ -98,6 +98,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
     private val threadImageProcessor = newSingleThreadContext("InferenceThread")
     private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
+    private val threadUpdate = newSingleThreadContext("UpdateThread")
+
 
     private var trackingOverlay: OverlayView? = null
     private var sensorOrientation: Int = 0
@@ -432,6 +434,16 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 }
             }
         }
+        lifecycleScope.launch(threadUpdate) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                while(true) {
+                    if(!detectorPaused) {
+                        scheduledUpdateTrackers()
+                        delay(TRACKER_UPDATE_RATE_MILLIS)
+                    }
+                }
+            }
+        }
     }
 
     private suspend fun scheduledOpticalFlow() {
@@ -550,6 +562,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
     companion object {
         private const val FLOW_REFRESH_RATE_MILLIS: Long = 100
+        private const val TRACKER_UPDATE_RATE_MILLIS: Long = 50
         private const val DOWNSAMPLING_FACTOR_FLOW: Int = 2
 
         private const val CONFIDENCE_THRESHOLD = 0.3f

@@ -7,8 +7,6 @@ import android.graphics.drawable.VectorDrawable
 import androidx.core.content.ContextCompat
 import org.opencv.core.CvType
 import org.opencv.core.Mat
-import org.opencv.core.Rect
-import org.opencv.core.Scalar
 import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import timber.log.Timber
@@ -177,21 +175,28 @@ class TrackerManager {
     fun associateFlowWithTrackers(listOfFlowLines: ArrayList<FloatArray>, flowRefreshRateInMillis: Long): PointF {
         // Associate each tracker with flow speed
         // V1: just take the average flow
-        var motionSpeed = PointF(0.0F, 0.0F)
+        var avgMotionSpeed = PointF(0.0F, 0.0F)
         if(listOfFlowLines.size > 0) {
             for (line in listOfFlowLines) {
-                motionSpeed.x += (line[2] - line[0])
-                motionSpeed.y += (line[3] - line[1])
+                avgMotionSpeed.x += (line[2] - line[0])
+                avgMotionSpeed.y += (line[3] - line[1])
             }
-            motionSpeed.x /= listOfFlowLines.size * 1000.0F / flowRefreshRateInMillis
-            motionSpeed.y /= listOfFlowLines.size * 1000.0F / flowRefreshRateInMillis
+            avgMotionSpeed.x /= listOfFlowLines.size * flowRefreshRateInMillis / 1000.0F
+            avgMotionSpeed.y /= listOfFlowLines.size * flowRefreshRateInMillis / 1000.0F
         }
 
         // Timber.i("Motion Speed: ${motionSpeed.x} ${motionSpeed.y}")
         for(tracker in trackers) {
-            tracker.updateSpeed(motionSpeed)
+            var medianSpeed = calculateMedianFlowSpeedForTrack(tracker.position, listOfFlowLines, 6)
+            medianSpeed?.let {
+                it.x /= 1.0F //flowRefreshRateInMillis / 1000.0F
+                it.y /= 1.0F //flowRefreshRateInMillis / 1000.0F
+            }
+
+            Timber.i("${tracker.index}: Motion Speed: ${medianSpeed?.x} ${medianSpeed?.y}")
+            tracker.updateSpeed(medianSpeed?:avgMotionSpeed)
         }
-        return motionSpeed
+        return avgMotionSpeed
     }
 
     @Synchronized
@@ -232,6 +237,64 @@ class TrackerManager {
             else -> {
                 throw IllegalArgumentException("unsupported drawable type")
             }
+        }
+    }
+
+    companion object {
+        @JvmStatic
+        fun calculateMedianFlowSpeedForTrack(
+            trackPoint: PointF,
+            opticalFlowData: ArrayList<FloatArray>,
+            k: Int
+        ): PointF? {
+            val kNearestOpticalFlowPoints = findKNearestOpticalFlowPoints(trackPoint, opticalFlowData, k)
+
+            if (kNearestOpticalFlowPoints.isNotEmpty()) {
+                // Calculate the median flow speed of the k nearest points
+                return calculateMedianFlowSpeed(kNearestOpticalFlowPoints)
+            }
+
+            return null // No data points found
+        }
+
+        @JvmStatic
+        private fun findKNearestOpticalFlowPoints(
+            trackPoint: PointF,
+            opticalFlowData: ArrayList<FloatArray>,
+            k: Int
+        ): List<PointF> {
+            return opticalFlowData
+                .sortedBy { dist(it, trackPoint) }
+                .map { PointF(it[2]-it[0], it[3]-it[1]) }
+                .take(k)
+        }
+
+        @JvmStatic
+        private fun calculateMedianFlowSpeed(opticalFlowPoints: List<PointF>): PointF {
+            val sortedFlowSpeedX = opticalFlowPoints.map { it.x }.sorted()
+            val sortedFlowSpeedY = opticalFlowPoints.map { it.y }.sorted()
+
+            val medianFlowSpeedX = if (sortedFlowSpeedX.size % 2 == 1) {
+                sortedFlowSpeedX[sortedFlowSpeedX.size / 2]
+            } else {
+                (sortedFlowSpeedX[sortedFlowSpeedX.size / 2 - 1] + sortedFlowSpeedX[sortedFlowSpeedX.size / 2]) / 2.0
+            }
+
+            val medianFlowSpeedY = if (sortedFlowSpeedY.size % 2 == 1) {
+                sortedFlowSpeedY[sortedFlowSpeedY.size / 2]
+            } else {
+                (sortedFlowSpeedY[sortedFlowSpeedY.size / 2 - 1] + sortedFlowSpeedY[sortedFlowSpeedY.size / 2]) / 2.0
+            }
+
+            return PointF(medianFlowSpeedX.toFloat(), medianFlowSpeedY.toFloat())
+        }
+        @JvmStatic
+        private fun dist(p1: FloatArray, p2:PointF): Float {
+            return kotlin.math.sqrt((p1[0] - p2.x) * (p1[0] - p2.x) + (p1[1] - p2.y) * (p1[1] - p2.y))
+        }
+        @JvmStatic
+        private fun dist(p1: PointF, p2:PointF): Float {
+            return kotlin.math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
         }
     }
 
