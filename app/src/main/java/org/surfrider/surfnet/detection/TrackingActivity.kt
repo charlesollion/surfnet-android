@@ -77,6 +77,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var handlerThread: HandlerThread? = null
     private var detectorPaused = true
     private var wasteCount = 0
+    private var location: Location? = null
 
     private var trackingOverlay: OverlayView? = null
     private var sensorOrientation: Int = 0
@@ -118,6 +119,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
         imageProcessor = ImageProcessor()
     }
+
     private fun hideSystemUI() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.hide(WindowInsets.Type.statusBars())
@@ -134,6 +136,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                     View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         }
     }
+
     @RequiresApi(Build.VERSION_CODES.R)
     private fun hideNavigationBar() {
         val windowInsetsController =
@@ -144,6 +147,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             view.onApplyWindowInsets(windowInsets)
         }
     }
+
     private fun getLocation() {
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         if ((ActivityCompat.checkSelfPermission(
@@ -158,11 +162,20 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             )
             return
         }
-        val location = fusedLocationClient.lastLocation
-        location.addOnSuccessListener {
+        val newLocation = fusedLocationClient.lastLocation
+
+        newLocation.addOnSuccessListener {
+
             if (it != null) {
-                bottomSheet.showGPSCoordinates(arrayOf(it.longitude.toString(), it.latitude.toString()))
+                bottomSheet.showGPSCoordinates(
+                    arrayOf(
+                        it.longitude.toString(),
+                        it.latitude.toString()
+                    )
+                )
             }
+            location = it
+
         }
     }
 
@@ -206,12 +219,11 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     }
 
 
-
     /** Callback for Camera2 API  */
     override fun onImageAvailable(reader: ImageReader) {
         try {
             imageProcessor.openCameraImage(reader, previewWidth, previewHeight)
-            if(detectorPaused) {
+            if (detectorPaused) {
                 imageProcessor.readyForNextImage()
             } else {
                 processImage()
@@ -290,7 +302,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 previewHeight = size!!.height
                 previewWidth = size.width
                 onPreviewSizeChosen(size, rotation)
-            }, { startDetector() }, { endDetector() }, this, desiredPreviewFrameSize,
+            },
+            { startDetector() }, { endDetector() }, this, desiredPreviewFrameSize,
         )
 
         camera2Fragment.setCamera(cameraId)
@@ -315,12 +328,12 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
     fun updateCounter(count: Int?) {
         binding.wasteCounter.text = count.toString()
-        if(count != null) {
+        if (count != null) {
             wasteCount = count
         }
     }
 
-    private fun getCount() : Int {
+    private fun getCount(): Int {
         return wasteCount
     }
 
@@ -345,7 +358,13 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             //create detector only one time
             if (detector == null) {
                 detector = YoloDetector.create(
-                    assets, modelString, labelFilename, CONFIDENCE_THRESHOLD, isQuantized, isV8, inputSize
+                    assets,
+                    modelString,
+                    labelFilename,
+                    CONFIDENCE_THRESHOLD,
+                    isQuantized,
+                    isV8,
+                    inputSize
                 )
             }
             detector?.useGpu()
@@ -394,8 +413,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                         trackerManager?.drawDebug(canvas)
                     }
                 }
-                trackerManager?.let {
-                        tracker -> updateCounter(tracker.detectedWaste.size)
+                trackerManager?.let { tracker ->
+                    updateCounter(tracker.detectedWaste.size)
                 }
                 // ImageUtils.drawDebugScreen(canvas, previewWidth, previewHeight, cropToFrameTransform)
             }
@@ -449,8 +468,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             }
 
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
-            val mappedRecognitions = ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
-            trackerManager?.processDetections(mappedRecognitions)
+            val mappedRecognitions =
+                ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
+            trackerManager?.processDetections(mappedRecognitions, location)
             trackingOverlay?.postInvalidate()
             computingDetection = false
             runOnUiThread {

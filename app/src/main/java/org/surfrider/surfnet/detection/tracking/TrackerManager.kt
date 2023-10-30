@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.VectorDrawable
+import android.location.Location
 import androidx.core.content.ContextCompat
 import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
@@ -22,7 +23,7 @@ class TrackerManager {
     }
 
     @Synchronized
-    fun processDetections(results: List<Recognition>) {
+    fun processDetections(results: List<Recognition>, location : Location?) {
         updateTrackers()
         // Store all Recognition objects in a list of TrackedDetections
         val dets = LinkedList<Tracker.TrackedDetection>()
@@ -50,7 +51,7 @@ class TrackerManager {
             if (det.associatedId != -1) {
                 trackers[det.associatedId].addDetection(det)
             } else {
-                trackers.addLast(Tracker(det, trackerIndex))
+                trackers.addLast(Tracker(det, trackerIndex, location))
                 trackerIndex++
             }
         }
