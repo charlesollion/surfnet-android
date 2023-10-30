@@ -14,7 +14,7 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     private val ASSOCIATION_THRESHOLD = 10.0F
 
     var index = idx
-    var location = lctn
+    var location: Location? = lctn
     var status : TrackerStatus = TrackerStatus.RED
     var animation = false
     var alreadyAssociated = false
