@@ -2,7 +2,6 @@ package org.surfrider.surfnet.detection.tracking
 
 import android.graphics.PointF
 import android.graphics.RectF
-import org.opencv.core.Core.*
 import org.surfrider.surfnet.detection.tflite.Detector
 import java.util.*
 import kotlin.math.abs
