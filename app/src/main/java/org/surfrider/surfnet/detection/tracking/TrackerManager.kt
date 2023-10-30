@@ -6,9 +6,12 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.VectorDrawable
 import androidx.core.content.ContextCompat
 import org.surfrider.surfnet.detection.R
+import org.surfrider.surfnet.detection.model.TrackerResult
+import org.surfrider.surfnet.detection.model.TrackerTrash
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import timber.log.Timber
 import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.math.min
 
 class TrackerManager {
@@ -70,8 +73,7 @@ class TrackerManager {
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
                 val bmp = context?.let {
                     getBitmap(
-                        it,
-                        if (tracker.status == Tracker.TrackerStatus.GREEN) {
+                        it, if (tracker.status == Tracker.TrackerStatus.GREEN) {
                             if (!detectedWaste.contains(tracker)) {
                                 detectedWaste.add(tracker)
                             }
@@ -164,6 +166,23 @@ class TrackerManager {
                 throw IllegalArgumentException("unsupported drawable type")
             }
         }
+    }
+
+    fun sendData() {
+        var trashes = ArrayList<TrackerTrash>()
+        trackers.forEach { tracker ->
+            trashes.add(TrackerTrash(date = null, lat = null, lng = null, name = null))
+        }
+        var result =
+            TrackerResult(
+                move = null,
+                bank = null,
+                trackingMode = "automatic",
+                files = ArrayList(),
+                trashes = trashes,
+                positions = ArrayList(),
+                comment = null
+            )
     }
 
 }
