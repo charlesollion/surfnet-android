@@ -32,6 +32,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
+import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.View
@@ -50,6 +51,7 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import org.surfrider.surfnet.detection.customview.BottomSheet
 import org.surfrider.surfnet.detection.customview.OverlayView
+import org.surfrider.surfnet.detection.databinding.FragmentSendDataDialogBinding
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageProcessor
 import org.surfrider.surfnet.detection.env.ImageUtils
@@ -96,8 +98,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private val numThreads = 1
     private val locationHandler = Handler()
     private var lastTrackerManager: TrackerManager? = null
-
+    private lateinit var bindingDialog: FragmentSendDataDialogBinding
     private val isDebug = false
+    private var isGpsActivate = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(null) // Changed
@@ -105,6 +108,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         //initialize binding & UI
         binding = TfeOdActivityCameraBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        bindingDialog = FragmentSendDataDialogBinding.inflate(
+                layoutInflater
+        )
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         chronometer = binding.chronoContainer
         binding.wasteCounter.text = "0"
@@ -115,8 +121,14 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         updateLocation()
-
         imageProcessor = ImageProcessor()
+        val mLocationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        isGpsActivate = mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+        if (!isGpsActivate) {
+            val locationPermissionDialog = LocationPermissionDialog()
+            locationPermissionDialog.show(supportFragmentManager, "stop_record_dialog")
+        }
+
     }
     private fun hideSystemUI() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -188,6 +200,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         if (checkPermissions(permissions)) {
             setFragment()
         } else {
+            //val locationPermissionDialog = LocationPermissionDialog()
+            //locationPermissionDialog.show(supportFragmentManager, "stop_record_dialog")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 requestPermissions(permissions, PERMISSIONS_REQUEST)
             }
@@ -195,6 +209,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     }
 
     private fun checkPermissions(permissions: Array<String>): Boolean {
+        Log.d("PERMISSIONS", "TEST")
         for (permission in permissions) {
             if (ContextCompat.checkSelfPermission(this, permission)
                 != PackageManager.PERMISSION_GRANTED
