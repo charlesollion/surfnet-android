@@ -11,6 +11,7 @@ import org.surfrider.surfnet.detection.model.TrackerResult
 import org.surfrider.surfnet.detection.model.TrackerTrash
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import timber.log.Timber
+import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.min
@@ -20,12 +21,13 @@ class TrackerManager {
     private var trackerIndex = 0
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
 
+
     private fun updateTrackers() {
         trackers.forEach { tracker -> tracker.update() }
     }
 
     @Synchronized
-    fun processDetections(results: List<Recognition>, location : Location?) {
+    fun processDetections(results: List<Recognition>, location: Location?) {
         updateTrackers()
         // Store all Recognition objects in a list of TrackedDetections
         val dets = LinkedList<Tracker.TrackedDetection>()
@@ -169,21 +171,31 @@ class TrackerManager {
         }
     }
 
-    fun sendData() {
+    fun sendData(email: String) {
         var trashes = ArrayList<TrackerTrash>()
-        trackers.forEach { tracker ->
-            trashes.add(TrackerTrash(date = null, lat = null, lng = null, name = null))
-        }
-        var result =
-            TrackerResult(
-                move = null,
-                bank = null,
-                trackingMode = "automatic",
-                files = ArrayList(),
-                trashes = trashes,
-                positions = ArrayList(),
-                comment = null
+        trackers.forEach {
+            val date = Date(it.startDate)
+            val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+            val iso8601DateString = iso8601Format.format(date)
+            Timber.i(iso8601DateString)
+            trashes.add(
+                TrackerTrash(
+                    date = iso8601DateString,
+                    lat = it.location?.latitude,
+                    lng = it.location?.longitude,
+                    name = "unknown"
+                )
             )
-    }
+        }
 
+        var result = TrackerResult(
+            move = null,
+            bank = null,
+            trackingMode = "automatic",
+            files = ArrayList(),
+            trashes = trashes,
+            positions = ArrayList(),
+            comment = "email : $email"
+        )
+    }
 }

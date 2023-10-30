@@ -24,6 +24,7 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     private val firstDetection = det
     private val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
     var position = firstDetection.getCenter()
+    var startDate = firstDetection.timestamp
 
     init {
         trackedObjects.addLast(firstDetection)
