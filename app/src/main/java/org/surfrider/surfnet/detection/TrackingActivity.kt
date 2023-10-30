@@ -364,6 +364,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             lastTrackerManager
         else
             TrackerManager()
+        if (trackerManager != null) {
+            bottomSheet.displayDetection(trackerManager!!)
+        }
         val cropSize = detector?.inputSize
         cropSize?.let {
             Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
