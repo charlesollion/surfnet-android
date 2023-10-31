@@ -7,11 +7,19 @@ import android.widget.LinearLayout
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
+
+import java.text.DecimalFormat
 import org.surfrider.surfnet.detection.tracking.TrackerManager
+
 
 class BottomSheet(binding: TfeOdActivityCameraBinding) {
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     private var bottomSheetLayout = binding.bottomSheetLayout
+    private var df = DecimalFormat("#.##")
+    var switchOF = bottomSheetLayout.switch1
+    var switchBoxes = bottomSheetLayout.switch2
+    var showOF = false
+    var showBoxes = false
 
     init {
         val bottomSheetLayout = binding.bottomSheetLayout
@@ -47,7 +55,16 @@ class BottomSheet(binding: TfeOdActivityCameraBinding) {
             }
             override fun onSlide(bottomSheet: View, slideOffset: Float) {}
         })
+
         bottomSheetLayout.materialSwitch.setChecked(true);
+
+        switchOF.setOnCheckedChangeListener {
+                _, isChecked -> showOF = isChecked
+        }
+        switchBoxes.setOnCheckedChangeListener {
+                _, isChecked -> showBoxes = isChecked
+        }
+
     }
 
     fun showInference(inferenceTime: String?) {
@@ -61,6 +78,20 @@ class BottomSheet(binding: TfeOdActivityCameraBinding) {
         } else {
             bottomSheetLayout.latitudeInfo.text = "null"
             bottomSheetLayout.longitudeInfo.text = "null"
+        }
+    }
+
+    fun showIMUStats(stats: Array<Float>?) {
+        if (stats != null && stats.size == 6) {
+            bottomSheetLayout.positionInfo.text =
+                df.format(stats[0]) + " " + df.format(stats[1]) + " " + df.format(stats[2])
+            bottomSheetLayout.speedInfo.text = df.format(stats[3])
+            bottomSheetLayout.flowInfo.text =
+                df.format(stats[4]) + " " + df.format(stats[5])
+        } else {
+            bottomSheetLayout.positionInfo.text = "null"
+            bottomSheetLayout.speedInfo.text = "null"
+            bottomSheetLayout.flowInfo.text = "null"
         }
     }
 

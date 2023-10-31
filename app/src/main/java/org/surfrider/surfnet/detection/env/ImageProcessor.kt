@@ -1,13 +1,18 @@
 package org.surfrider.surfnet.detection.env
 
+import android.graphics.Bitmap
 import android.media.ImageReader
 import android.os.Trace
+import org.opencv.android.Utils
+import org.opencv.core.Mat
 import timber.log.Timber
 
 class ImageProcessor {
+    @JvmField
+    var rgbBytes: IntArray? = null
+
     private var isProcessingFrame = false
     private val yuvBytes = arrayOfNulls<ByteArray>(3)
-    private var rgbBytes: IntArray? = null
     private var luminanceStride = 0
     private var postInferenceCallback: Runnable? = null
     private var imageConverter: Runnable? = null
@@ -66,5 +71,21 @@ class ImageProcessor {
         if (postInferenceCallback != null) {
             postInferenceCallback!!.run()
         }
+    }
+    fun getMatFromRGB(previewWidth: Int, previewHeight: Int): Mat? {
+        if(rgbBytes == null) {
+            return null
+        }
+        val rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
+        getRgbBytes()?.let {
+            rgbFrameBitmap.setPixels(
+                it, 0, previewWidth, 0, 0, previewWidth, previewHeight
+            )
+        }
+        readyForNextImage()
+        val bmp32: Bitmap = rgbFrameBitmap.copy(Bitmap.Config.ARGB_8888, true)
+        val currFrame = Mat()
+        Utils.bitmapToMat(bmp32, currFrame)
+        return currFrame
     }
 }
