@@ -2,16 +2,18 @@ package org.surfrider.surfnet.detection.tracking
 
 import android.graphics.PointF
 import android.graphics.RectF
+import android.location.Location
 import org.surfrider.surfnet.detection.tflite.Detector
 import java.util.*
 import kotlin.math.abs
 
-public class Tracker(det: TrackedDetection, idx: Int, dt: Double) {
+public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     private val MAX_TIMESTAMP = 3000
     private val MAX_ANIMATION_TIMESTAMP = 1000
     private val NUM_CONSECUTIVE_DET = 5
 
     var index = idx
+    var location: Location? = lctn
     var status : TrackerStatus = TrackerStatus.RED
     var animation = false
     var alreadyAssociated = false
