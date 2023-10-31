@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.VectorDrawable
+import android.location.Location
 import androidx.core.content.ContextCompat
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -22,13 +23,15 @@ class TrackerManager {
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
     private var trackerIndex = 0
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
+    var displayDetection = true
 
     fun updateTrackers(flowRefreshRateInMillis: Long) {
         trackers.forEach { tracker -> tracker.update(flowRefreshRateInMillis) }
     }
 
     @Synchronized
-    fun processDetections(results: List<Recognition>) {
+
+    fun processDetections(results: List<Recognition>, location : Location?) {
         // Store all Recognition objects in a list of TrackedDetections
         val dets = LinkedList<Tracker.TrackedDetection>()
         for (result in results) {
@@ -53,7 +56,7 @@ class TrackerManager {
             if (det.associatedId != -1) {
                 trackers[det.associatedId].addDetection(det)
             } else {
-                trackers.addLast(Tracker(det, trackerIndex))
+                trackers.addLast(Tracker(det, trackerIndex, location))
                 trackerIndex++
             }
         }
@@ -79,7 +82,7 @@ class TrackerManager {
                             if (!detectedWaste.contains(tracker)) {
                                 detectedWaste.add(tracker)
                             }
-                            R.drawable.green_dot
+                                R.drawable.green_dot
                         } else {
                             R.drawable.red_dot
                         }
@@ -109,30 +112,52 @@ class TrackerManager {
                 paintLine.strokeWidth = 8.0F
                 canvas.drawLines(speedLine, paintLine)
 
-                //Animation drawing
-                if (tracker.animation) {
-                    val shouldShowBottomAnimation = trackedPos.y < canvas.height.div(scale) / 2
-                    val animation = context?.let {
-                        getBitmap(
-                            it,
-                            if (shouldShowBottomAnimation) R.drawable.animation_down else R.drawable.animation
+                if (bmp != null && displayDetection) {
+                    val bmpWidth = bmp.width.div(scale)
+                    val bmpHeight = bmp.height.div(scale)
+
+                    val point =
+                        floatArrayOf(trackedPos.x - bmpWidth / 2, trackedPos.y - bmpHeight / 2)
+                    frameToCanvasTransform.mapPoints(point)
+
+                    canvas.drawBitmap(bmp, point[0], point[1], null)
+
+                    //affichage du text avec le numéro du tracker
+                    val paint = Paint()
+                    paint.textSize = 40.0F
+                    canvas.drawText(tracker.index.toString(), point[0], point[1], paint)
+
+
+                    //Animation drawing
+                    /*if (tracker.animation) {
+                        val shouldShowBottomAnimation = trackedPos.y < canvas.height.div(scale) / 2
+                        val animation = getBitmap(
+                            context,*/
+                    //Animation drawing
+                    if (tracker.animation) {
+                        val shouldShowBottomAnimation = trackedPos.y < canvas.height.div(scale) / 2
+                        val animation = context?.let {
+                            getBitmap(
+                                it,
+                                if (shouldShowBottomAnimation) R.drawable.animation_down else R.drawable.animation
+                            )
+                        } ?: return
+
+                        val animationWidth = animation.width.div(scale)
+                        val animationHeight = animation.height.div(scale)
+
+                        val animationPoint = floatArrayOf(
+                            trackedPos.x - (animationWidth / 2) + 3,
+                            if (shouldShowBottomAnimation) trackedPos.y + bmpHeight / 2 else trackedPos.y - bmpHeight / 2 - (animationHeight)
                         )
-                    } ?: return
-
-                    val animationWidth = animation.width.div(scale)
-                    val animationHeight = animation.height.div(scale)
-
-                    val animationPoint = floatArrayOf(
-                        trackedPos.x - (animationWidth / 2) + 3,
-                        if (shouldShowBottomAnimation) trackedPos.y + bmpHeight / 2 else trackedPos.y - bmpHeight / 2 - (animationHeight)
-                    )
-                    frameToCanvasTransform.mapPoints(animationPoint)
-                    canvas.drawBitmap(
-                        animation,
-                        animationPoint[0],
-                        animationPoint[1],
-                        null
-                    )
+                        frameToCanvasTransform.mapPoints(animationPoint)
+                        canvas.drawBitmap(
+                            animation,
+                            animationPoint[0],
+                            animationPoint[1],
+                            null
+                        )
+                    }
                 }
 
                 //affichage du text avec le numéro du tracker

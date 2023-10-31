@@ -93,6 +93,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var detectorPaused = true
     private var flowRegionUpdateNeeded = false
     private var wasteCount = 0
+    private var location: Location? = null
 
     private val threadImageProcessor = newSingleThreadContext("ImageProcessorThread")
     private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
@@ -190,11 +191,20 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             )
             return
         }
-        val location = fusedLocationClient.lastLocation
-        location.addOnSuccessListener {
+        val newLocation = fusedLocationClient.lastLocation
+
+        newLocation.addOnSuccessListener {
+
             if (it != null) {
-                bottomSheet.showGPSCoordinates(arrayOf(it.longitude.toString(), it.latitude.toString()))
+                bottomSheet.showGPSCoordinates(
+                    arrayOf(
+                        it.longitude.toString(),
+                        it.latitude.toString()
+                    )
+                )
             }
+            location = it
+
         }
     }
 
@@ -241,7 +251,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     override fun onImageAvailable(reader: ImageReader) {
         try {
             imageProcessor.openCameraImage(reader, previewWidth, previewHeight)
-            if(detectorPaused) {
+            if (detectorPaused) {
                 imageProcessor.readyForNextImage()
             } else {
                 processImage()
@@ -302,7 +312,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 previewHeight = size!!.height
                 previewWidth = size.width
                 onPreviewSizeChosen(size, rotation)
-            }, { startDetector() }, { endDetector() }, this, desiredPreviewFrameSize,
+            },
+            { startDetector() }, { endDetector() }, this, desiredPreviewFrameSize,
         )
 
         camera2Fragment.setCamera(cameraId)
@@ -327,12 +338,12 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
     fun updateCounter(count: Int?) {
         binding.wasteCounter.text = count.toString()
-        if(count != null) {
+        if (count != null) {
             wasteCount = count
         }
     }
 
-    private fun getCount() : Int {
+    private fun getCount(): Int {
         return wasteCount
     }
 
@@ -357,7 +368,13 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             //create detector only one time
             if (detector == null) {
                 detector = YoloDetector.create(
-                    assets, modelString, labelFilename, CONFIDENCE_THRESHOLD, isQuantized, isV8, inputSize
+                    assets,
+                    modelString,
+                    labelFilename,
+                    CONFIDENCE_THRESHOLD,
+                    isQuantized,
+                    isV8,
+                    inputSize
                 )
             }
             detector?.useGpu()
@@ -376,6 +393,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             lastTrackerManager
         else
             TrackerManager()
+        if (trackerManager != null) {
+            bottomSheet.displayDetection(trackerManager!!)
+        }
         val cropSize = detector?.inputSize
         cropSize?.let {
             // Timber.i(Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888).toString())
@@ -405,9 +425,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                         trackerManager?.drawDebug(canvas)
                     }
                 }
-
-                trackerManager?.let {
-                        tracker -> updateCounter(tracker.detectedWaste.size)
+                trackerManager?.let { tracker ->
+                    updateCounter(tracker.detectedWaste.size)
                 }
                 // ImageUtils.drawDebugScreen(canvas, previewWidth, previewHeight, cropToFrameTransform)
             }
@@ -516,9 +535,10 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 }
 
                 lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
-                val mappedRecognitions = ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
+                val mappedRecognitions =
+                    ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
                 mutex.withLock {
-                    trackerManager?.processDetections(mappedRecognitions)
+                    trackerManager?.processDetections(mappedRecognitions, location)
                 }
                 flowRegionUpdateNeeded = true
 
