@@ -6,6 +6,10 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.VectorDrawable
 import android.location.Location
 import androidx.core.content.ContextCompat
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import org.opencv.core.Rect
+import org.opencv.core.Scalar
 import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.model.TrackerResult
 import org.surfrider.surfnet.detection.model.TrackerTrash
@@ -17,18 +21,20 @@ import kotlin.collections.ArrayList
 import kotlin.math.min
 
 class TrackerManager {
+    private val ASSOCIATION_THRESHOLD = 50.0F
+
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
     private var trackerIndex = 0
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
+    var displayDetection = true
 
-
-    private fun updateTrackers() {
-        trackers.forEach { tracker -> tracker.update() }
+    fun updateTrackers(flowRefreshRateInMillis: Long) {
+        trackers.forEach { tracker -> tracker.update(flowRefreshRateInMillis) }
     }
 
     @Synchronized
+
     fun processDetections(results: List<Recognition>, location: Location?) {
-        updateTrackers()
         // Store all Recognition objects in a list of TrackedDetections
         val dets = LinkedList<Tracker.TrackedDetection>()
         for (result in results) {
@@ -39,13 +45,11 @@ class TrackerManager {
         for (det in dets) {
             val position = det.getCenter()
             var minDist = 10000.0F
-            // Timber.i("Trackers Size = ${trackers.size}")
             // Greedy assignment of trackers
             trackers.forEachIndexed { i, tracker ->
                 if (tracker.status != Tracker.TrackerStatus.INACTIVE && !tracker.alreadyAssociated) {
                     val dist = tracker.distTo(position)
-                    // Timber.i("Distance = $dist")
-                    if (dist < minDist) {
+                    if (dist < minDist && dist < ASSOCIATION_THRESHOLD) {
                         minDist = dist
                         det.associatedId = i
                     }
@@ -62,7 +66,13 @@ class TrackerManager {
     }
 
     @Synchronized
-    fun draw(canvas: Canvas, context: Context?, previewWidth: Int, previewHeight: Int) {
+    fun draw(
+        canvas: Canvas,
+        context: Context?,
+        previewWidth: Int,
+        previewHeight: Int,
+        showOF: Boolean
+    ) {
         // Build transform matrix from canvas and context
         val frameToCanvasTransform = Matrix()
         val scale = min(
@@ -85,11 +95,24 @@ class TrackerManager {
                             R.drawable.red_dot
                         }
                     )
+                } ?: return
+
+                // Draw the speed line to show displacement of the tracker depending on camera motion
+                if (showOF) {
+                    val speedLine = floatArrayOf(
+                        trackedPos.x,
+                        trackedPos.y,
+                        trackedPos.x + tracker.speed.x,
+                        trackedPos.y + tracker.speed.y
+                    )
+                    frameToCanvasTransform.mapPoints(speedLine)
+                    val paintLine = Paint()
+                    paintLine.color = Color.GREEN
+                    paintLine.strokeWidth = 8.0F
+                    canvas.drawLines(speedLine, paintLine)
                 }
 
-
-
-                if (bmp != null) {
+                if (displayDetection) {
                     val bmpWidth = bmp.width.div(scale)
                     val bmpHeight = bmp.height.div(scale)
 
@@ -108,25 +131,76 @@ class TrackerManager {
                     //Animation drawing
                     if (tracker.animation) {
                         val shouldShowBottomAnimation = trackedPos.y < canvas.height.div(scale) / 2
-                        val animation = getBitmap(
-                            context,
-                            if (shouldShowBottomAnimation) R.drawable.animation_down else R.drawable.animation
-                        )
-
-                        if (animation != null) {
-                            val animationWidth = animation.width.div(scale)
-                            val animationHeight = animation.height.div(scale)
-
-                            val animationPoint = floatArrayOf(
-                                trackedPos.x - (animationWidth / 2) + 3,
-                                if (shouldShowBottomAnimation) trackedPos.y + bmpHeight / 2 else trackedPos.y - bmpHeight / 2 - (animationHeight)
+                        val animation = context?.let {
+                            getBitmap(
+                                it,
+                                if (shouldShowBottomAnimation) R.drawable.animation_down else R.drawable.animation
                             )
-                            frameToCanvasTransform.mapPoints(animationPoint)
-                            canvas.drawBitmap(animation, animationPoint[0], animationPoint[1], null)
+                        } ?: return
+
+                        val animationWidth = animation.width.div(scale)
+                        val animationHeight = animation.height.div(scale)
+
+                        val animationPoint = floatArrayOf(
+                            trackedPos.x - (animationWidth / 2) + 3,
+                            if (shouldShowBottomAnimation) trackedPos.y + bmpHeight / 2 else trackedPos.y - bmpHeight / 2 - (animationHeight)
+                        )
+                        frameToCanvasTransform.mapPoints(animationPoint)
+                        canvas.drawBitmap(
+                            animation,
+                            animationPoint[0],
+                            animationPoint[1],
+                            null
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun getCurrentRois(width: Int, height: Int, downScale: Int, squareSize: Int): Mat? {
+        // Get regions of interest within the frame: areas around each tracker
+        // The output is a mask matrix with 1s next to tracker centers and 0s otherwise
+        if (trackers.size == 0) {
+            return null
+        }
+        val currRois = Mat.zeros(height / downScale, width / downScale, CvType.CV_8UC1)
+        for (tracker in trackers) {
+            val trackedPos = tracker.position
+            if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
+                val xCenter: Int = trackedPos.x.toInt() / downScale
+                val yCenter: Int = trackedPos.y.toInt() / downScale
+
+                for (i in -squareSize / 2..squareSize / 2) {
+                    for (j in -squareSize / 2..squareSize / 2) {
+                        val x = xCenter + i
+                        val y = yCenter + j
+
+                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                            currRois.put(y, x, byteArrayOf(1))
                         }
                     }
                 }
             }
+        }
+        return currRois
+    }
+
+    fun associateFlowWithTrackers(listOfFlowLines: ArrayList<FloatArray>) {
+        // Associate each tracker with flow speed
+        // V1: just take the average flow
+        var motionSpeed: PointF = PointF(0.0F, 0.0F)
+        if (listOfFlowLines.size > 0) {
+            for (line in listOfFlowLines) {
+                motionSpeed.x += (line[2] - line[0])
+                motionSpeed.y += (line[3] - line[1])
+            }
+            motionSpeed.x /= listOfFlowLines.size
+            motionSpeed.y /= listOfFlowLines.size
+        }
+
+        for (tracker in trackers) {
+            tracker.speed = motionSpeed
         }
     }
 
