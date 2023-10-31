@@ -48,6 +48,9 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     }
 
     fun updateSpeed(measuredSpeed: PointF) {
+        // Move tracker directly
+        position.x += measuredSpeed.x
+        position.y += measuredSpeed.y
         speed = measuredSpeed
     }
 
@@ -74,8 +77,8 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
             status = TrackerStatus.INACTIVE
         }
 
-        // Move tracker
-        if(lastUpdatedTimestamp > 0) {
+        // Move tracker smoothly depending on speed
+        /*if(lastUpdatedTimestamp > 0) {
             val dt = kotlin.math.min(
                 timeDiffInMilli(currTimeStamp, lastUpdatedTimestamp),
                 age
@@ -83,7 +86,8 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
             position.x += dt * speed.x // Estimated x
             position.y += dt * speed.y // Estimated y
-        }
+        }*/
+
         lastUpdatedTimestamp = currTimeStamp
     }
 
@@ -92,14 +96,14 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     }
 
     class TrackedDetection(det: Detector.Recognition) {
-        var location: RectF = RectF(det.location)
+        var rect: RectF = RectF(det.location)
         var detectionConfidence = det.confidence
         var timestamp: Long = System.currentTimeMillis()
         var classId: String = det.id
         var associatedId = -1
 
         fun getCenter(): PointF {
-            return PointF(location.centerX(), location.centerY())
+            return PointF(rect.centerX(), rect.centerY())
         }
     }
 

@@ -16,7 +16,6 @@ import kotlin.collections.ArrayList
 import kotlin.math.min
 
 class TrackerManager {
-    private val ASSOCIATION_THRESHOLD = 50.0F
 
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
     private var trackerIndex = 0
@@ -122,17 +121,11 @@ class TrackerManager {
 
                     canvas.drawBitmap(bmp, point[0], point[1], null)
 
-                    //affichage du text avec le numéro du tracker
+                    // Draw text with tracker number
                     val paint = Paint()
                     paint.textSize = 40.0F
                     canvas.drawText(tracker.index.toString(), point[0], point[1], paint)
 
-
-                    //Animation drawing
-                    /*if (tracker.animation) {
-                        val shouldShowBottomAnimation = trackedPos.y < canvas.height.div(scale) / 2
-                        val animation = getBitmap(
-                            context,*/
                     //Animation drawing
                     if (tracker.animation) {
                         val shouldShowBottomAnimation = trackedPos.y < canvas.height.div(scale) / 2
@@ -159,12 +152,6 @@ class TrackerManager {
                         )
                     }
                 }
-
-                //affichage du text avec le numéro du tracker
-                val paint = Paint()
-                paint.textSize = 40.0F
-                canvas.drawText(tracker.index.toString(), point[0], point[1], paint)
-
             }
         }
     }
@@ -199,7 +186,7 @@ class TrackerManager {
 
     fun associateFlowWithTrackers(listOfFlowLines: ArrayList<FloatArray>, flowRefreshRateInMillis: Long): PointF {
         // Associate each tracker with flow speed
-        // V1: just take the average flow
+        // Compute the average flow for debug purposes
         var avgMotionSpeed = PointF(0.0F, 0.0F)
         if(listOfFlowLines.size > 0) {
             for (line in listOfFlowLines) {
@@ -210,15 +197,15 @@ class TrackerManager {
             avgMotionSpeed.y /= listOfFlowLines.size * flowRefreshRateInMillis / 1000.0F
         }
 
-        // Timber.i("Motion Speed: ${motionSpeed.x} ${motionSpeed.y}")
         for(tracker in trackers) {
             var medianSpeed = calculateMedianFlowSpeedForTrack(tracker.position, listOfFlowLines, 6)
-            medianSpeed?.let {
-                it.x /= 1.0F //flowRefreshRateInMillis / 1000.0F
-                it.y /= 1.0F //flowRefreshRateInMillis / 1000.0F
-            }
 
-            Timber.i("${tracker.index}: Motion Speed: ${medianSpeed?.x} ${medianSpeed?.y}")
+            // scale speed depending on optical flow refresh rate
+            /*medianSpeed?.let {
+                it.x /= flowRefreshRateInMillis / 1000.0F
+                it.y /= flowRefreshRateInMillis / 1000.0F
+            }*/
+
             tracker.updateSpeed(medianSpeed?:avgMotionSpeed)
         }
         return avgMotionSpeed
@@ -321,6 +308,8 @@ class TrackerManager {
         private fun dist(p1: PointF, p2:PointF): Float {
             return kotlin.math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
         }
+
+        private const val ASSOCIATION_THRESHOLD = 50.0F
     }
 
 }

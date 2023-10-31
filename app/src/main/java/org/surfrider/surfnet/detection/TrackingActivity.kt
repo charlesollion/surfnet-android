@@ -99,7 +99,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
     private val threadImageProcessor = newSingleThreadContext("InferenceThread")
     private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
-    // private val threadUpdate = newSingleThreadContext("UpdateThread")
+    private val threadUpdate = newSingleThreadContext("UpdateThread")
 
 
     private var trackingOverlay: OverlayView? = null
