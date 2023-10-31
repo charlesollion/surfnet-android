@@ -251,7 +251,6 @@ class TrackerManager {
             val date = Date(it.startDate)
             val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
             val iso8601DateString = iso8601Format.format(date)
-            Timber.i(iso8601DateString)
             trashes.add(
                 TrackerTrash(
                     date = iso8601DateString,
