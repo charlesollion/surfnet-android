@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.R
+import org.surfrider.surfnet.detection.env.MathUtils.solveLinearSumAssignment
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import timber.log.Timber
 import java.util.*
@@ -27,36 +28,50 @@ class TrackerManager {
     }
 
     @Synchronized
-
     fun processDetections(results: List<Recognition>, location : Location?) {
+        if(results.isEmpty()) {
+            return
+        }
         // Store all Recognition objects in a list of TrackedDetections
         val dets = LinkedList<Tracker.TrackedDetection>()
         for (result in results) {
             dets.addLast(Tracker.TrackedDetection(result))
         }
 
-        // Associate results with current trackers
-        for (det in dets) {
-            val position = det.getCenter()
-            var minDist = 10000.0F
-            // Greedy assignment of trackers
-            trackers.forEachIndexed { i, tracker ->
-                if (tracker.status != Tracker.TrackerStatus.INACTIVE && !tracker.alreadyAssociated) {
-                    val dist = tracker.distTo(position)
-                    if (dist < minDist && dist < ASSOCIATION_THRESHOLD) {
-                        minDist = dist
-                        det.associatedId = i
-                    }
-                }
-
+        // Create cost matrix
+        if(trackers.size > 0) {
+            val costMatrix = Array(dets.size) { _ ->
+                DoubleArray(trackers.size)
             }
-            if (det.associatedId != -1) {
-                trackers[det.associatedId].addDetection(det)
-            } else {
+            dets.forEachIndexed { t, det ->
+                trackers.forEachIndexed { i, tracker ->
+                    costMatrix[t][i] = score(det, tracker)
+                }
+            }
+
+            // Compute best assignment
+            val assignments = solveLinearSumAssignment(costMatrix)
+            for ((detIdx, trackIdx) in assignments) {
+                val detection = dets[detIdx]
+                val tracker = trackers[trackIdx]
+                tracker.addDetection(detection)
+                detection.associatedId = trackIdx
+            }
+        }
+        // create new trackers for unassigned detections
+        for(det in dets) {
+            if (det.associatedId == -1) {
                 trackers.addLast(Tracker(det, trackerIndex, location))
                 trackerIndex++
             }
         }
+    }
+
+    private fun score(det: Tracker.TrackedDetection, tracker: Tracker): Double {
+        if (tracker.status != Tracker.TrackerStatus.INACTIVE && !tracker.alreadyAssociated) {
+            return tracker.distTo(det.getCenter()).toDouble()
+        }
+        return 0.0
     }
 
     @Synchronized
