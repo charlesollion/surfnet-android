@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.R
+import org.surfrider.surfnet.detection.env.MathUtils.calculateIoU
 import org.surfrider.surfnet.detection.env.MathUtils.solveLinearSumAssignment
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import timber.log.Timber
@@ -45,7 +46,7 @@ class TrackerManager {
             }
             dets.forEachIndexed { t, det ->
                 trackers.forEachIndexed { i, tracker ->
-                    costMatrix[t][i] = score(det, tracker)
+                    costMatrix[t][i] = cost(det, tracker)
                 }
             }
 
@@ -67,11 +68,23 @@ class TrackerManager {
         }
     }
 
-    private fun score(det: Tracker.TrackedDetection, tracker: Tracker): Double {
+    private fun cost(det: Tracker.TrackedDetection, tracker: Tracker): Double {
         if (tracker.status != Tracker.TrackerStatus.INACTIVE && !tracker.alreadyAssociated) {
-            return tracker.distTo(det.getCenter()).toDouble()
+            val dist = tracker.distTo(det.getCenter()).toDouble() / SCREEN_DIAGONAL
+            if(dist > ASSOCIATION_THRESHOLD) {
+                return Double.MAX_VALUE
+            }
+            val confidence = 1.0 - det.detectionConfidence
+            val iou = 1.0 - calculateIoU(det.rect, tracker.trackedObjects.last.rect)
+            val classMatch = if (det.classId == tracker.trackedObjects.last.classId) 0.0 else 1.0
+            val strength = 1.0 - tracker.strength
+            val cost = W_DIST * dist + W_CONF * confidence + W_IOU * iou
+                     + W_CLASS * classMatch + W_TRACKER_STRENGTH * strength
+            Timber.i("${tracker.index}/${det.rect}:$cost --- dist:${dist} confidence:${confidence} iou:$iou classmatch:$classMatch strength:${strength}")
+            return cost
+
         }
-        return 0.0
+        return Double.MAX_VALUE
     }
 
     @Synchronized
@@ -324,7 +337,15 @@ class TrackerManager {
             return kotlin.math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
         }
 
-        private const val ASSOCIATION_THRESHOLD = 50.0F
+        private const val SCREEN_DIAGONAL = 960.0F // sqrt(720x1280)
+        private const val ASSOCIATION_THRESHOLD = 40.0F / SCREEN_DIAGONAL
+
+        // Weights of different scores
+        private const val W_DIST = 1.0
+        private const val W_CONF = 0.1
+        private const val W_IOU = 1.0
+        private const val W_CLASS = 0.1
+        private const val W_TRACKER_STRENGTH = 0.1
     }
 
 }

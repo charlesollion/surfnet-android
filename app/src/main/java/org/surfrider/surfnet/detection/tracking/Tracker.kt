@@ -22,9 +22,10 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     private var animationTimeStamp : Long? = null
 
     private val firstDetection = det
-    private val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
+    val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
     var position = firstDetection.getCenter()
     var speed = PointF(0.0F, 0.0F)
+    var strength = 0.5F
 
     init {
         trackedObjects.addLast(firstDetection)
@@ -37,7 +38,10 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     fun addDetection(newDet: TrackedDetection) {
         trackedObjects.addLast(newDet)
         position = newDet.getCenter()
-
+        strength += 0.5F
+        if(strength > 1.0F) {
+            strength = 1.0F
+        }
         alreadyAssociated = true
 
         if(trackedObjects.size > NUM_CONSECUTIVE_DET && status == TrackerStatus.RED) {
@@ -60,6 +64,9 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
         val currTimeStamp = System.currentTimeMillis()
         val age = timeDiffInMilli(currTimeStamp, trackedObjects.last.timestamp)
+        strength -= age.toFloat() / MAX_TIMESTAMP
+        if(strength < 0.0F)
+            strength = 0.0F
         // Timber.i("AGE +> ${age.toString()} | MAX TIMESTAMP +> $MAX_TIMESTAMP")
 
         val ageOfAnimation = animationTimeStamp?.let {

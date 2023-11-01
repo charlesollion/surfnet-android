@@ -1,5 +1,7 @@
 package org.surfrider.surfnet.detection.env
 
+import android.graphics.RectF
+
 object MathUtils {
 
     @JvmStatic
@@ -12,6 +14,7 @@ object MathUtils {
         // Step 1: Subtract the minimum value from each row
         for (i in 0 until numRows) {
             val minVal = costMatrix[i].minOrNull() ?: 0.0
+            if(minVal == Double.MAX_VALUE) break
             for (j in 0 until numCols) {
                 costMatrix[i][j] -= minVal
             }
@@ -20,6 +23,7 @@ object MathUtils {
         // Step 2: Subtract the minimum value from each column
         for (j in 0 until numCols) {
             val minVal = (0 until numRows).map { costMatrix[it][j] }.minOrNull() ?: 0.0
+            if(minVal == Double.MAX_VALUE) break
             for (i in 0 until numRows) {
                 costMatrix[i][j] -= minVal
             }
@@ -60,4 +64,22 @@ object MathUtils {
 
         return assignments
     }
+
+    @JvmStatic
+    fun calculateIoU(rect1: RectF, rect2: RectF): Float {
+        // Calculate the intersection of the two rectangles
+        val intersection = RectF()
+        intersection.setIntersect(rect1, rect2)
+
+        // Calculate the area of intersection
+        val intersectionArea = if (intersection.isEmpty) 0.0f else intersection.width() * intersection.height()
+
+        // Calculate the area of the individual rectangles
+        val areaRect1 = rect1.width() * rect1.height()
+        val areaRect2 = rect2.width() * rect2.height()
+
+        // Calculate IoU
+        return intersectionArea / (areaRect1 + areaRect2 - intersectionArea)
+    }
+
 }
