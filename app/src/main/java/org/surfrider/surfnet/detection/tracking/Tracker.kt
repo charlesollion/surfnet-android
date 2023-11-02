@@ -7,15 +7,15 @@ import org.surfrider.surfnet.detection.tflite.Detector
 import java.util.*
 import kotlin.math.abs
 
-public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
+class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
     var index = idx
     var location: Location? = lctn
     var status : TrackerStatus = TrackerStatus.RED
     var animation = false
     var alreadyAssociated = false
-    var lastUpdatedTimestamp: Long = 0
 
+    private var lastUpdatedTimestamp: Long = 0
     private var animationTimeStamp : Long? = null
 
     private val firstDetection = det
@@ -79,17 +79,6 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
             status = TrackerStatus.INACTIVE
         }
 
-        // Move tracker smoothly depending on speed
-        /*if(lastUpdatedTimestamp > 0) {
-            val dt = kotlin.math.min(
-                timeDiffInMilli(currTimeStamp, lastUpdatedTimestamp),
-                age
-            ) / 1000.0F
-
-            position.x += dt * speed.x // Estimated x
-            position.y += dt * speed.y // Estimated y
-        }*/
-
         lastUpdatedTimestamp = currTimeStamp
     }
 
@@ -99,7 +88,7 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
     class TrackedDetection(det: Detector.Recognition) {
         var rect: RectF = RectF(det.location)
-        var detectionConfidence = det.confidence
+        var detectionConfidence: Float = det.confidence
         var timestamp: Long = System.currentTimeMillis()
         var classId: String = det.id
         var associatedId = -1
