@@ -8,9 +8,6 @@ import java.util.*
 import kotlin.math.abs
 
 public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
-    private val MAX_TIMESTAMP = 3000
-    private val MAX_ANIMATION_TIMESTAMP = 1000
-    private val NUM_CONSECUTIVE_DET = 5
 
     var index = idx
     var location: Location? = lctn
@@ -25,7 +22,7 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
     var position = firstDetection.getCenter()
     var speed = PointF(0.0F, 0.0F)
-    var strength = 0.5F
+    var strength = 0.0F
 
     init {
         trackedObjects.addLast(firstDetection)
@@ -38,7 +35,7 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     fun addDetection(newDet: TrackedDetection) {
         trackedObjects.addLast(newDet)
         position = newDet.getCenter()
-        strength += 0.5F
+        strength += 0.2F
         if(strength > 1.0F) {
             strength = 1.0F
         }
@@ -64,9 +61,6 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
         val currTimeStamp = System.currentTimeMillis()
         val age = timeDiffInMilli(currTimeStamp, trackedObjects.last.timestamp)
-        strength -= age.toFloat() / MAX_TIMESTAMP
-        if(strength < 0.0F)
-            strength = 0.0F
         // Timber.i("AGE +> ${age.toString()} | MAX TIMESTAMP +> $MAX_TIMESTAMP")
 
         val ageOfAnimation = animationTimeStamp?.let {
@@ -80,7 +74,8 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
             }
         }
 
-        if(age > MAX_TIMESTAMP) {
+        // Green last twice as long as red
+        if((status == TrackerStatus.RED && age > MAX_TIMESTAMP) || (status == TrackerStatus.GREEN && age > MAX_TIMESTAMP * 2)) {
             status = TrackerStatus.INACTIVE
         }
 
@@ -123,5 +118,9 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         private fun dist(p1: PointF, p2:PointF): Float {
             return kotlin.math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
         }
+
+        private const val MAX_TIMESTAMP = 2000
+        private const val MAX_ANIMATION_TIMESTAMP = 1000
+        private const val NUM_CONSECUTIVE_DET = 5
     }
 }

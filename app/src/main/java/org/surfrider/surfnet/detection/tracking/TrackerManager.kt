@@ -68,6 +68,7 @@ class TrackerManager {
         }
     }
 
+
     private fun cost(det: Tracker.TrackedDetection, tracker: Tracker): Double {
         if (tracker.status != Tracker.TrackerStatus.INACTIVE && !tracker.alreadyAssociated) {
             val dist = tracker.distTo(det.getCenter()).toDouble() / SCREEN_DIAGONAL
@@ -78,8 +79,7 @@ class TrackerManager {
             val iou = 1.0 - calculateIoU(det.rect, tracker.trackedObjects.last.rect)
             val classMatch = if (det.classId == tracker.trackedObjects.last.classId) 0.0 else 1.0
             val strength = 1.0 - tracker.strength
-            val cost = W_DIST * dist + W_CONF * confidence + W_IOU * iou
-                     + W_CLASS * classMatch + W_TRACKER_STRENGTH * strength
+            val cost = W_DIST * dist + W_CONF * confidence + W_IOU * iou + W_CLASS * classMatch + W_TRACKER_STRENGTH * strength
             Timber.i("${tracker.index}/${det.rect}:$cost --- dist:${dist} confidence:${confidence} iou:$iou classmatch:$classMatch strength:${strength}")
             return cost
 
