@@ -20,9 +20,14 @@ import kotlin.math.min
 class TrackerManager {
 
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
-    private var trackerIndex = 0
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
+
     var displayDetection = true
+
+    private var bmpRed: Bitmap? = null
+    private var bmpGreen: Bitmap? = null
+
+    private var trackerIndex = 0
 
     fun updateTrackers() {
         trackers.forEach { tracker -> tracker.update() }
@@ -95,49 +100,33 @@ class TrackerManager {
             canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
         )
         frameToCanvasTransform.postScale(scale, scale)
+        if(bmpRed == null) {
+            bmpRed = context?.let { getBitmap(it, R.drawable.red_dot) }
+        }
+        if(bmpGreen == null) {
+            bmpGreen = context?.let { getBitmap(it, R.drawable.green_dot) }
+        }
 
         for (tracker in trackers) {
             val trackedPos = tracker.position
             //Only draw tracker if not inactive
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
-                val bmp = context?.let {
-                    getBitmap(
-                        it,
-                        if (tracker.status == Tracker.TrackerStatus.GREEN) {
-                            if (!detectedWaste.contains(tracker)) {
-                                detectedWaste.add(tracker)
-                            }
-                                R.drawable.green_dot
-                        } else {
-                            R.drawable.red_dot
-                        }
-                    )
-                } ?: return
-
-                val bmpWidth = bmp.width.div(scale)
-                val bmpHeight = bmp.height.div(scale)
-
-                val point =
-                    floatArrayOf(trackedPos.x - bmpWidth / 2, trackedPos.y - bmpHeight / 2)
-                frameToCanvasTransform.mapPoints(point)
-
-                canvas.drawBitmap(bmp, point[0], point[1], null)
-
+                var bmp: Bitmap? = null
+                if (tracker.status == Tracker.TrackerStatus.GREEN) {
+                    if (!detectedWaste.contains(tracker)) {
+                        detectedWaste.add(tracker)
+                    }
+                    bmp = bmpGreen
+                } else {
+                    bmp = bmpRed
+                }
 
                 // Draw the speed line to show displacement of the tracker depending on camera motion
                 if(showOF) {
-                    val speedLine = floatArrayOf(
-                        trackedPos.x,
-                        trackedPos.y,
-                        trackedPos.x + tracker.speed.x,
-                        trackedPos.y + tracker.speed.y
-                    )
-                    frameToCanvasTransform.mapPoints(speedLine)
-                    val paintLine = Paint()
-                    paintLine.color = Color.GREEN
-                    paintLine.strokeWidth = 8.0F
-                    canvas.drawLines(speedLine, paintLine)
+                    drawOF(canvas, tracker, frameToCanvasTransform)
                 }
+
+
 
                 if (bmp != null && displayDetection) {
                     val bmpWidth = bmp.width.div(scale)
@@ -180,8 +169,36 @@ class TrackerManager {
                         )
                     }
                 }
+                drawEllipses(canvas, tracker, frameToCanvasTransform)
             }
         }
+    }
+
+    private fun drawOF(canvas: Canvas, tracker: Tracker, transform:Matrix) {
+        val speedLine = floatArrayOf(
+            tracker.position.x,
+            tracker.position.y,
+            tracker.position.x + tracker.speed.x,
+            tracker.position.y + tracker.speed.y
+        )
+        transform.mapPoints(speedLine)
+        val paintLine = Paint()
+        paintLine.color = Color.GREEN
+        paintLine.strokeWidth = 8.0F
+        canvas.drawLines(speedLine, paintLine)
+    }
+
+    private fun drawEllipses(canvas: Canvas, tracker: Tracker, transform:Matrix) {
+        val paint = Paint()
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 4.0F
+        paint.color = Color.BLUE
+        val dims = PointF((1.0F + tracker.speedCov.x * 0.0F)  * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL,
+            (1.0F + tracker.speedCov.y * 0.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
+        val rect = RectF(tracker.position.x - dims.x, tracker.position.y - dims.y,
+            tracker.position.x + dims.x, tracker.position.y + dims.y)
+        transform.mapRect(rect)
+        canvas.drawOval(rect, paint)
     }
 
     fun getCurrentRois(width: Int, height: Int, downScale: Int, squareSize: Int): Mat? {
@@ -234,7 +251,7 @@ class TrackerManager {
                 it.y /= flowRefreshRateInMillis / 1000.0F
             }*/
 
-            tracker.updateSpeed(medianSpeed?:avgMotionSpeed)
+            tracker.updateSpeed(medianSpeed?:avgMotionSpeed, ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
         }
         return avgMotionSpeed
     }

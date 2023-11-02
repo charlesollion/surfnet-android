@@ -540,7 +540,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         get() = Size(1280, 720)
 
     companion object {
-        private const val FLOW_REFRESH_RATE_MILLIS: Long = 100
+        private const val FLOW_REFRESH_RATE_MILLIS: Long = 50
         private const val DOWNSAMPLING_FACTOR_FLOW: Int = 2
 
         private const val CONFIDENCE_THRESHOLD = 0.3f

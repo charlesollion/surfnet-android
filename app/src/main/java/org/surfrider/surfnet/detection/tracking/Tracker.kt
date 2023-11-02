@@ -6,6 +6,8 @@ import android.location.Location
 import org.surfrider.surfnet.detection.tflite.Detector
 import java.util.*
 import kotlin.math.abs
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
@@ -22,6 +24,9 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
     var position = firstDetection.getCenter()
     var speed = PointF(0.0F, 0.0F)
+    var speedCov: PointF = PointF(0.0f, 0.0f)
+
+
     var strength = 0.0F
 
     init {
@@ -29,7 +34,13 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     }
 
     fun distTo(newPos: PointF): Float {
-        return dist(position, newPos)
+        val diffX = position.x - newPos.x
+        val diffY = position.y - newPos.y
+        val mahalanobisDistanceX = (diffX / (1.0F + speedCov.x)).pow(2)
+        val mahalanobisDistanceY = (diffY / (1.0F + speedCov.y)).pow(2)
+
+        // Calculate the Mahalanobis distance by summing the squared components
+        return sqrt(mahalanobisDistanceX + mahalanobisDistanceY)
     }
 
     fun addDetection(newDet: TrackedDetection) {
@@ -48,11 +59,19 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         }
     }
 
-    fun updateSpeed(measuredSpeed: PointF) {
+    fun updateSpeed(measuredSpeed: PointF, scale: Float) {
         // Move tracker directly
         position.x += measuredSpeed.x
         position.y += measuredSpeed.y
         speed = measuredSpeed
+
+        // Calculate the squared speed components
+        val speedXSquared = speed.x * speed.x / (scale * scale)
+        val speedYSquared = speed.y * speed.y / (scale * scale)
+
+        // Update the estimated covariance using EMA
+        speedCov.x = COVARIANCE_SMOOTHING_FACTOR * speedCov.x + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedXSquared
+        speedCov.y = COVARIANCE_SMOOTHING_FACTOR * speedCov.y + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedYSquared
     }
 
 
@@ -111,5 +130,6 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         private const val MAX_TIMESTAMP = 2000
         private const val MAX_ANIMATION_TIMESTAMP = 1000
         private const val NUM_CONSECUTIVE_DET = 5
+        private const val COVARIANCE_SMOOTHING_FACTOR = 0.2F
     }
 }
