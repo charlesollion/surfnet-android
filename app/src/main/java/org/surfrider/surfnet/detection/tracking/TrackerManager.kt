@@ -3,22 +3,21 @@ package org.surfrider.surfnet.detection.tracking
 import android.content.Context
 import android.graphics.*
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.VectorDrawable
 import android.location.Location
 import androidx.core.content.ContextCompat
 import org.opencv.core.CvType
 import org.opencv.core.Mat
-import org.opencv.core.Rect
-import org.opencv.core.Scalar
 import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.model.TrackerResult
 import org.surfrider.surfnet.detection.model.TrackerTrash
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
-import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.collections.ArrayList
 import kotlin.math.min
+
 
 class TrackerManager {
     private val ASSOCIATION_THRESHOLD = 50.0F
@@ -27,6 +26,7 @@ class TrackerManager {
     private var trackerIndex = 0
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
     var displayDetection = true
+    var transparentDrawable: Drawable = ColorDrawable(Color.TRANSPARENT)
 
     fun updateTrackers(flowRefreshRateInMillis: Long) {
         trackers.forEach { tracker -> tracker.update(flowRefreshRateInMillis) }
@@ -85,16 +85,21 @@ class TrackerManager {
             //Only draw tracker if not inactive
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
                 val bmp = context?.let {
-                    getBitmap(
-                        it, if (tracker.status == Tracker.TrackerStatus.GREEN) {
+                    if (!displayDetection &&  tracker.status == Tracker.TrackerStatus.RED) {
+                        null
+                    } else {
+                        getBitmap(
+                                it, if (tracker.status == Tracker.TrackerStatus.GREEN) {
                             if (!detectedWaste.contains(tracker)) {
                                 detectedWaste.add(tracker)
                             }
                             R.drawable.green_dot
                         } else {
-                            R.drawable.red_dot
+                             R.drawable.red_dot
+
                         }
-                    )
+                        )
+                    }
                 } ?: return
 
                 // Draw the speed line to show displacement of the tracker depending on camera motion
@@ -112,7 +117,7 @@ class TrackerManager {
                     canvas.drawLines(speedLine, paintLine)
                 }
 
-                if (displayDetection) {
+                //if (displayDetection ) {
                     val bmpWidth = bmp.width.div(scale)
                     val bmpHeight = bmp.height.div(scale)
 
@@ -153,7 +158,7 @@ class TrackerManager {
                             null
                         )
                     }
-                }
+               // }
             }
         }
     }
