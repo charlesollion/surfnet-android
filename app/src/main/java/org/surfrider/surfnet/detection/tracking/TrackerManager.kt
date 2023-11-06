@@ -11,8 +11,11 @@ import org.opencv.core.Mat
 import org.opencv.core.Rect
 import org.opencv.core.Scalar
 import org.surfrider.surfnet.detection.R
+import org.surfrider.surfnet.detection.model.TrackerResult
+import org.surfrider.surfnet.detection.model.TrackerTrash
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import timber.log.Timber
+import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.min
@@ -31,7 +34,7 @@ class TrackerManager {
 
     @Synchronized
 
-    fun processDetections(results: List<Recognition>, location : Location?) {
+    fun processDetections(results: List<Recognition>, location: Location?) {
         // Store all Recognition objects in a list of TrackedDetections
         val dets = LinkedList<Tracker.TrackedDetection>()
         for (result in results) {
@@ -63,7 +66,13 @@ class TrackerManager {
     }
 
     @Synchronized
-    fun draw(canvas: Canvas, context: Context?, previewWidth: Int, previewHeight: Int, showOF: Boolean) {
+    fun draw(
+        canvas: Canvas,
+        context: Context?,
+        previewWidth: Int,
+        previewHeight: Int,
+        showOF: Boolean
+    ) {
         // Build transform matrix from canvas and context
         val frameToCanvasTransform = Matrix()
         val scale = min(
@@ -77,30 +86,19 @@ class TrackerManager {
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
                 val bmp = context?.let {
                     getBitmap(
-                        it,
-                        if (tracker.status == Tracker.TrackerStatus.GREEN) {
+                        it, if (tracker.status == Tracker.TrackerStatus.GREEN) {
                             if (!detectedWaste.contains(tracker)) {
                                 detectedWaste.add(tracker)
                             }
-                                R.drawable.green_dot
+                            R.drawable.green_dot
                         } else {
                             R.drawable.red_dot
                         }
                     )
                 } ?: return
 
-                val bmpWidth = bmp.width.div(scale)
-                val bmpHeight = bmp.height.div(scale)
-
-                val point =
-                    floatArrayOf(trackedPos.x - bmpWidth / 2, trackedPos.y - bmpHeight / 2)
-                frameToCanvasTransform.mapPoints(point)
-
-                canvas.drawBitmap(bmp, point[0], point[1], null)
-
-
                 // Draw the speed line to show displacement of the tracker depending on camera motion
-                if(showOF) {
+                if (showOF) {
                     val speedLine = floatArrayOf(
                         trackedPos.x,
                         trackedPos.y,
@@ -114,7 +112,7 @@ class TrackerManager {
                     canvas.drawLines(speedLine, paintLine)
                 }
 
-                if (bmp != null && displayDetection) {
+                if (displayDetection) {
                     val bmpWidth = bmp.width.div(scale)
                     val bmpHeight = bmp.height.div(scale)
 
@@ -130,11 +128,6 @@ class TrackerManager {
                     canvas.drawText(tracker.index.toString(), point[0], point[1], paint)
 
 
-                    //Animation drawing
-                    /*if (tracker.animation) {
-                        val shouldShowBottomAnimation = trackedPos.y < canvas.height.div(scale) / 2
-                        val animation = getBitmap(
-                            context,*/
                     //Animation drawing
                     if (tracker.animation) {
                         val shouldShowBottomAnimation = trackedPos.y < canvas.height.div(scale) / 2
@@ -161,12 +154,6 @@ class TrackerManager {
                         )
                     }
                 }
-
-                //affichage du text avec le numéro du tracker
-                val paint = Paint()
-                paint.textSize = 40.0F
-                canvas.drawText(tracker.index.toString(), point[0], point[1], paint)
-
             }
         }
     }
@@ -174,7 +161,7 @@ class TrackerManager {
     fun getCurrentRois(width: Int, height: Int, downScale: Int, squareSize: Int): Mat? {
         // Get regions of interest within the frame: areas around each tracker
         // The output is a mask matrix with 1s next to tracker centers and 0s otherwise
-        if(trackers.size == 0) {
+        if (trackers.size == 0) {
             return null
         }
         val currRois = Mat.zeros(height / downScale, width / downScale, CvType.CV_8UC1)
@@ -184,8 +171,8 @@ class TrackerManager {
                 val xCenter: Int = trackedPos.x.toInt() / downScale
                 val yCenter: Int = trackedPos.y.toInt() / downScale
 
-                for (i in -squareSize/2..squareSize/2) {
-                    for (j in -squareSize/2..squareSize/2) {
+                for (i in -squareSize / 2..squareSize / 2) {
+                    for (j in -squareSize / 2..squareSize / 2) {
                         val x = xCenter + i
                         val y = yCenter + j
 
@@ -203,7 +190,7 @@ class TrackerManager {
         // Associate each tracker with flow speed
         // V1: just take the average flow
         var motionSpeed: PointF = PointF(0.0F, 0.0F)
-        if(listOfFlowLines.size > 0) {
+        if (listOfFlowLines.size > 0) {
             for (line in listOfFlowLines) {
                 motionSpeed.x += (line[2] - line[0])
                 motionSpeed.y += (line[3] - line[1])
@@ -212,7 +199,7 @@ class TrackerManager {
             motionSpeed.y /= listOfFlowLines.size
         }
 
-        for(tracker in trackers) {
+        for (tracker in trackers) {
             tracker.speed = motionSpeed
         }
     }
@@ -258,4 +245,30 @@ class TrackerManager {
         }
     }
 
+    fun sendData(email: String) {
+        var trashes = ArrayList<TrackerTrash>()
+        trackers.forEach {
+            val date = Date(it.startDate)
+            val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+            val iso8601DateString = iso8601Format.format(date)
+            trashes.add(
+                TrackerTrash(
+                    date = iso8601DateString,
+                    lat = it.location?.latitude,
+                    lng = it.location?.longitude,
+                    name = "unknown"
+                )
+            )
+        }
+
+        var result = TrackerResult(
+            move = null,
+            bank = null,
+            trackingMode = "automatic",
+            files = ArrayList(),
+            trashes = trashes,
+            positions = ArrayList(),
+            comment = "email : $email"
+        )
+    }
 }

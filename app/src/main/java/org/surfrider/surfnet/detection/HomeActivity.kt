@@ -49,7 +49,7 @@ class HomeActivity : AppCompatActivity() {
         // Make the link clickable
         cguView.movementMethod = LinkMovementMethod.getInstance()
 
-        val sharedPreference =  getSharedPreferences("email", Context.MODE_PRIVATE)
+        val sharedPreference =  getSharedPreferences("prefs", Context.MODE_PRIVATE)
 
         binding.editTextTextEmailAddress.text= SpannableStringBuilder(sharedPreference.getString("email",""))
 
