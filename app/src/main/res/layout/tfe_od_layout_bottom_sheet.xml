@@ -48,7 +48,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:gravity="right"
-            android:text="640*480"
+            android:text=""
             android:textColor="@android:color/black" />
     </LinearLayout>
 
@@ -72,9 +72,10 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:gravity="right"
-            android:text="640*480"
+            android:text=""
             android:textColor="@android:color/black" />
     </LinearLayout>
+
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -95,28 +96,114 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:gravity="right"
-            android:text="640*480"
+            android:text=""
             android:textColor="@android:color/black" />
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
 
+        <TextView
+            android:id="@+id/position"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="position"
+            android:textColor="@android:color/black" />
 
-    <!-- TODO(b/112541284): Unhide when new NNAPI delegate is used. -->
+        <TextView
+            android:id="@+id/position_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="right"
+            android:text="0.0 0.0 0.0"
+            android:textColor="@android:color/black" />
+    </LinearLayout>
 
     <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/speed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Speed"
+            android:textColor="@android:color/black" />
+
+        <TextView
+            android:id="@+id/speed_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="right"
+            android:text="0.0"
+            android:textColor="@android:color/black" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/flow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Flow"
+            android:textColor="@android:color/black" />
+
+        <TextView
+            android:id="@+id/flow_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="right"
+            android:text="0.0"
+            android:textColor="@android:color/black" />
+    </LinearLayout>
+
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/material_switch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Display detections "
+        android:layout_marginBottom="10dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+    <TableLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal">
 
-        <ListView
-            android:id="@+id/device_list"
-            android:layout_width="100dp"
-            android:layout_height="wrap_content" />
-
-        <ListView
-            android:id="@+id/model_list"
+        <TableRow
             android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-    </LinearLayout>
+            android:layout_height="match_parent" >
+
+            <Switch
+                android:id="@+id/switch1"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="0.5"
+                android:text="Show Flow" />
+
+            <Switch
+                android:id="@+id/switch2"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:checked="false"
+                android:layout_weight="0.5"
+                android:text="Show Boxes" />
+        </TableRow>
+
+    </TableLayout>
+
 
 </LinearLayout>

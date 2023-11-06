@@ -2,26 +2,29 @@ package org.surfrider.surfnet.detection.tracking
 
 import android.graphics.PointF
 import android.graphics.RectF
+import android.location.Location
 import org.surfrider.surfnet.detection.tflite.Detector
 import java.util.*
 import kotlin.math.abs
 
-public class Tracker(det: TrackedDetection, idx: Int) {
+public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     private val MAX_TIMESTAMP = 3000
     private val MAX_ANIMATION_TIMESTAMP = 1000
     private val NUM_CONSECUTIVE_DET = 5
-    private val ASSOCIATION_THRESHOLD = 10.0F
 
     var index = idx
+    var location: Location? = lctn
     var status : TrackerStatus = TrackerStatus.RED
     var animation = false
     var alreadyAssociated = false
+    var lastUpdatedTimestamp: Long = 0
 
     private var animationTimeStamp : Long? = null
 
     private val firstDetection = det
     private val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
     var position = firstDetection.getCenter()
+    var speed = PointF(0.0F, 0.0F)
 
     init {
         trackedObjects.addLast(firstDetection)
@@ -47,12 +50,15 @@ public class Tracker(det: TrackedDetection, idx: Int) {
         }
     }
 
-    fun update() {
+    fun update(flowRefreshRateInMillis: Long) {
         alreadyAssociated = false
-        val age = compareTimeDifferenceInMilliseconds(System.currentTimeMillis(), trackedObjects.last.timestamp)
+
+        val currTimeStamp = System.currentTimeMillis()
+        val age = compareTimeDifferenceInMilliseconds(currTimeStamp, trackedObjects.last.timestamp)
+        // Timber.i("AGE +> ${age.toString()} | MAX TIMESTAMP +> $MAX_TIMESTAMP")
 
         val ageOfAnimation = animationTimeStamp?.let {
-            compareTimeDifferenceInMilliseconds(System.currentTimeMillis(),
+            compareTimeDifferenceInMilliseconds(currTimeStamp,
                 it
             )
         }
@@ -61,10 +67,18 @@ public class Tracker(det: TrackedDetection, idx: Int) {
                 animation = false
             }
         }
+
         if(age > MAX_TIMESTAMP) {
             status = TrackerStatus.INACTIVE
-
         }
+
+        // Move tracker
+        if(lastUpdatedTimestamp > 0) {
+            val elapsedTime = compareTimeDifferenceInMilliseconds(currTimeStamp, lastUpdatedTimestamp)
+            position.x += speed.x * (elapsedTime / flowRefreshRateInMillis)
+            position.y += speed.y * (elapsedTime / flowRefreshRateInMillis)
+        }
+        lastUpdatedTimestamp = currTimeStamp
     }
 
     private fun compareTimeDifferenceInMilliseconds(timestamp1: Long, timestamp2: Long): Long {

@@ -22,14 +22,19 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.media.Image
 import android.os.Environment
+import org.opencv.core.Core
+import org.opencv.core.Mat
+import org.opencv.core.Scalar
 import org.surfrider.surfnet.detection.TrackingActivity
 import org.surfrider.surfnet.detection.tflite.Detector
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
+import java.util.ArrayList
 import java.util.LinkedList
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 
 /** Utility class for manipulating images.  */
 object ImageUtils {
@@ -225,24 +230,84 @@ object ImageUtils {
         canvas?.drawRect(rectCrop, paint)
     }
 
-    fun drawDetections(results: List<Detector.Recognition>?, croppedBitmap: Bitmap?, cropToFrameTransform: Matrix?) {
-        val cropCopyBitmap = croppedBitmap?.let { Bitmap.createBitmap(it) }
-        val canvas = cropCopyBitmap?.let { Canvas(it) }
+    fun drawDetections(canvas: Canvas?, results: List<Detector.Recognition>?, previewWidth: Int, previewHeight: Int) {
         val paint = Paint()
         paint.color = Color.RED
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2.0f
+        val frameToCanvasTransform = Matrix()
+        val scale = min(
+            canvas!!.width / previewWidth.toFloat(), canvas!!.height / previewHeight.toFloat()
+        )
+        frameToCanvasTransform.postScale(scale, scale)
         if (results != null) {
             for (result in results) {
                 val location = result.location
                 if (location != null) {
+                    frameToCanvasTransform?.mapRect(location)
                     canvas?.drawRect(location, paint)
-                    cropToFrameTransform?.mapRect(location)
-                    result.location = location
                 }
             }
         }
     }
+
+    fun drawOFLinesPRK(canvas: Canvas?, outputLinesFlow: ArrayList<FloatArray>, previewWidth: Int, previewHeight: Int) {
+        val paint = Paint()
+        paint.color = Color.WHITE
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 4.0f
+        // Timber.i("output line flow size: ${outputLinesFlow.size}")
+        val frameToCanvasTransform = Matrix()
+        val scale = Math.min(canvas!!.width / previewWidth.toFloat(),
+            canvas!!.height / previewHeight.toFloat())
+        // Adjust scale whether we downsampled the greyImage to compute the points
+        frameToCanvasTransform.postScale(scale * 1.0F, scale * 1.0F)
+        for(line in outputLinesFlow) {
+            val points = line.clone()
+            frameToCanvasTransform.mapPoints(points)
+            //Timber.i(" flow - i, j, dx, dy, $i, $j, $dx, $dy")
+            canvas?.drawCircle(points[0], points[1], 10.0f, paint)
+            canvas?.drawLine(points[0], points[1], points[2], points[3], paint)
+        }
+    }
+    fun drawOFLines(canvas: Canvas?, outputFlow: Mat, previewWidth: Int, previewHeight: Int) {
+        // Draw dense optical flow, not used
+        val paint = Paint()
+        paint.color = Color.RED
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 4.0f
+        val factor = 10
+        val gridSize = 8.0F * factor
+        if(outputFlow == null)
+            return
+
+        val frameToCanvasTransform = Matrix()
+        val scale = Math.min(canvas!!.width / previewWidth.toFloat(),
+            canvas!!.height / previewHeight.toFloat())
+        frameToCanvasTransform.postScale(scale, scale)
+        for (i: Int in 4 until outputFlow.rows() / factor- 4) {
+            for (j: Int in 1 until outputFlow.cols() / factor-1) {
+                val x: Float = gridSize * i
+                val y: Float = gridSize * j
+                val pointFlow = outputFlow[i * factor, j * factor]
+                if(pointFlow != null) {
+                    val dx: Float = pointFlow[0].toFloat() * 2.0F
+                    val dy: Float = pointFlow[1].toFloat() * 2.0F
+                    val points = floatArrayOf(x, y, x + dx, y + dy)
+                    frameToCanvasTransform.mapPoints(points)
+                    canvas?.drawLine(points[0], points[1], points[2], points[3], paint)
+                }
+            }
+        }
+        paint.color = Color.GREEN
+        paint.strokeWidth = 10.0F
+        val avgMV : Scalar = Core.mean(outputFlow)
+        val cx = canvas!!.width/2.0F
+        val cy = canvas.height/2.0F
+        val factorLine = 10.0F
+        canvas?.drawLine(cx, cy, cx + avgMV.`val`[0].toFloat() * factorLine, cy + avgMV.`val`[1].toFloat() * factorLine, paint)
+    }
+
 
     fun mapDetectionsWithTransform(results: List<Detector.Recognition>?, cropToFrameTransform: Matrix?): MutableList<Detector.Recognition> {
         val mappedRecognitions: MutableList<Detector.Recognition> = LinkedList()
