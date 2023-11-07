@@ -8,13 +8,10 @@ import android.location.Location
 import androidx.core.content.ContextCompat
 import org.opencv.core.CvType
 import org.opencv.core.Mat
-import org.opencv.core.Rect
-import org.opencv.core.Scalar
 import org.surfrider.surfnet.detection.R
-import org.surfrider.surfnet.detection.model.TrackerResult
-import org.surfrider.surfnet.detection.model.TrackerTrash
+import org.surfrider.surfnet.detection.models.TrackerResult
+import org.surfrider.surfnet.detection.models.TrackerTrash
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
-import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
