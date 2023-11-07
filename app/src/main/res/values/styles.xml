@@ -73,6 +73,12 @@
         <item name="android:textColor">#89B684</item>
     </style>
 
+    <style name="DialogRed" parent="TextAppearance.AppCompat">
+        <item name="android:fontFamily">@font/montserrat</item>
+        <item name="android:textSize">14dp</item>
+        <item name="android:textColor">#FF2B2B</item>
+    </style>
+
     <!-- DIALOG STYLE -->
     <style name="CustomDialogTheme" parent="Theme.AppCompat.Light.Dialog">
         <item name="android:windowIsFloating">true</item>
