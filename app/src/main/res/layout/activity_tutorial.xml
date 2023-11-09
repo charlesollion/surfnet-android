@@ -150,7 +150,7 @@
             android:paddingEnd="10dp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/tutorial_p2"
-            app:srcCompat="@drawable/red_dot" />
+            app:srcCompat="@drawable/yellow_dot" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 
