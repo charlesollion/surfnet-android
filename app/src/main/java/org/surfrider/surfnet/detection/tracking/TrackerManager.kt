@@ -8,13 +8,10 @@ import android.location.Location
 import androidx.core.content.ContextCompat
 import org.opencv.core.CvType
 import org.opencv.core.Mat
-import org.opencv.core.Rect
-import org.opencv.core.Scalar
 import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.model.TrackerResult
 import org.surfrider.surfnet.detection.model.TrackerTrash
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
-import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
@@ -92,7 +89,7 @@ class TrackerManager {
                             }
                             R.drawable.green_dot
                         } else {
-                            R.drawable.red_dot
+                            R.drawable.yellow_dot
                         }
                     )
                 } ?: return
@@ -219,7 +216,7 @@ class TrackerManager {
     private fun getBitmap(vectorDrawable: VectorDrawable?): Bitmap? {
         vectorDrawable?.let {
             val bitmap = Bitmap.createBitmap(
-                it.intrinsicWidth * 2, it.intrinsicHeight * 2, Bitmap.Config.ARGB_8888
+                it.intrinsicWidth, it.intrinsicHeight, Bitmap.Config.ARGB_8888
             )
             val canvas = Canvas(bitmap)
             it.setBounds(0, 0, canvas.width, canvas.height)

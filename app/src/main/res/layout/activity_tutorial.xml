@@ -87,18 +87,18 @@
             android:paddingBottom="20dp"
             android:text="@string/tutorial_p2_text"
             android:textAppearance="@style/TutorialText"
-            app:layout_constraintBottom_toTopOf="@id/red_dot_description"
+            app:layout_constraintBottom_toTopOf="@id/yellow_dot_description"
             app:layout_constraintStart_toStartOf="parent" />
 
         <TextView
-            android:id="@+id/red_dot_description"
+            android:id="@+id/yellow_dot_description"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/red_dot_tutorial_text"
             android:textAppearance="@style/ItalicText"
-            app:layout_constraintStart_toEndOf="@id/tutorial_red_dot"
-            app:layout_constraintTop_toTopOf="@id/tutorial_red_dot"
-            app:layout_constraintBottom_toBottomOf="@id/tutorial_red_dot" />
+            app:layout_constraintStart_toEndOf="@id/tutorial_yellow_dot"
+            app:layout_constraintTop_toTopOf="@id/tutorial_yellow_dot"
+            app:layout_constraintBottom_toBottomOf="@id/tutorial_yellow_dot" />
 
         <TextView
             android:id="@+id/green_dot_description"
@@ -137,12 +137,12 @@
             android:paddingEnd="10dp"
             app:layout_constraintBottom_toTopOf="@id/ready_button"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tutorial_red_dot"
+            app:layout_constraintTop_toBottomOf="@id/tutorial_yellow_dot"
             app:srcCompat="@drawable/green_dot"
             tools:layout_editor_absoluteY="217dp" />
 
         <ImageView
-            android:id="@+id/tutorial_red_dot"
+            android:id="@+id/tutorial_yellow_dot"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -150,7 +150,7 @@
             android:paddingEnd="10dp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/tutorial_p2"
-            app:srcCompat="@drawable/red_dot" />
+            app:srcCompat="@drawable/yellow_dot" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 
