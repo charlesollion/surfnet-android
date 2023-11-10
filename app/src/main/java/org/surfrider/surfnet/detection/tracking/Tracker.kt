@@ -26,8 +26,8 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     var speed = PointF(0.0F, 0.0F)
     var speedCov: PointF = PointF(0.0f, 0.0f)
 
-
     var strength = 0.0F
+    var startDate = firstDetection.timestamp
 
     init {
         trackedObjects.addLast(firstDetection)

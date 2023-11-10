@@ -11,8 +11,11 @@ import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.env.MathUtils.calculateIoU
 import org.surfrider.surfnet.detection.env.MathUtils.solveLinearSumAssignment
+import org.surfrider.surfnet.detection.model.TrackerResult
+import org.surfrider.surfnet.detection.model.TrackerTrash
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import timber.log.Timber
+import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.min
@@ -93,7 +96,13 @@ class TrackerManager {
     }
 
     @Synchronized
-    fun draw(canvas: Canvas, context: Context?, previewWidth: Int, previewHeight: Int, showOF: Boolean) {
+    fun draw(
+        canvas: Canvas,
+        context: Context?,
+        previewWidth: Int,
+        previewHeight: Int,
+        showOF: Boolean
+    ) {
         // Build transform matrix from canvas and context
         val frameToCanvasTransform = Matrix()
         val scale = min(
@@ -125,8 +134,6 @@ class TrackerManager {
                 if(showOF) {
                     drawOF(canvas, tracker, frameToCanvasTransform)
                 }
-
-
 
                 if (bmp != null && displayDetection) {
                     val bmpWidth = bmp.width.div(scale)
@@ -169,7 +176,7 @@ class TrackerManager {
                         )
                     }
                 }
-                drawEllipses(canvas, tracker, frameToCanvasTransform)
+                // drawEllipses(canvas, tracker, frameToCanvasTransform)
             }
         }
     }
@@ -204,7 +211,7 @@ class TrackerManager {
     fun getCurrentRois(width: Int, height: Int, downScale: Int, squareSize: Int): Mat? {
         // Get regions of interest within the frame: areas around each tracker
         // The output is a mask matrix with 1s next to tracker centers and 0s otherwise
-        if(trackers.size == 0) {
+        if (trackers.size == 0) {
             return null
         }
         val currRois = Mat.zeros(height / downScale, width / downScale, CvType.CV_8UC1)
@@ -214,8 +221,8 @@ class TrackerManager {
                 val xCenter: Int = trackedPos.x.toInt() / downScale
                 val yCenter: Int = trackedPos.y.toInt() / downScale
 
-                for (i in -squareSize/2..squareSize/2) {
-                    for (j in -squareSize/2..squareSize/2) {
+                for (i in -squareSize / 2..squareSize / 2) {
+                    for (j in -squareSize / 2..squareSize / 2) {
                         val x = xCenter + i
                         val y = yCenter + j
 
@@ -231,6 +238,7 @@ class TrackerManager {
 
     fun associateFlowWithTrackers(listOfFlowLines: ArrayList<FloatArray>, flowRefreshRateInMillis: Long): PointF {
         // Associate each tracker with flow speed
+
         // Compute the average flow for debug purposes
         var avgMotionSpeed = PointF(0.0F, 0.0F)
         if(listOfFlowLines.size > 0) {
@@ -252,6 +260,7 @@ class TrackerManager {
             }*/
 
             tracker.updateSpeed(medianSpeed?:avgMotionSpeed, ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
+
         }
         return avgMotionSpeed
     }
@@ -295,6 +304,33 @@ class TrackerManager {
                 throw IllegalArgumentException("unsupported drawable type")
             }
         }
+    }
+
+    fun sendData(email: String) {
+        var trashes = ArrayList<TrackerTrash>()
+        trackers.forEach {
+            val date = Date(it.startDate)
+            val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+            val iso8601DateString = iso8601Format.format(date)
+            trashes.add(
+                TrackerTrash(
+                    date = iso8601DateString,
+                    lat = it.location?.latitude,
+                    lng = it.location?.longitude,
+                    name = "unknown"
+                )
+            )
+        }
+
+        var result = TrackerResult(
+            move = null,
+            bank = null,
+            trackingMode = "automatic",
+            files = ArrayList(),
+            trashes = trashes,
+            positions = ArrayList(),
+            comment = "email : $email"
+        )
     }
 
     companion object {

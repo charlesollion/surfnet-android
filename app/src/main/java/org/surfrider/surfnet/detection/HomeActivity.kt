@@ -8,6 +8,7 @@ import android.text.SpannableString
 import android.text.SpannableStringBuilder
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
+import android.util.Patterns
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import org.surfrider.surfnet.detection.databinding.ActivityHomeBinding
@@ -49,18 +50,30 @@ class HomeActivity : AppCompatActivity() {
         // Make the link clickable
         cguView.movementMethod = LinkMovementMethod.getInstance()
 
-        val sharedPreference =  getSharedPreferences("email", Context.MODE_PRIVATE)
+        val sharedPreference =  getSharedPreferences("prefs", Context.MODE_PRIVATE)
 
         binding.editTextTextEmailAddress.text= SpannableStringBuilder(sharedPreference.getString("email",""))
 
 
         binding.button.setOnClickListener {
+            if (validateEmail()) {
+                val editor = sharedPreference.edit()
+                editor.putString("email", binding.editTextTextEmailAddress.text.toString())
+                editor.apply()
+                val intent = Intent(this, TutorialActivity::class.java)
+                startActivity(intent)
+            }
+        }
+    }
 
-            var editor = sharedPreference.edit()
-            editor.putString("email",binding.editTextTextEmailAddress.text.toString())
-            editor.commit()
-            val intent = Intent(this, TutorialActivity::class.java)
-            startActivity(intent)
+    private fun validateEmail(): Boolean {
+        val email = binding.editTextTextEmailAddress.text.toString().trim()
+        val pattern = Patterns.EMAIL_ADDRESS
+        return if (pattern.matcher(email).matches()) {
+            true
+        } else {
+            binding.editTextTextEmailAddress.error = "Vous devez saisir une adresse email valide"
+            false
         }
     }
 
