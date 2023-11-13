@@ -180,7 +180,7 @@ class TrackerManager {
                         )
                     }
                 }
-                // drawEllipses(canvas, tracker, frameToCanvasTransform)
+                drawEllipses(canvas, tracker, frameToCanvasTransform)
             }
         }
     }
@@ -263,7 +263,6 @@ class TrackerManager {
             }*/
 
             tracker.updateSpeed(medianSpeed?:avgMotionSpeed, ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
-
         }
         return avgMotionSpeed
     }
