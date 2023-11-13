@@ -121,13 +121,17 @@ class TrackerManager {
             //Only draw tracker if not inactive
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
                 var bmp: Bitmap? = null
-                if (tracker.status == Tracker.TrackerStatus.GREEN) {
-                    if (!detectedWaste.contains(tracker)) {
-                        detectedWaste.add(tracker)
-                    }
-                    bmp = bmpGreen
+                if (!displayDetection &&  tracker.status == Tracker.TrackerStatus.RED) {
+                    null
                 } else {
-                    bmp = bmpYellow
+                    bmp = if (tracker.status == Tracker.TrackerStatus.GREEN) {
+                        if (!detectedWaste.contains(tracker)) {
+                            detectedWaste.add(tracker)
+                        }
+                        bmpGreen
+                    } else {
+                        bmpYellow
+                    }
                 }
 
                 // Draw the speed line to show displacement of the tracker depending on camera motion
@@ -238,7 +242,6 @@ class TrackerManager {
 
     fun associateFlowWithTrackers(listOfFlowLines: ArrayList<FloatArray>, flowRefreshRateInMillis: Long): PointF {
         // Associate each tracker with flow speed
-
         // Compute the average flow for debug purposes
         var avgMotionSpeed = PointF(0.0F, 0.0F)
         if(listOfFlowLines.size > 0) {
