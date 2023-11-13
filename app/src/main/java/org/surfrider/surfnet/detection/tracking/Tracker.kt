@@ -6,42 +6,50 @@ import android.location.Location
 import org.surfrider.surfnet.detection.tflite.Detector
 import java.util.*
 import kotlin.math.abs
+import kotlin.math.pow
+import kotlin.math.sqrt
 
-public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
-    private val MAX_TIMESTAMP = 3000
-    private val MAX_ANIMATION_TIMESTAMP = 1000
-    private val NUM_CONSECUTIVE_DET = 5
+class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
     var index = idx
     var location: Location? = lctn
     var status : TrackerStatus = TrackerStatus.RED
     var animation = false
     var alreadyAssociated = false
-    var lastUpdatedTimestamp: Long = 0
 
+    private var lastUpdatedTimestamp: Long = 0
     private var animationTimeStamp : Long? = null
 
     private val firstDetection = det
-    private val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
+    val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
     var position = firstDetection.getCenter()
     var speed = PointF(0.0F, 0.0F)
+    var speedCov: PointF = PointF(0.0f, 0.0f)
+
+    var strength = 0.0F
     var startDate = firstDetection.timestamp
 
     init {
         trackedObjects.addLast(firstDetection)
     }
-    
-    private fun dist(p1: PointF, p2:PointF): Float {
-        return kotlin.math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
-    }
 
     fun distTo(newPos: PointF): Float {
-        return dist(position, newPos)
+        val diffX = position.x - newPos.x
+        val diffY = position.y - newPos.y
+        val mahalanobisDistanceX = (diffX / (1.0F + speedCov.x)).pow(2)
+        val mahalanobisDistanceY = (diffY / (1.0F + speedCov.y)).pow(2)
+
+        // Calculate the Mahalanobis distance by summing the squared components
+        return sqrt(mahalanobisDistanceX + mahalanobisDistanceY)
     }
 
     fun addDetection(newDet: TrackedDetection) {
         trackedObjects.addLast(newDet)
         position = newDet.getCenter()
+        strength += 0.2F
+        if(strength > 1.0F) {
+            strength = 1.0F
+        }
         alreadyAssociated = true
 
         if(trackedObjects.size > NUM_CONSECUTIVE_DET && status == TrackerStatus.RED) {
@@ -51,15 +59,31 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         }
     }
 
-    fun update(flowRefreshRateInMillis: Long) {
+    fun updateSpeed(measuredSpeed: PointF, scale: Float) {
+        // Move tracker directly
+        position.x += measuredSpeed.x
+        position.y += measuredSpeed.y
+        speed = measuredSpeed
+
+        // Calculate the squared speed components
+        val speedXSquared = speed.x * speed.x / (scale * scale)
+        val speedYSquared = speed.y * speed.y / (scale * scale)
+
+        // Update the estimated covariance using EMA
+        speedCov.x = COVARIANCE_SMOOTHING_FACTOR * speedCov.x + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedXSquared
+        speedCov.y = COVARIANCE_SMOOTHING_FACTOR * speedCov.y + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedYSquared
+    }
+
+
+    fun update() {
         alreadyAssociated = false
 
         val currTimeStamp = System.currentTimeMillis()
-        val age = compareTimeDifferenceInMilliseconds(currTimeStamp, trackedObjects.last.timestamp)
+        val age = timeDiffInMilli(currTimeStamp, trackedObjects.last.timestamp)
         // Timber.i("AGE +> ${age.toString()} | MAX TIMESTAMP +> $MAX_TIMESTAMP")
 
         val ageOfAnimation = animationTimeStamp?.let {
-            compareTimeDifferenceInMilliseconds(currTimeStamp,
+            timeDiffInMilli(currTimeStamp,
                 it
             )
         }
@@ -69,36 +93,43 @@ public class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
             }
         }
 
-        if(age > MAX_TIMESTAMP) {
+        // Green last twice as long as red
+        if((status == TrackerStatus.RED && age > MAX_TIMESTAMP) || (status == TrackerStatus.GREEN && age > MAX_TIMESTAMP * 2)) {
             status = TrackerStatus.INACTIVE
         }
 
-        // Move tracker
-        if(lastUpdatedTimestamp > 0) {
-            val elapsedTime = compareTimeDifferenceInMilliseconds(currTimeStamp, lastUpdatedTimestamp)
-            position.x += speed.x * (elapsedTime / flowRefreshRateInMillis)
-            position.y += speed.y * (elapsedTime / flowRefreshRateInMillis)
-        }
         lastUpdatedTimestamp = currTimeStamp
     }
 
-    private fun compareTimeDifferenceInMilliseconds(timestamp1: Long, timestamp2: Long): Long {
+    private fun timeDiffInMilli(timestamp1: Long, timestamp2: Long): Long {
         return abs(timestamp1 - timestamp2)
     }
 
     class TrackedDetection(det: Detector.Recognition) {
-        var location: RectF = RectF(det.location)
-        var detectionConfidence = det.confidence
+        var rect: RectF = RectF(det.location)
+        var detectionConfidence: Float = det.confidence
         var timestamp: Long = System.currentTimeMillis()
         var classId: String = det.id
         var associatedId = -1
 
         fun getCenter(): PointF {
-            return PointF(location.centerX(), location.centerY())
+            return PointF(rect.centerX(), rect.centerY())
         }
     }
 
     enum class TrackerStatus {
         GREEN, RED, INACTIVE
+    }
+
+    companion object {
+        @JvmStatic
+        private fun dist(p1: PointF, p2:PointF): Float {
+            return kotlin.math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
+        }
+
+        private const val MAX_TIMESTAMP = 2000
+        private const val MAX_ANIMATION_TIMESTAMP = 1000
+        private const val NUM_CONSECUTIVE_DET = 5
+        private const val COVARIANCE_SMOOTHING_FACTOR = 0.2F
     }
 }

@@ -22,7 +22,10 @@ class DenseOpticalFlow {
 
     private fun updatePoints(greyImage: Mat, mask: Mat?) {
         val corners = MatOfPoint()
-        Imgproc.goodFeaturesToTrack(greyImage, corners, maxCorners - prevPts.rows(), 0.1, minDistance, mask ?: Mat())
+        var numberCorners = maxCorners
+        if(!prevPts.empty())
+            numberCorners -= prevPts.rows()
+        Imgproc.goodFeaturesToTrack(greyImage, corners, numberCorners, 0.1, minDistance, mask ?: Mat())
 
         val newCornersArray = corners.toArray()
 
@@ -46,12 +49,12 @@ class DenseOpticalFlow {
     }
 
 
-    fun run(newFrame: Mat, mask:Mat?): ArrayList<FloatArray> {
-        return  PyrLK(newFrame, mask)
+    fun run(newFrame: Mat, mask:Mat?, scalingFactor: Int): ArrayList<FloatArray> {
+        return  PyrLK(newFrame, mask, scalingFactor)
         // return Farneback(newFrame)
     }
 
-    private fun PyrLK(newFrame: Mat, mask: Mat?) : ArrayList<FloatArray> {
+    private fun PyrLK(newFrame: Mat, mask: Mat?, scalingFactor: Int) : ArrayList<FloatArray> {
         // convert the frame to Gray
         Imgproc.cvtColor(newFrame, currGreyImage, Imgproc.COLOR_RGBA2GRAY)
         // if this is the first loop, find good features
@@ -73,7 +76,7 @@ class DenseOpticalFlow {
         Video.calcOpticalFlowPyrLK(prevGreyImage, currGreyImage, prevPts, currPts, status, err)
         //Timber.i("output of flow -- prevPts: ${prevPts.size()} currPts: ${currPts.size()} status: ${status.size()}")
         flowPtsCount = 0
-        val lines = createLines()
+        val lines = createLines(scalingFactor)
 
         // update last image
         currGreyImage.copyTo(prevGreyImage)
@@ -144,7 +147,7 @@ class DenseOpticalFlow {
         return Point(pt2Avg.x - pt1Avg.x, pt2Avg.y - pt1Avg.y)
     }
 
-    private fun createLines(): ArrayList<FloatArray> {
+    private fun createLines(scalingFactor: Int): ArrayList<FloatArray> {
         val statusArr = status.toArray()
         val prevPtsArr = prevPts.toArray()
         val currPtsArr = currPts.toArray()
@@ -152,10 +155,10 @@ class DenseOpticalFlow {
         for (i in 0 until prevPts.rows()) {
             if(i < statusArr.size && i < currPtsArr.size) {
                 if (statusArr[i].toInt() == 1) {
-                    val pt1x = prevPtsArr[i].x.toFloat()
-                    val pt1y = prevPtsArr[i].y.toFloat()
-                    val pt2x = currPtsArr[i].x.toFloat()
-                    val pt2y = currPtsArr[i].y.toFloat()
+                    val pt1x = prevPtsArr[i].x.toFloat() * scalingFactor
+                    val pt1y = prevPtsArr[i].y.toFloat() * scalingFactor
+                    val pt2x = currPtsArr[i].x.toFloat() * scalingFactor
+                    val pt2y = currPtsArr[i].y.toFloat() * scalingFactor
                     listLines.add(
                         floatArrayOf(pt1x, pt1y, pt2x, pt2y)
                     )

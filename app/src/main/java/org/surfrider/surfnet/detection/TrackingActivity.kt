@@ -115,12 +115,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var latestDetections: List<Detector.Recognition>? = null
     private var currROIs : Mat? = null
     private val mutex = Mutex()
-    private val modelString = "yolov8n_float16.tflite"
-    private val labelFilename = "file:///android_asset/coco.txt"
-    private val inputSize = 640
-    private val isV8 = true
-    private val isQuantized = false
-    private val numThreads = 1
     private val locationHandler = Handler()
     private var lastTrackerManager: TrackerManager? = null
     private lateinit var bindingDialog: FragmentSendDataDialogBinding
@@ -128,7 +122,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var isGpsActivate = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(null) // Changed
+        super.onCreate(null)
         Timber.d("onCreate $this")
 
         if(OpenCVLoader.initDebug())
@@ -151,12 +145,14 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         updateLocation()
         imageProcessor = ImageProcessor()
+
         val mLocationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         isGpsActivate = mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
         if (!isGpsActivate) {
             val locationPermissionDialog = LocationPermissionDialog()
             locationPermissionDialog.show(supportFragmentManager, "stop_record_dialog")
         }
+
         // init IMU_estimator, optical flow
         imuEstimator = IMU_estimator(this.applicationContext)
         opticalFlow = DenseOpticalFlow()
@@ -281,30 +277,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     }
 
     @Synchronized
-    public override fun onStart() {
-        Timber.d("onStart $this")
-        super.onStart()
-    }
-
-    @Synchronized
-    public override fun onResume() {
-        Timber.d("onResume $this")
-        super.onResume()
-    }
-
-    @Synchronized
-    public override fun onPause() {
-        Timber.d("onPause $this")
-        super.onPause()
-    }
-
-    @Synchronized
-    public override fun onStop() {
-        Timber.d("onStop $this")
-        super.onStop()
-    }
-
-    @Synchronized
     public override fun onDestroy() {
         Timber.d("onDestroy $this")
         super.onDestroy()
@@ -387,16 +359,16 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             if (detector == null) {
                 detector = YoloDetector.create(
                     assets,
-                    modelString,
-                    labelFilename,
+                    MODEL_STRING,
+                    LABEL_FILENAME,
                     CONFIDENCE_THRESHOLD,
-                    isQuantized,
-                    isV8,
-                    inputSize
+                    IS_QUANTIZED,
+                    IS_V8,
+                    INPUT_SIZE
                 )
             }
             detector?.useGpu()
-            detector?.setNumThreads(numThreads)
+            detector?.setNumThreads(NUM_THREADS)
             detectorPaused = false
         } catch (e: IOException) {
             e.printStackTrace()
@@ -439,7 +411,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                     if(bottomSheet.showOF) {
                         drawOFLinesPRK(canvas, outputLinesFlow, previewWidth, previewHeight)
                     }
-
                     if(bottomSheet.showBoxes) {
                         drawDetections(canvas, latestDetections, previewWidth, previewHeight)
                     }
@@ -488,16 +459,15 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         if(flowRegionUpdateNeeded) {
             flowRegionUpdateNeeded = false
             mutex.withLock {
-                trackerManager?.associateFlowWithTrackers(outputLinesFlow)
-
-                currROIs = trackerManager?.getCurrentRois(1280, 720, 1, 60)
+                avgFlowSpeed = trackerManager?.associateFlowWithTrackers(outputLinesFlow, FLOW_REFRESH_RATE_MILLIS)
+                currROIs = trackerManager?.getCurrentRois(1280, 720, DOWNSAMPLING_FACTOR_FLOW, 60)
             }
         }
 
-        val currFrame = imageProcessor.getMatFromRGB(previewWidth, previewHeight)
+        val currFrame = imageProcessor.getMatFromRGB(previewWidth, previewHeight, DOWNSAMPLING_FACTOR_FLOW)
 
         currFrame?.let {
-            outputLinesFlow = opticalFlow.run(it, currROIs)
+            outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
         }
 
         bottomSheet.showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2],
@@ -507,7 +477,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private suspend fun scheduledUpdateTrackers() {
         mutex.withLock {
             trackerManager?.let {
-                it.updateTrackers(FLOW_REFRESH_RATE_MILLIS)
+                it.updateTrackers()
             }
         }
     }
@@ -545,6 +515,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         }
         imageProcessor.readyForNextImage()
 
+        trackerManager?.let {
+            it.updateTrackers()
+        }
 
         if (croppedBitmap != null && rgbFrameBitmap != null && frameToCropTransform != null) {
             val canvas = Canvas(croppedBitmap!!)
@@ -584,13 +557,20 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         get() = Size(1280, 720)
 
     companion object {
-        private const val FLOW_REFRESH_RATE_MILLIS: Long = 250
+        private const val FLOW_REFRESH_RATE_MILLIS: Long = 50
+        private const val DOWNSAMPLING_FACTOR_FLOW: Int = 2
 
         private const val CONFIDENCE_THRESHOLD = 0.3f
+        private const val MODEL_STRING = "yolov8n_float16.tflite"
+        private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
+        private const val INPUT_SIZE = 640
+        private const val IS_V8 = true
+        private const val IS_QUANTIZED = false
+        private const val NUM_THREADS = 1
+
         private const val MAINTAIN_ASPECT = true
         private const val SAVE_PREVIEW_BITMAP = false
         private const val REQUEST_LOCATION_PERMISSION = 2
-
         private const val PERMISSIONS_REQUEST = 1
         private const val PERMISSION_CAMERA = Manifest.permission.CAMERA
         private const val PERMISSION_LOCATION = Manifest.permission.ACCESS_FINE_LOCATION
