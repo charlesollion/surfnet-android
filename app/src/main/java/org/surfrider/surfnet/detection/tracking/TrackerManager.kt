@@ -200,8 +200,8 @@ class TrackerManager {
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 4.0F
         paint.color = Color.BLUE
-        val dims = PointF((1.0F + tracker.speedCov.x * 0.0F)  * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL,
-            (1.0F + tracker.speedCov.y * 0.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
+        val dims = PointF((1.0F + kotlin.math.sqrt(tracker.speedCov.x) * 1.0F)  * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL,
+            (1.0F + kotlin.math.sqrt(tracker.speedCov.y) * 1.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
         val rect = RectF(tracker.position.x - dims.x, tracker.position.y - dims.y,
             tracker.position.x + dims.x, tracker.position.y + dims.y)
         transform.mapRect(rect)
@@ -391,7 +391,7 @@ class TrackerManager {
         }
 
         private const val SCREEN_DIAGONAL = 960.0F // sqrt(720x1280)
-        private const val ASSOCIATION_THRESHOLD = 40.0F / SCREEN_DIAGONAL
+        private const val ASSOCIATION_THRESHOLD = 60.0F / SCREEN_DIAGONAL
 
         // Weights of different scores
         private const val W_DIST = 1.0

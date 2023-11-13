@@ -3,9 +3,12 @@ package org.surfrider.surfnet.detection.tracking
 import android.graphics.PointF
 import android.graphics.RectF
 import android.location.Location
+import org.surfrider.surfnet.detection.env.MathUtils.malDist
 import org.surfrider.surfnet.detection.tflite.Detector
 import java.util.*
+import kotlin.jvm.internal.Intrinsics.Kotlin
 import kotlin.math.abs
+import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -34,13 +37,12 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     }
 
     fun distTo(newPos: PointF): Float {
-        val diffX = position.x - newPos.x
-        val diffY = position.y - newPos.y
-        val mahalanobisDistanceX = (diffX / (1.0F + speedCov.x)).pow(2)
-        val mahalanobisDistanceY = (diffY / (1.0F + speedCov.y)).pow(2)
-
-        // Calculate the Mahalanobis distance by summing the squared components
-        return sqrt(mahalanobisDistanceX + mahalanobisDistanceY)
+        // Computes an adjusted distance between a point and a newPos.
+        // Also anticipates the movement with speed, and computes the minimum of both distances
+        val distance = malDist(position, newPos, speedCov)
+        val anticipatedPosition = PointF(position.x+speed.x, position.y + speed.y)
+        val anticipatedDistance = malDist(anticipatedPosition, newPos, speedCov)
+        return min(distance, anticipatedDistance)
     }
 
     fun addDetection(newDet: TrackedDetection) {
