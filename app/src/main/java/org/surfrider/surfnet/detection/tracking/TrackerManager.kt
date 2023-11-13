@@ -133,6 +133,7 @@ class TrackerManager {
                 // Draw the speed line to show displacement of the tracker depending on camera motion
                 if(showOF) {
                     drawOF(canvas, tracker, frameToCanvasTransform)
+                    drawEllipses(canvas, tracker, frameToCanvasTransform)
                 }
 
                 if (bmp != null && displayDetection) {
@@ -176,7 +177,6 @@ class TrackerManager {
                         )
                     }
                 }
-                // drawEllipses(canvas, tracker, frameToCanvasTransform)
             }
         }
     }
