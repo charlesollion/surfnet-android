@@ -121,13 +121,17 @@ class TrackerManager {
             //Only draw tracker if not inactive
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
                 var bmp: Bitmap? = null
-                if (tracker.status == Tracker.TrackerStatus.GREEN) {
-                    if (!detectedWaste.contains(tracker)) {
-                        detectedWaste.add(tracker)
-                    }
-                    bmp = bmpGreen
+                if (!displayDetection &&  tracker.status == Tracker.TrackerStatus.RED) {
+                    null
                 } else {
-                    bmp = bmpYellow
+                    bmp = if (tracker.status == Tracker.TrackerStatus.GREEN) {
+                        if (!detectedWaste.contains(tracker)) {
+                            detectedWaste.add(tracker)
+                        }
+                        bmpGreen
+                    } else {
+                        bmpYellow
+                    }
                 }
 
                 // Draw the speed line to show displacement of the tracker depending on camera motion
@@ -135,7 +139,7 @@ class TrackerManager {
                     drawOF(canvas, tracker, frameToCanvasTransform)
                 }
 
-                if (bmp != null && displayDetection) {
+                if (bmp != null) {
                     val bmpWidth = bmp.width.div(scale)
                     val bmpHeight = bmp.height.div(scale)
 
