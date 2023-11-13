@@ -27,7 +27,7 @@ class TrackerManager {
 
     var displayDetection = true
 
-    private var bmpRed: Bitmap? = null
+    private var bmpYellow: Bitmap? = null
     private var bmpGreen: Bitmap? = null
 
     private var trackerIndex = 0
@@ -109,8 +109,8 @@ class TrackerManager {
             canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
         )
         frameToCanvasTransform.postScale(scale, scale)
-        if(bmpRed == null) {
-            bmpRed = context?.let { getBitmap(it, R.drawable.red_dot) }
+        if(bmpYellow == null) {
+            bmpYellow = context?.let { getBitmap(it, R.drawable.yellow_dot) }
         }
         if(bmpGreen == null) {
             bmpGreen = context?.let { getBitmap(it, R.drawable.green_dot) }
@@ -127,7 +127,7 @@ class TrackerManager {
                     }
                     bmp = bmpGreen
                 } else {
-                    bmp = bmpRed
+                    bmp = bmpYellow
                 }
 
                 // Draw the speed line to show displacement of the tracker depending on camera motion
@@ -280,7 +280,7 @@ class TrackerManager {
     private fun getBitmap(vectorDrawable: VectorDrawable?): Bitmap? {
         vectorDrawable?.let {
             val bitmap = Bitmap.createBitmap(
-                it.intrinsicWidth * 2, it.intrinsicHeight * 2, Bitmap.Config.ARGB_8888
+                it.intrinsicWidth, it.intrinsicHeight, Bitmap.Config.ARGB_8888
             )
             val canvas = Canvas(bitmap)
             it.setBounds(0, 0, canvas.width, canvas.height)
