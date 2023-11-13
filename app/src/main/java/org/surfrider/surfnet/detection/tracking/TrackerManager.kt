@@ -22,7 +22,7 @@ import kotlin.math.min
 
 class TrackerManager {
 
-    val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
+    private val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
 
     var displayDetection = true
