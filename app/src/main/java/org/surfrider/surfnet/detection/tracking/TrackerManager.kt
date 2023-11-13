@@ -139,7 +139,7 @@ class TrackerManager {
                     drawOF(canvas, tracker, frameToCanvasTransform)
                 }
 
-                if (bmp != null && displayDetection) {
+                if (bmp != null) {
                     val bmpWidth = bmp.width.div(scale)
                     val bmpHeight = bmp.height.div(scale)
 
