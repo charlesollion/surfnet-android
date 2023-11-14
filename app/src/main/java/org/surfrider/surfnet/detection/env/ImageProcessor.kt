@@ -40,7 +40,6 @@ class ImageProcessor {
             val uvRowStride = planes[1].rowStride
             val uvPixelStride = planes[1].pixelStride
             imageConverter = Runnable {
-                Timber.i("ImageConverter: ${Thread.currentThread().name}")
                 ImageUtils.convertYUV420ToARGB8888(
                     yuvBytes[0]!!,
                     yuvBytes[1]!!,

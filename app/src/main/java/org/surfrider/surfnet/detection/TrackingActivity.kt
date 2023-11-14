@@ -108,6 +108,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var lastProcessingTimeMs: Long = 0
     private var rgbFrameBitmap: Bitmap? = null
     private var croppedBitmap: Bitmap? = null
+    private var currFrameMat: Mat? = null
     private var computingDetection = false
     private var computingOF = false
     private var frameToCropTransform: Matrix? = null
@@ -446,31 +447,28 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             kotlin.math.sqrt((xVelocity * xVelocity + yVelocity * yVelocity + zVelocity * zVelocity).toDouble())
                 .toFloat()
 
+        currFrameMat = imageProcessor.getMatFromRGB(
+            previewWidth,
+            previewHeight,
+            DOWNSAMPLING_FACTOR_FLOW
+        )
+
         lifecycleScope.launch(threadOpticalFlow) {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                if (flowRegionUpdateNeeded) {
-                    flowRegionUpdateNeeded = false
-                    mutex.withLock {
-                        avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
-                            outputLinesFlow,
-                            FLOW_REFRESH_RATE_MILLIS
-                        )
+                mutex.withLock {
+                    avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
+                        outputLinesFlow,
+                        FLOW_REFRESH_RATE_MILLIS
+                    )
+                    if (flowRegionUpdateNeeded) {
+                        flowRegionUpdateNeeded = false
                         currROIs =
                             trackerManager?.getCurrentRois(1280, 720, DOWNSAMPLING_FACTOR_FLOW, 60)
                     }
                 }
-                Timber.i("OpticalFlow: ${Thread.currentThread().name}")
-                val currFrame = imageProcessor.getMatFromRGB(
-                    previewWidth,
-                    previewHeight,
-                    DOWNSAMPLING_FACTOR_FLOW
-                )
 
-                currFrame?.let {
+                currFrameMat?.let {
                     outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
-                }
-                mutex.withLock {
-                    trackerManager?.updateTrackers()
                 }
                 computingOF = false
 
@@ -503,7 +501,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
 
     private fun processImage() {
-        Timber.i("processImage: ${Thread.currentThread().name}")
         trackingOverlay?.postInvalidate()
 
         // No mutex needed as this method is not reentrant.
@@ -547,7 +544,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
         lifecycleScope.launch(threadDetector) {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                Timber.i("Detector: ${Thread.currentThread().name}")
                 val startTime = SystemClock.uptimeMillis()
                 val results: List<Detector.Recognition>? = croppedBitmap?.let {
                     detector?.recognizeImage(croppedBitmap)
