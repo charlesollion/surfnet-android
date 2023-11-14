@@ -357,6 +357,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         try {
             //create detector only one time
             if (detector == null) {
+                binding.tv.visibility = View.VISIBLE
                 detector = YoloDetector.create(
                     assets,
                     MODEL_STRING,
@@ -366,6 +367,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                     IS_V8,
                     INPUT_SIZE
                 )
+
             }
             detector?.useGpu()
             detector?.setNumThreads(NUM_THREADS)
@@ -402,6 +404,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         cropToFrameTransform = Matrix()
         frameToCropTransform?.invert(cropToFrameTransform)
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
+
         trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
                 if (canvas != null) {
@@ -421,6 +424,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                         trackerManager?.drawDebug(canvas)
                     }
                 }
+                binding.tv.visibility = View.INVISIBLE
                 trackerManager?.let { tracker ->
                     updateCounter(tracker.detectedWaste.size)
                 }
