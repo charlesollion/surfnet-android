@@ -57,14 +57,14 @@ import kotlin.math.min
 
 @SuppressLint("ValidFragment")
 class CameraConnectionFragment private constructor(
-        private var chrono: TableRow,
-        private var wasteCount: () -> Unit,
-        private val cameraConnectionCallback: (Size?, Int) -> Unit,
-        private val startDetector: () -> Unit,
-        private val endDetector: () -> Unit,
-        /** A [OnImageAvailableListener] to receive frames as they are available.  */
+    private var chrono: TableRow,
+    private var wasteCount: () -> Unit,
+    private val cameraConnectionCallback: (Size?, Int) -> Unit,
+    private val startDetector: () -> Unit,
+    private val endDetector: () -> Unit,
+    /** A [OnImageAvailableListener] to receive frames as they are available.  */
     private val imageListener: OnImageAvailableListener,
-        /** The input size in pixels desired by TensorFlow (width and height of a square bitmap).  */
+    /** The input size in pixels desired by TensorFlow (width and height of a square bitmap).  */
     private val inputSize: Size
 
 ) : Fragment() {

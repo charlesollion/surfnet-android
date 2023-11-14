@@ -11,55 +11,88 @@ import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.models.TrackerResult
 import org.surfrider.surfnet.detection.models.TrackerTrash
+import org.surfrider.surfnet.detection.env.MathUtils.calculateIoU
+import org.surfrider.surfnet.detection.env.MathUtils.solveLinearSumAssignment
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
+import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.min
 
 class TrackerManager {
-    private val ASSOCIATION_THRESHOLD = 50.0F
 
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
-    private var trackerIndex = 0
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
+
     var displayDetection = true
 
-    fun updateTrackers(flowRefreshRateInMillis: Long) {
-        trackers.forEach { tracker -> tracker.update(flowRefreshRateInMillis) }
+    private var bmpYellow: Bitmap? = null
+    private var bmpGreen: Bitmap? = null
+
+    private var trackerIndex = 0
+
+    fun updateTrackers() {
+        trackers.forEach { tracker -> tracker.update() }
     }
 
     @Synchronized
-
-    fun processDetections(results: List<Recognition>, location: Location?) {
+    fun processDetections(results: List<Recognition>, location : Location?) {
+        if(results.isEmpty()) {
+            return
+        }
         // Store all Recognition objects in a list of TrackedDetections
         val dets = LinkedList<Tracker.TrackedDetection>()
         for (result in results) {
             dets.addLast(Tracker.TrackedDetection(result))
         }
 
-        // Associate results with current trackers
-        for (det in dets) {
-            val position = det.getCenter()
-            var minDist = 10000.0F
-            // Greedy assignment of trackers
-            trackers.forEachIndexed { i, tracker ->
-                if (tracker.status != Tracker.TrackerStatus.INACTIVE && !tracker.alreadyAssociated) {
-                    val dist = tracker.distTo(position)
-                    if (dist < minDist && dist < ASSOCIATION_THRESHOLD) {
-                        minDist = dist
-                        det.associatedId = i
-                    }
-                }
-
+        // Create cost matrix
+        if(trackers.size > 0) {
+            val costMatrix = Array(dets.size) { _ ->
+                DoubleArray(trackers.size)
             }
-            if (det.associatedId != -1) {
-                trackers[det.associatedId].addDetection(det)
-            } else {
+            dets.forEachIndexed { t, det ->
+                trackers.forEachIndexed { i, tracker ->
+                    costMatrix[t][i] = cost(det, tracker)
+                }
+            }
+
+            // Compute best assignment
+            val assignments = solveLinearSumAssignment(costMatrix)
+            for ((detIdx, trackIdx) in assignments) {
+                val detection = dets[detIdx]
+                val tracker = trackers[trackIdx]
+                tracker.addDetection(detection)
+                detection.associatedId = trackIdx
+            }
+        }
+        // create new trackers for unassigned detections
+        for(det in dets) {
+            if (det.associatedId == -1) {
                 trackers.addLast(Tracker(det, trackerIndex, location))
                 trackerIndex++
             }
         }
+    }
+
+
+    private fun cost(det: Tracker.TrackedDetection, tracker: Tracker): Double {
+        if (tracker.status != Tracker.TrackerStatus.INACTIVE && !tracker.alreadyAssociated) {
+            val dist = tracker.distTo(det.getCenter()).toDouble() / SCREEN_DIAGONAL
+            if(dist > ASSOCIATION_THRESHOLD) {
+                return Double.MAX_VALUE
+            }
+            val confidence = 1.0 - det.detectionConfidence
+            val iou = 1.0 - calculateIoU(det.rect, tracker.trackedObjects.last.rect)
+            val classMatch = if (det.classId == tracker.trackedObjects.last.classId) 0.0 else 1.0
+            val strength = 1.0 - tracker.strength
+            val cost = W_DIST * dist + W_CONF * confidence + W_IOU * iou + W_CLASS * classMatch + W_TRACKER_STRENGTH * strength
+            Timber.i("${tracker.index}/${det.rect}:$cost --- dist:${dist} confidence:${confidence} iou:$iou classmatch:$classMatch strength:${strength}")
+            return cost
+
+        }
+        return Double.MAX_VALUE
     }
 
     @Synchronized
@@ -76,40 +109,37 @@ class TrackerManager {
             canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
         )
         frameToCanvasTransform.postScale(scale, scale)
+        if(bmpYellow == null) {
+            bmpYellow = context?.let { getBitmap(it, R.drawable.yellow_dot) }
+        }
+        if(bmpGreen == null) {
+            bmpGreen = context?.let { getBitmap(it, R.drawable.green_dot) }
+        }
 
         for (tracker in trackers) {
             val trackedPos = tracker.position
             //Only draw tracker if not inactive
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
-                val bmp = context?.let {
-                    getBitmap(
-                        it, if (tracker.status == Tracker.TrackerStatus.GREEN) {
-                            if (!detectedWaste.contains(tracker)) {
-                                detectedWaste.add(tracker)
-                            }
-                            R.drawable.green_dot
-                        } else {
-                            R.drawable.red_dot
+                var bmp: Bitmap? = null
+                if (!displayDetection &&  tracker.status == Tracker.TrackerStatus.RED) {
+                    null
+                } else {
+                    bmp = if (tracker.status == Tracker.TrackerStatus.GREEN) {
+                        if (!detectedWaste.contains(tracker)) {
+                            detectedWaste.add(tracker)
                         }
-                    )
-                } ?: return
-
-                // Draw the speed line to show displacement of the tracker depending on camera motion
-                if (showOF) {
-                    val speedLine = floatArrayOf(
-                        trackedPos.x,
-                        trackedPos.y,
-                        trackedPos.x + tracker.speed.x,
-                        trackedPos.y + tracker.speed.y
-                    )
-                    frameToCanvasTransform.mapPoints(speedLine)
-                    val paintLine = Paint()
-                    paintLine.color = Color.GREEN
-                    paintLine.strokeWidth = 8.0F
-                    canvas.drawLines(speedLine, paintLine)
+                        bmpGreen
+                    } else {
+                        bmpYellow
+                    }
                 }
 
-                if (displayDetection) {
+                // Draw the speed line to show displacement of the tracker depending on camera motion
+                if(showOF) {
+                    drawOF(canvas, tracker, frameToCanvasTransform)
+                }
+
+                if (bmp != null) {
                     val bmpWidth = bmp.width.div(scale)
                     val bmpHeight = bmp.height.div(scale)
 
@@ -119,11 +149,10 @@ class TrackerManager {
 
                     canvas.drawBitmap(bmp, point[0], point[1], null)
 
-                    //affichage du text avec le numéro du tracker
+                    // Draw text with tracker number
                     val paint = Paint()
                     paint.textSize = 40.0F
                     canvas.drawText(tracker.index.toString(), point[0], point[1], paint)
-
 
                     //Animation drawing
                     if (tracker.animation) {
@@ -151,8 +180,36 @@ class TrackerManager {
                         )
                     }
                 }
+                // drawEllipses(canvas, tracker, frameToCanvasTransform)
             }
         }
+    }
+
+    private fun drawOF(canvas: Canvas, tracker: Tracker, transform:Matrix) {
+        val speedLine = floatArrayOf(
+            tracker.position.x,
+            tracker.position.y,
+            tracker.position.x + tracker.speed.x,
+            tracker.position.y + tracker.speed.y
+        )
+        transform.mapPoints(speedLine)
+        val paintLine = Paint()
+        paintLine.color = Color.GREEN
+        paintLine.strokeWidth = 8.0F
+        canvas.drawLines(speedLine, paintLine)
+    }
+
+    private fun drawEllipses(canvas: Canvas, tracker: Tracker, transform:Matrix) {
+        val paint = Paint()
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 4.0F
+        paint.color = Color.BLUE
+        val dims = PointF((1.0F + tracker.speedCov.x * 0.0F)  * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL,
+            (1.0F + tracker.speedCov.y * 0.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
+        val rect = RectF(tracker.position.x - dims.x, tracker.position.y - dims.y,
+            tracker.position.x + dims.x, tracker.position.y + dims.y)
+        transform.mapRect(rect)
+        canvas.drawOval(rect, paint)
     }
 
     fun getCurrentRois(width: Int, height: Int, downScale: Int, squareSize: Int): Mat? {
@@ -183,22 +240,33 @@ class TrackerManager {
         return currRois
     }
 
-    fun associateFlowWithTrackers(listOfFlowLines: ArrayList<FloatArray>) {
+    fun associateFlowWithTrackers(listOfFlowLines: ArrayList<FloatArray>, flowRefreshRateInMillis: Long): PointF {
         // Associate each tracker with flow speed
-        // V1: just take the average flow
-        var motionSpeed: PointF = PointF(0.0F, 0.0F)
-        if (listOfFlowLines.size > 0) {
+
+        // Compute the average flow for debug purposes
+        var avgMotionSpeed = PointF(0.0F, 0.0F)
+        if(listOfFlowLines.size > 0) {
             for (line in listOfFlowLines) {
-                motionSpeed.x += (line[2] - line[0])
-                motionSpeed.y += (line[3] - line[1])
+                avgMotionSpeed.x += (line[2] - line[0])
+                avgMotionSpeed.y += (line[3] - line[1])
             }
-            motionSpeed.x /= listOfFlowLines.size
-            motionSpeed.y /= listOfFlowLines.size
+            avgMotionSpeed.x /= listOfFlowLines.size * flowRefreshRateInMillis / 1000.0F
+            avgMotionSpeed.y /= listOfFlowLines.size * flowRefreshRateInMillis / 1000.0F
         }
 
-        for (tracker in trackers) {
-            tracker.speed = motionSpeed
+        for(tracker in trackers) {
+            var medianSpeed = calculateMedianFlowSpeedForTrack(tracker.position, listOfFlowLines, 6)
+
+            // scale speed depending on optical flow refresh rate
+            /*medianSpeed?.let {
+                it.x /= flowRefreshRateInMillis / 1000.0F
+                it.y /= flowRefreshRateInMillis / 1000.0F
+            }*/
+
+            tracker.updateSpeed(medianSpeed?:avgMotionSpeed, ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
+
         }
+        return avgMotionSpeed
     }
 
     @Synchronized
@@ -216,7 +284,7 @@ class TrackerManager {
     private fun getBitmap(vectorDrawable: VectorDrawable?): Bitmap? {
         vectorDrawable?.let {
             val bitmap = Bitmap.createBitmap(
-                it.intrinsicWidth * 2, it.intrinsicHeight * 2, Bitmap.Config.ARGB_8888
+                it.intrinsicWidth, it.intrinsicHeight, Bitmap.Config.ARGB_8888
             )
             val canvas = Canvas(bitmap)
             it.setBounds(0, 0, canvas.width, canvas.height)
@@ -268,4 +336,73 @@ class TrackerManager {
             comment = "email : $email"
         )
     }
+
+    companion object {
+        @JvmStatic
+        fun calculateMedianFlowSpeedForTrack(
+            trackPoint: PointF,
+            opticalFlowData: ArrayList<FloatArray>,
+            k: Int
+        ): PointF? {
+            val kNearestOpticalFlowPoints = findKNearestOpticalFlowPoints(trackPoint, opticalFlowData, k)
+
+            if (kNearestOpticalFlowPoints.isNotEmpty()) {
+                // Calculate the median flow speed of the k nearest points
+                return calculateMedianFlowSpeed(kNearestOpticalFlowPoints)
+            }
+
+            return null // No data points found
+        }
+
+        @JvmStatic
+        private fun findKNearestOpticalFlowPoints(
+            trackPoint: PointF,
+            opticalFlowData: ArrayList<FloatArray>,
+            k: Int
+        ): List<PointF> {
+            return opticalFlowData
+                .sortedBy { dist(it, trackPoint) }
+                .map { PointF(it[2]-it[0], it[3]-it[1]) }
+                .take(k)
+        }
+
+        @JvmStatic
+        private fun calculateMedianFlowSpeed(opticalFlowPoints: List<PointF>): PointF {
+            val sortedFlowSpeedX = opticalFlowPoints.map { it.x }.sorted()
+            val sortedFlowSpeedY = opticalFlowPoints.map { it.y }.sorted()
+
+            val medianFlowSpeedX = if (sortedFlowSpeedX.size % 2 == 1) {
+                sortedFlowSpeedX[sortedFlowSpeedX.size / 2]
+            } else {
+                (sortedFlowSpeedX[sortedFlowSpeedX.size / 2 - 1] + sortedFlowSpeedX[sortedFlowSpeedX.size / 2]) / 2.0
+            }
+
+            val medianFlowSpeedY = if (sortedFlowSpeedY.size % 2 == 1) {
+                sortedFlowSpeedY[sortedFlowSpeedY.size / 2]
+            } else {
+                (sortedFlowSpeedY[sortedFlowSpeedY.size / 2 - 1] + sortedFlowSpeedY[sortedFlowSpeedY.size / 2]) / 2.0
+            }
+
+            return PointF(medianFlowSpeedX.toFloat(), medianFlowSpeedY.toFloat())
+        }
+        @JvmStatic
+        private fun dist(p1: FloatArray, p2:PointF): Float {
+            return kotlin.math.sqrt((p1[0] - p2.x) * (p1[0] - p2.x) + (p1[1] - p2.y) * (p1[1] - p2.y))
+        }
+        @JvmStatic
+        private fun dist(p1: PointF, p2:PointF): Float {
+            return kotlin.math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
+        }
+
+        private const val SCREEN_DIAGONAL = 960.0F // sqrt(720x1280)
+        private const val ASSOCIATION_THRESHOLD = 40.0F / SCREEN_DIAGONAL
+
+        // Weights of different scores
+        private const val W_DIST = 1.0
+        private const val W_CONF = 0.1
+        private const val W_IOU = 1.0
+        private const val W_CLASS = 0.1
+        private const val W_TRACKER_STRENGTH = 0.1
+    }
+
 }

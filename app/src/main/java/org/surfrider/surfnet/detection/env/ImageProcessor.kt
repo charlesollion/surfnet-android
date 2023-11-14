@@ -5,11 +5,12 @@ import android.media.ImageReader
 import android.os.Trace
 import org.opencv.android.Utils
 import org.opencv.core.Mat
+import org.surfrider.surfnet.detection.env.ImageUtils.downsampleRGBInts
 import timber.log.Timber
 
 class ImageProcessor {
     @JvmField
-    var rgbBytes: IntArray? = null
+    var rgbInts: IntArray? = null
 
     private var isProcessingFrame = false
     private val yuvBytes = arrayOfNulls<ByteArray>(3)
@@ -22,8 +23,8 @@ class ImageProcessor {
         if (previewWidth == 0 || previewHeight == 0) {
             return
         }
-        if (rgbBytes == null) {
-            rgbBytes = IntArray(previewWidth * previewHeight)
+        if (rgbInts == null) {
+            rgbInts = IntArray(previewWidth * previewHeight)
         }
         try {
             val image = reader.acquireLatestImage() ?: return
@@ -48,7 +49,7 @@ class ImageProcessor {
                     luminanceStride,
                     uvRowStride,
                     uvPixelStride,
-                    rgbBytes!!
+                    rgbInts!!
                 )
             }
             postInferenceCallback = Runnable {
@@ -64,7 +65,7 @@ class ImageProcessor {
     }
     fun getRgbBytes(): IntArray? {
         imageConverter?.run()
-        return rgbBytes
+        return rgbInts
     }
 
     fun readyForNextImage() {
@@ -72,18 +73,22 @@ class ImageProcessor {
             postInferenceCallback!!.run()
         }
     }
-    fun getMatFromRGB(previewWidth: Int, previewHeight: Int): Mat? {
-        if(rgbBytes == null) {
+    fun getMatFromRGB(previewWidth: Int, previewHeight: Int, downsampleFactor: Int): Mat? {
+        if(rgbInts == null) {
             return null
         }
-        val rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
+        val newWidth = previewWidth / downsampleFactor
+        val newHeight = previewHeight / downsampleFactor
+        val rgbFrameBitmap = Bitmap.createBitmap(newWidth, newHeight, Bitmap.Config.ARGB_8888)
         getRgbBytes()?.let {
+            val downsampledRGBInts = downsampleRGBInts(it, previewWidth, previewHeight, downsampleFactor)
             rgbFrameBitmap.setPixels(
-                it, 0, previewWidth, 0, 0, previewWidth, previewHeight
+                downsampledRGBInts, 0, newWidth, 0, 0, newWidth, newHeight
             )
         }
         readyForNextImage()
         val bmp32: Bitmap = rgbFrameBitmap.copy(Bitmap.Config.ARGB_8888, true)
+
         val currFrame = Mat()
         Utils.bitmapToMat(bmp32, currFrame)
         return currFrame

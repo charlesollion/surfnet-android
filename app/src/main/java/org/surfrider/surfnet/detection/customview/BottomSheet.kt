@@ -55,7 +55,6 @@ class BottomSheet(binding: TfeOdActivityCameraBinding) {
             }
             override fun onSlide(bottomSheet: View, slideOffset: Float) {}
         })
-
         bottomSheetLayout.materialSwitch.setChecked(true);
 
         switchOF.setOnCheckedChangeListener {
@@ -64,7 +63,6 @@ class BottomSheet(binding: TfeOdActivityCameraBinding) {
         switchBoxes.setOnCheckedChangeListener {
                 _, isChecked -> showBoxes = isChecked
         }
-
     }
 
     fun showInference(inferenceTime: String?) {
