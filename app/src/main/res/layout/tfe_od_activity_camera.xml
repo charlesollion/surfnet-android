@@ -35,15 +35,23 @@
 
             </FrameLayout>
 
-            <TextView
-                android:id="@+id/tv"
+            <RelativeLayout
+                android:id="@+id/loadingPanel"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:gravity="center"
-                android:text="LOADING"
                 android:visibility="invisible"
-                android:textColor="@android:color/holo_red_dark"
-                android:textSize="96sp" />
+                android:gravity="center"
+                tools:visibility="visible">
+
+                <ProgressBar
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:indeterminateTintMode="src_atop"
+                    android:indeterminateTint="@color/loader_dark"
+                    android:indeterminate="true"
+                   />
+            </RelativeLayout>
+
 
             <TableLayout
     android:layout_width="wrap_content"

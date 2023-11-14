@@ -5,6 +5,8 @@
     <color name="tfe_color_accent">#425066</color>
 
     <color name="tfe_semi_transparent">#66000000</color>
+    <color name="loader_dark">#000000</color>
+
 
     <color name="control_background">#FFFFFF</color>
     <color name="selection_highlight">#aaaaaa</color>
