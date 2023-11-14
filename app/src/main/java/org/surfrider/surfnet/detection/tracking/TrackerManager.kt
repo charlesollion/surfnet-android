@@ -88,7 +88,7 @@ class TrackerManager {
             val classMatch = if (det.classId == tracker.trackedObjects.last.classId) 0.0 else 1.0
             val strength = 1.0 - tracker.strength
             val cost = W_DIST * dist + W_CONF * confidence + W_IOU * iou + W_CLASS * classMatch + W_TRACKER_STRENGTH * strength
-            Timber.i("${tracker.index}/${det.rect}:$cost --- dist:${dist} confidence:${confidence} iou:$iou classmatch:$classMatch strength:${strength}")
+            // Timber.i("${tracker.index}/${det.rect}:$cost --- dist:${dist} confidence:${confidence} iou:$iou classmatch:$classMatch strength:${strength}")
             return cost
 
         }
