@@ -19,7 +19,6 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Context
-import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.ImageFormat
 import android.graphics.Matrix
@@ -33,7 +32,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
-import android.os.SystemClock
 import android.text.TextUtils
 import android.util.Size
 import android.util.SparseIntArray
@@ -42,8 +40,6 @@ import android.view.Surface
 import android.view.TextureView.SurfaceTextureListener
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Chronometer
-import android.widget.TableRow
 import android.widget.Toast
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
@@ -57,18 +53,14 @@ import kotlin.math.min
 
 @SuppressLint("ValidFragment")
 class CameraConnectionFragment private constructor(
-    private var chrono: TableRow,
-    private var wasteCount: () -> Unit,
     private val cameraConnectionCallback: (Size?, Int) -> Unit,
-    private val startDetector: () -> Unit,
-    private val endDetector: () -> Unit,
     /** A [OnImageAvailableListener] to receive frames as they are available.  */
     private val imageListener: OnImageAvailableListener,
     /** The input size in pixels desired by TensorFlow (width and height of a square bitmap).  */
     private val inputSize: Size
 
 ) : Fragment() {
-    private var lastPause: Long = 0
+
     private lateinit var binding: TfeOdCameraConnectionFragmentTrackingBinding
 
     /** A [Semaphore] to prevent the app from exiting before closing the camera.  */
@@ -177,40 +169,6 @@ class CameraConnectionFragment private constructor(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
         binding = TfeOdCameraConnectionFragmentTrackingBinding.inflate(inflater, container, false)
-        val chronometerText = chrono.findViewById<Chronometer>(R.id.chronometer)
-
-        binding.closeButton.setOnClickListener {
-            val intent = Intent(requireContext(), TutorialActivity::class.java)
-            startActivity(intent)
-        }
-
-        binding.startButton.setOnClickListener {
-            binding.startButton.visibility = View.INVISIBLE
-            binding.stopButton.visibility = View.VISIBLE
-            chrono.visibility = View.VISIBLE
-            binding.closeButton.visibility = View.INVISIBLE
-            binding.redLine.visibility = View.INVISIBLE
-            startDetector()
-            if (lastPause == 0L) {
-                chronometerText.base = SystemClock.elapsedRealtime()
-            } else {
-                val interval = SystemClock.elapsedRealtime() - lastPause
-                chronometerText.base = chronometerText.getBase() + interval
-            }
-            chronometerText.start()
-
-        }
-
-        binding.stopButton.setOnClickListener {
-            binding.startButton.visibility = View.VISIBLE
-            binding.stopButton.visibility = View.INVISIBLE
-            binding.redLine.visibility = View.VISIBLE
-            endDetector()
-            lastPause = SystemClock.elapsedRealtime();
-            chrono.findViewById<Chronometer>(R.id.chronometer).stop()
-            val stopRecordDialog = StopRecordDialog(wasteCount(), 2F )
-            stopRecordDialog.show(parentFragmentManager, "stop_record_dialog")
-        }
 
         return binding.root
     }
@@ -554,15 +512,11 @@ class CameraConnectionFragment private constructor(
         }
 
         fun newInstance(
-                chrono: TableRow,
-                wasteCount: () -> Unit,
                 callback: (Size?, Int) -> Unit,
-                startDetector: () -> Unit,
-                endDetector: () -> Unit,
                 imageListener: OnImageAvailableListener,
                 inputSize: Size,
         ): CameraConnectionFragment {
-            return CameraConnectionFragment(chrono, wasteCount, callback, startDetector, endDetector, imageListener, inputSize)
+            return CameraConnectionFragment(callback, imageListener, inputSize)
         }
     }
 }
