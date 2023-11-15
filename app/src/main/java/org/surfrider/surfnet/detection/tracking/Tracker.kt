@@ -105,6 +105,10 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         return abs(timestamp1 - timestamp2)
     }
 
+    fun isValid(): Boolean {
+        return status == TrackerStatus.GREEN
+    }
+
     class TrackedDetection(det: Detector.Recognition) {
         var rect: RectF = RectF(det.location)
         var detectionConfidence: Float = det.confidence

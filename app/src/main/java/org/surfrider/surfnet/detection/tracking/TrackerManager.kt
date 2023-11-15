@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.R
+import org.surfrider.surfnet.detection.env.JsonFileWriter
 import org.surfrider.surfnet.detection.models.TrackerResult
 import org.surfrider.surfnet.detection.models.TrackerTrash
 import org.surfrider.surfnet.detection.env.MathUtils.calculateIoU
@@ -310,20 +311,22 @@ class TrackerManager {
         }
     }
 
-    fun sendData(email: String) {
+    fun sendData(context: Context, email: String?) {
         var trashes = ArrayList<TrackerTrash>()
         trackers.forEach {
-            val date = Date(it.startDate)
-            val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
-            val iso8601DateString = iso8601Format.format(date)
-            trashes.add(
-                TrackerTrash(
-                    date = iso8601DateString,
-                    lat = it.location?.latitude,
-                    lng = it.location?.longitude,
-                    name = "unknown"
+            if(it.isValid()) {
+                val date = Date(it.startDate)
+                val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+                val iso8601DateString = iso8601Format.format(date)
+                trashes.add(
+                    TrackerTrash(
+                        date = iso8601DateString,
+                        lat = it.location?.latitude,
+                        lng = it.location?.longitude,
+                        name = "unknown"
+                    )
                 )
-            )
+            }
         }
 
         var result = TrackerResult(
@@ -335,6 +338,8 @@ class TrackerManager {
             positions = ArrayList(),
             comment = "email : $email"
         )
+        //Save JSON file to "Downloads" folder
+        JsonFileWriter.writeResultToJsonFile(context, result)
     }
 
     companion object {

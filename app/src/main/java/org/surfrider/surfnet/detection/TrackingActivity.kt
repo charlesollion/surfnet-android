@@ -160,6 +160,10 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
     }
 
+    private fun getTrackerManager(): TrackerManager? {
+        return trackerManager
+    }
+
     private fun hideSystemUI() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.hide(WindowInsets.Type.statusBars())
@@ -297,6 +301,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         val cameraId = chooseCamera(cameraManager)
         val camera2Fragment = CameraConnectionFragment.newInstance(
             chronometer,
+            { getTrackerManager() },
             { getCount() },
             { size: Size?, rotation: Int ->
                 previewHeight = size!!.height
@@ -339,7 +344,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
     private fun endDetector() {
         trackerManager?.let {
-            tracker -> lastTrackerManager = tracker
+            lastTrackerManager = it
         }
         detectorPaused = true
         //removes all drawings of the trackingOverlay from the screen

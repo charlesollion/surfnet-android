@@ -8,7 +8,7 @@ import androidx.fragment.app.DialogFragment
 import org.surfrider.surfnet.detection.databinding.FragmentSendDataDialogBinding
 
 
-class SendDataDialog(private var wasteCount: Unit, private var metersTravelled: Float) : DialogFragment() {
+class SendDataDialog(private var wasteCount: Int, private var metersTravelled: Float) : DialogFragment() {
 
 
     override fun onCreate(savedInstanceState: Bundle?) {

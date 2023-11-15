@@ -48,6 +48,7 @@ import android.widget.Toast
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
 import org.surfrider.surfnet.detection.databinding.TfeOdCameraConnectionFragmentTrackingBinding
+import org.surfrider.surfnet.detection.tracking.TrackerManager
 import timber.log.Timber
 import java.util.*
 import java.util.concurrent.Semaphore
@@ -58,7 +59,8 @@ import kotlin.math.min
 @SuppressLint("ValidFragment")
 class CameraConnectionFragment private constructor(
     private var chrono: TableRow,
-    private var wasteCount: () -> Unit,
+    private var getTrackerManager: () -> TrackerManager?,
+    private var wasteCount: () -> Int,
     private val cameraConnectionCallback: (Size?, Int) -> Unit,
     private val startDetector: () -> Unit,
     private val endDetector: () -> Unit,
@@ -195,7 +197,7 @@ class CameraConnectionFragment private constructor(
                 chronometerText.base = SystemClock.elapsedRealtime()
             } else {
                 val interval = SystemClock.elapsedRealtime() - lastPause
-                chronometerText.base = chronometerText.getBase() + interval
+                chronometerText.base += interval
             }
             chronometerText.start()
 
@@ -205,11 +207,14 @@ class CameraConnectionFragment private constructor(
             binding.startButton.visibility = View.VISIBLE
             binding.stopButton.visibility = View.INVISIBLE
             binding.redLine.visibility = View.VISIBLE
+            val trackerManager: TrackerManager? = getTrackerManager()
             endDetector()
-            lastPause = SystemClock.elapsedRealtime();
+            lastPause = SystemClock.elapsedRealtime()
             chrono.findViewById<Chronometer>(R.id.chronometer).stop()
-            val stopRecordDialog = StopRecordDialog(wasteCount(), 2F )
-            stopRecordDialog.show(parentFragmentManager, "stop_record_dialog")
+            trackerManager?.let {
+                val stopRecordDialog = StopRecordDialog(wasteCount(), 2F, it)
+                stopRecordDialog.show(parentFragmentManager, "stop_record_dialog")
+            }
         }
 
         return binding.root
@@ -555,14 +560,15 @@ class CameraConnectionFragment private constructor(
 
         fun newInstance(
                 chrono: TableRow,
-                wasteCount: () -> Unit,
+                getTrackerManager: () -> TrackerManager?,
+                wasteCount: () -> Int,
                 callback: (Size?, Int) -> Unit,
                 startDetector: () -> Unit,
                 endDetector: () -> Unit,
                 imageListener: OnImageAvailableListener,
                 inputSize: Size,
         ): CameraConnectionFragment {
-            return CameraConnectionFragment(chrono, wasteCount, callback, startDetector, endDetector, imageListener, inputSize)
+            return CameraConnectionFragment(chrono, getTrackerManager, wasteCount, callback, startDetector, endDetector, imageListener, inputSize)
         }
     }
 }
