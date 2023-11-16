@@ -99,7 +99,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var wasteCount = 0
     private var location: Location? = null
 
-    private val threadImageProcessor = newSingleThreadContext("InferenceThread")
+    private val threadDetector = newSingleThreadContext("InferenceThread")
     private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
 
     private var trackingOverlay: OverlayView? = null
@@ -108,7 +108,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var lastProcessingTimeMs: Long = 0
     private var rgbFrameBitmap: Bitmap? = null
     private var croppedBitmap: Bitmap? = null
+    private var currFrameMat: Mat? = null
     private var computingDetection = false
+    private var computingOF = false
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
     private var trackerManager: TrackerManager? = null
@@ -218,7 +220,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 IS_V8,
                 INPUT_SIZE
             )
-            detector?.useGpu()
+            //detector?.useGpu()
             detector?.setNumThreads(NUM_THREADS)
             detectorPaused = false
         } catch (e: IOException) {
@@ -268,17 +270,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             }
         })
 
-        lifecycleScope.launch(threadOpticalFlow) {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                while (true) {
-                    if (!detectorPaused) {
-                        scheduledOpticalFlow()
-                        scheduledUpdateTrackers()
-                        delay(FLOW_REFRESH_RATE_MILLIS)
-                    }
-                }
-            }
-        }
         binding.chronometer.base = if (lastPause == 0L) {
             SystemClock.elapsedRealtime()
         } else {
@@ -444,7 +435,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         }
     }
 
-    private suspend fun scheduledOpticalFlow() {
+    private fun computeOF() {
+        computingOF = true
         // get IMU variables
         val velocity: FloatArray = imuEstimator.velocity
         val imuPosition: FloatArray = imuEstimator.position
@@ -459,38 +451,40 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             kotlin.math.sqrt((xVelocity * xVelocity + yVelocity * yVelocity + zVelocity * zVelocity).toDouble())
                 .toFloat()
 
-        if (flowRegionUpdateNeeded) {
-            flowRegionUpdateNeeded = false
-            mutex.withLock {
-                avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
-                    outputLinesFlow, FLOW_REFRESH_RATE_MILLIS
-                )
-                currROIs = trackerManager?.getCurrentRois(1280, 720, DOWNSAMPLING_FACTOR_FLOW, 60)
-            }
-        }
-
-        val currFrame =
-            imageProcessor.getMatFromRGB(previewWidth, previewHeight, DOWNSAMPLING_FACTOR_FLOW)
-
-        currFrame?.let {
-            outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
-        }
-
-        bottomSheet.showIMUStats(
-            arrayOf(
-                imuPosition[0],
-                imuPosition[1],
-                imuPosition[2],
-                speed,
-                avgFlowSpeed?.x ?: 0.0F,
-                avgFlowSpeed?.y ?: 0.0F
-            )
+        currFrameMat = imageProcessor.getMatFromRGB(
+            previewWidth,
+            previewHeight,
+            DOWNSAMPLING_FACTOR_FLOW
         )
-    }
 
-    private suspend fun scheduledUpdateTrackers() {
-        mutex.withLock {
-            trackerManager?.updateTrackers()
+        lifecycleScope.launch(threadOpticalFlow) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                mutex.withLock {
+                    avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
+                        outputLinesFlow,
+                        FLOW_REFRESH_RATE_MILLIS
+                    )
+                    if (flowRegionUpdateNeeded) {
+                        flowRegionUpdateNeeded = false
+                        currROIs =
+                            trackerManager?.getCurrentRois(1280, 720, DOWNSAMPLING_FACTOR_FLOW, 60)
+                    }
+                }
+
+                currFrameMat?.let {
+                    outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
+                }
+                computingOF = false
+
+                runOnUiThread {
+                    bottomSheet.showIMUStats(
+                        arrayOf(
+                            imuPosition[0], imuPosition[1], imuPosition[2],
+                            speed, avgFlowSpeed?.x ?: 0.0F, avgFlowSpeed?.y ?: 0.0F
+                        )
+                    )
+                }
+            }
         }
     }
 
@@ -514,10 +508,22 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         trackingOverlay?.postInvalidate()
 
         // No mutex needed as this method is not reentrant.
-        if (computingDetection) {
+        if (computingDetection && computingOF) {
             imageProcessor.readyForNextImage()
             return
         }
+        if(!computingOF) {
+            // will run its own thread
+            computeOF()
+        }
+        if(!computingDetection) {
+            // will run its own thread
+            detect()
+        }
+
+    }
+
+    private fun detect() {
         computingDetection = true
 
         imageProcessor.getRgbBytes()?.let {
@@ -527,7 +533,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         }
         imageProcessor.readyForNextImage()
 
-        trackerManager?.updateTrackers()
+        /*trackerManager?.let {
+            it.updateTrackers()
+        }*/
 
         if (croppedBitmap != null && rgbFrameBitmap != null && frameToCropTransform != null) {
             val canvas = Canvas(croppedBitmap!!)
@@ -538,7 +546,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             }
         }
 
-        lifecycleScope.launch(threadImageProcessor) {
+        lifecycleScope.launch(threadDetector) {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 val startTime = SystemClock.uptimeMillis()
                 val results: List<Detector.Recognition>? = croppedBitmap?.let {
@@ -551,6 +559,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                     ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
                 mutex.withLock {
                     trackerManager?.processDetections(mappedRecognitions, location)
+                    trackerManager?.updateTrackers()
                 }
                 flowRegionUpdateNeeded = true
 
