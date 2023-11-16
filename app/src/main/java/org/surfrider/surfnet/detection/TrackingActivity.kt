@@ -195,8 +195,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
         lastPause = SystemClock.elapsedRealtime()
         binding.chronometer.stop()
-        val stopRecordDialog = StopRecordDialog(wasteCount, 2F, trackerManager)
-        stopRecordDialog.show(supportFragmentManager, "stop_record_dialog")
+        val stopRecordDialog = trackerManager?.let { StopRecordDialog(wasteCount, 2F, it) }
+        stopRecordDialog?.show(supportFragmentManager, "stop_record_dialog")
     }
 
     private fun startDetector() {
