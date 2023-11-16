@@ -220,7 +220,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 IS_V8,
                 INPUT_SIZE
             )
-            //detector?.useGpu()
+            detector?.useGpu()
             detector?.setNumThreads(NUM_THREADS)
             detectorPaused = false
         } catch (e: IOException) {
