@@ -16,8 +16,6 @@
 package org.surfrider.surfnet.detection
 
 import android.annotation.SuppressLint
-import android.app.AlertDialog
-import android.app.Dialog
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.ImageFormat
@@ -41,9 +39,8 @@ import android.view.TextureView.SurfaceTextureListener
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.Fragment
-import org.surfrider.surfnet.detection.databinding.TfeOdCameraConnectionFragmentTrackingBinding
+import org.surfrider.surfnet.detection.databinding.CameraConnectionFragmentTrackingBinding
 import timber.log.Timber
 import java.util.*
 import java.util.concurrent.Semaphore
@@ -61,7 +58,7 @@ class CameraConnectionFragment private constructor(
 
 ) : Fragment() {
 
-    private lateinit var binding: TfeOdCameraConnectionFragmentTrackingBinding
+    private lateinit var binding: CameraConnectionFragmentTrackingBinding
 
     /** A [Semaphore] to prevent the app from exiting before closing the camera.  */
     private val cameraOpenCloseLock = Semaphore(1)
@@ -168,7 +165,7 @@ class CameraConnectionFragment private constructor(
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
     ): View {
-        binding = TfeOdCameraConnectionFragmentTrackingBinding.inflate(inflater, container, false)
+        binding = CameraConnectionFragmentTrackingBinding.inflate(inflater, container, false)
 
         return binding.root
     }
@@ -230,8 +227,7 @@ class CameraConnectionFragment private constructor(
         } catch (e: NullPointerException) {
             // Currently an NPE is thrown when the Camera2API is used but not supported on the
             // device this code runs.
-            ErrorDialog.newInstance(getString(R.string.tfe_od_camera_error))
-                .show(childFragmentManager, FRAGMENT_DIALOG)
+            Timber.e(getString(R.string.tfe_od_camera_error))
             throw IllegalStateException(getString(R.string.tfe_od_camera_error))
         }
         cameraConnectionCallback(previewSize, sensorOrientation!!)
@@ -420,30 +416,6 @@ class CameraConnectionFragment private constructor(
                 )
             }
             return 0
-        }
-    }
-
-    /** Shows an error message dialog.  */
-    class ErrorDialog : DialogFragment() {
-        override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
-            val activity = activity
-            return AlertDialog.Builder(activity).setMessage(arguments?.getString(ARG_MESSAGE))
-                .setPositiveButton(
-                    android.R.string.ok
-                ) { _, _ ->
-                    activity?.finish()
-                }.create()
-        }
-
-        companion object {
-            private const val ARG_MESSAGE = "message"
-            fun newInstance(message: String?): ErrorDialog {
-                val dialog = ErrorDialog()
-                val args = Bundle()
-                args.putString(ARG_MESSAGE, message)
-                dialog.arguments = args
-                return dialog
-            }
         }
     }
 

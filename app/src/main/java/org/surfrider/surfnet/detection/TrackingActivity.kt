@@ -62,7 +62,7 @@ import org.opencv.core.*
 import org.surfrider.surfnet.detection.customview.BottomSheet
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.databinding.FragmentSendDataDialogBinding
-import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
+import org.surfrider.surfnet.detection.databinding.ActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageProcessor
 import org.surfrider.surfnet.detection.env.ImageUtils
 import org.surfrider.surfnet.detection.env.ImageUtils.drawDetections
@@ -82,7 +82,7 @@ import java.util.*
 class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, LocationListener {
 
     private lateinit var locationManager: LocationManager
-    private lateinit var binding: TfeOdActivityCameraBinding
+    private lateinit var binding: ActivityCameraBinding
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var bottomSheet: BottomSheet
     private lateinit var chronoContainer: TableRow
@@ -130,7 +130,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         if (OpenCVLoader.initDebug()) Timber.i("Successful opencv loading")
 
         //initialize binding & UI
-        binding = TfeOdActivityCameraBinding.inflate(layoutInflater)
+        binding = ActivityCameraBinding.inflate(layoutInflater)
         setContentView(binding.root)
         bindingDialog = FragmentSendDataDialogBinding.inflate(
             layoutInflater
