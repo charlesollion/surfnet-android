@@ -21,7 +21,7 @@ class StopRecordDialog(
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View? {
+    ): View {
         // Use DataBindingUtil to inflate the layout with data binding
         val binding = FragmentStopRecordDialogBinding.inflate(
             layoutInflater

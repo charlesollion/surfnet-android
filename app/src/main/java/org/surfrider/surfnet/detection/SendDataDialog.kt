@@ -18,7 +18,7 @@ class SendDataDialog(private var wasteCount: Int, private var metersTravelled: F
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View? {
+    ): View {
         // Use DataBindingUtil to inflate the layout with data binding
         val binding = FragmentSendDataDialogBinding.inflate(
             layoutInflater
