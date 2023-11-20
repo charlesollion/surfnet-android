@@ -4,6 +4,7 @@ import android.graphics.PointF
 import android.graphics.RectF
 import android.location.Location
 import org.surfrider.surfnet.detection.tflite.Detector
+import timber.log.Timber
 import java.util.*
 import kotlin.math.abs
 import kotlin.math.pow
@@ -109,7 +110,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         var rect: RectF = RectF(det.location)
         var detectionConfidence: Float = det.confidence
         var timestamp: Long = System.currentTimeMillis()
-        var classId: String = det.id
+        var classId: String = det.title
         var associatedId = -1
 
         fun getCenter(): PointF {
