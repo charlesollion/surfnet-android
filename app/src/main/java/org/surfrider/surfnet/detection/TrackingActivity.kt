@@ -17,6 +17,7 @@ package org.surfrider.surfnet.detection
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -32,7 +33,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.SystemClock
-import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.View
@@ -62,7 +62,7 @@ import org.opencv.core.*
 import org.surfrider.surfnet.detection.customview.BottomSheet
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.databinding.FragmentSendDataDialogBinding
-import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
+import org.surfrider.surfnet.detection.databinding.ActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageProcessor
 import org.surfrider.surfnet.detection.env.ImageUtils
 import org.surfrider.surfnet.detection.env.ImageUtils.drawDetections
@@ -82,14 +82,14 @@ import java.util.*
 class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, LocationListener {
 
     private lateinit var locationManager: LocationManager
-    private lateinit var binding: TfeOdActivityCameraBinding
+    private lateinit var binding: ActivityCameraBinding
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var bottomSheet: BottomSheet
-    private lateinit var chronometer: TableRow
+    private lateinit var chronoContainer: TableRow
     private lateinit var imageProcessor: ImageProcessor
     private lateinit var outputLinesFlow: ArrayList<FloatArray>
-    private lateinit var imuEstimator : IMU_estimator
-    private lateinit var opticalFlow : DenseOpticalFlow
+    private lateinit var imuEstimator: IMU_estimator
+    private lateinit var opticalFlow: DenseOpticalFlow
 
     private var previewWidth = 0
 
@@ -99,7 +99,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var wasteCount = 0
     private var location: Location? = null
 
-    private val threadImageProcessor = newSingleThreadContext("InferenceThread")
+    private val threadDetector = newSingleThreadContext("InferenceThread")
     private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
 
     private var trackingOverlay: OverlayView? = null
@@ -108,12 +108,14 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var lastProcessingTimeMs: Long = 0
     private var rgbFrameBitmap: Bitmap? = null
     private var croppedBitmap: Bitmap? = null
+    private var currFrameMat: Mat? = null
     private var computingDetection = false
+    private var computingOF = false
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
     private var trackerManager: TrackerManager? = null
     private var latestDetections: List<Detector.Recognition>? = null
-    private var currROIs : Mat? = null
+    private var currROIs: Mat? = null
     private val mutex = Mutex()
     private val locationHandler = Handler()
     private var lastTrackerManager: TrackerManager? = null
@@ -121,21 +123,22 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private val isDebug = false
     private var isGpsActivate = false
 
+    private var lastPause: Long = 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(null)
         Timber.d("onCreate $this")
 
-        if(OpenCVLoader.initDebug())
-            Timber.i("Successful opencv loading")
+        if (OpenCVLoader.initDebug()) Timber.i("Successful opencv loading")
 
         //initialize binding & UI
-        binding = TfeOdActivityCameraBinding.inflate(layoutInflater)
+        binding = ActivityCameraBinding.inflate(layoutInflater)
         setContentView(binding.root)
         bindingDialog = FragmentSendDataDialogBinding.inflate(
-                layoutInflater
+            layoutInflater
         )
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        chronometer = binding.chronoContainer
+        chronoContainer = binding.chronoContainer
         binding.wasteCounter.text = "0"
         bottomSheet = BottomSheet(binding)
         hideSystemUI()
@@ -158,6 +161,123 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         opticalFlow = DenseOpticalFlow()
         outputLinesFlow = arrayListOf()
 
+        binding.closeButton.setOnClickListener {
+            val intent = Intent(applicationContext, TutorialActivity::class.java)
+            startActivity(intent)
+        }
+
+        binding.startButton.setOnClickListener {
+            startDetector()
+        }
+
+        binding.stopButton.setOnClickListener {
+            endDetector()
+        }
+
+    }
+
+    private fun endDetector() {
+        binding.startButton.visibility = View.VISIBLE
+        binding.stopButton.visibility = View.INVISIBLE
+        binding.redLine.visibility = View.VISIBLE
+        trackerManager?.let { tracker ->
+            lastTrackerManager = tracker
+        }
+        detectorPaused = true
+        //removes all drawings of the trackingOverlay from the screen
+        trackingOverlay?.invalidate()
+
+        //reset trackers
+        croppedBitmap = null
+        cropToFrameTransform = null
+        trackerManager = null
+        trackingOverlay = null
+
+        lastPause = SystemClock.elapsedRealtime()
+        binding.chronometer.stop()
+        val stopRecordDialog = StopRecordDialog(wasteCount, 2F)
+        stopRecordDialog.show(supportFragmentManager, "stop_record_dialog")
+    }
+
+    private fun startDetector() {
+        with(binding) {
+            startButton.visibility = View.INVISIBLE
+            stopButton.visibility = View.VISIBLE
+            chronoContainer.visibility = View.VISIBLE
+            closeButton.visibility = View.INVISIBLE
+            redLine.visibility = View.INVISIBLE
+        }
+
+        val context = this
+        try {
+            //create detector only one time
+            binding.loadingPanel.visibility = View.VISIBLE
+            detector = detector ?: YoloDetector.create(
+                assets,
+                MODEL_STRING,
+                LABEL_FILENAME,
+                CONFIDENCE_THRESHOLD,
+                IS_QUANTIZED,
+                IS_V8,
+                INPUT_SIZE
+            )
+            detector?.useGpu()
+            detector?.setNumThreads(NUM_THREADS)
+            binding.loadingPanel.visibility = View.INVISIBLE
+            detectorPaused = false
+        } catch (e: IOException) {
+            e.printStackTrace()
+            Timber.e(e, "Exception initializing Detector!")
+            val toast = Toast.makeText(
+                applicationContext, "Detector could not be initialized", Toast.LENGTH_SHORT
+            )
+            toast.show()
+            finish()
+        }
+        trackerManager = lastTrackerManager ?: TrackerManager()
+
+        bottomSheet.displayDetection(trackerManager!!)
+
+        detector?.inputSize?.let {
+            croppedBitmap = Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888)
+            frameToCropTransform = ImageUtils.getTransformationMatrix(
+                previewWidth, previewHeight, it, it, sensorOrientation, MAINTAIN_ASPECT
+            )
+        }
+
+        cropToFrameTransform = Matrix()
+        frameToCropTransform?.invert(cropToFrameTransform)
+
+        trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
+        trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
+            override fun drawCallback(canvas: Canvas?) {
+                canvas?.let {
+                    trackerManager?.draw(
+                        it, context, previewWidth, previewHeight, bottomSheet.showOF
+                    )
+                    if (bottomSheet.showOF) {
+                        drawOFLinesPRK(it, outputLinesFlow, previewWidth, previewHeight)
+                    }
+                    if (bottomSheet.showBoxes) {
+                        drawDetections(it, latestDetections, previewWidth, previewHeight)
+                    }
+                    if (isDebug) {
+                        trackerManager?.drawDebug(it)
+                    }
+                }
+                trackerManager?.let { tracker ->
+                    updateCounter(tracker.detectedWaste.size)
+                }
+                // ImageUtils.drawDebugScreen(canvas, previewWidth, previewHeight, cropToFrameTransform)
+            }
+        })
+
+        binding.chronometer.base = if (lastPause == 0L) {
+            SystemClock.elapsedRealtime()
+        } else {
+            binding.chronometer.base + (SystemClock.elapsedRealtime() - lastPause)
+        }
+        binding.chronometer.start()
     }
 
     private fun hideSystemUI() {
@@ -172,15 +292,14 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             hideNavigationBar()
         } else {
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            window.decorView.systemUiVisibility =
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
     private fun hideNavigationBar() {
-        val windowInsetsController =
-            WindowCompat.getInsetsController(window, window.decorView)
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
         windowInsetsController.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         window.decorView.setOnApplyWindowInsetsListener { view, windowInsets ->
@@ -197,8 +316,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             ) != PackageManager.PERMISSION_GRANTED)
         ) {
             ActivityCompat.requestPermissions(
-                this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                REQUEST_LOCATION_PERMISSION
+                this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), REQUEST_LOCATION_PERMISSION
             )
             return
         }
@@ -209,8 +327,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             if (it != null) {
                 bottomSheet.showGPSCoordinates(
                     arrayOf(
-                        it.longitude.toString(),
-                        it.latitude.toString()
+                        it.longitude.toString(), it.latitude.toString()
                     )
                 )
             }
@@ -234,9 +351,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
     private fun setupPermissions() {
         val permissions = arrayOf(
-            PERMISSION_CAMERA,
-            PERMISSION_LOCATION,
-            Manifest.permission.ACCESS_FINE_LOCATION
+            PERMISSION_CAMERA, PERMISSION_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION
         )
         if (checkPermissions(permissions)) {
             setFragment()
@@ -250,10 +365,11 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     }
 
     private fun checkPermissions(permissions: Array<String>): Boolean {
-        Log.d("PERMISSIONS", "TEST")
         for (permission in permissions) {
-            if (ContextCompat.checkSelfPermission(this, permission)
-                != PackageManager.PERMISSION_GRANTED
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    permission
+                ) != PackageManager.PERMISSION_GRANTED
             ) {
                 return false
             }
@@ -288,22 +404,19 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
-        if (requestCode == PERMISSIONS_REQUEST && checkPermissions(permissions))
-            setFragment()
+        if (requestCode == PERMISSIONS_REQUEST && checkPermissions(permissions)) setFragment()
     }
 
     private fun setFragment() {
         val cameraManager = getSystemService(CAMERA_SERVICE) as CameraManager
         val cameraId = chooseCamera(cameraManager)
         val camera2Fragment = CameraConnectionFragment.newInstance(
-            chronometer,
-            { getCount() },
             { size: Size?, rotation: Int ->
                 previewHeight = size!!.height
                 previewWidth = size.width
                 onPreviewSizeChosen(size, rotation)
             },
-            { startDetector() }, { endDetector() }, this, desiredPreviewFrameSize,
+            this, desiredPreviewFrameSize,
         )
 
         camera2Fragment.setCamera(cameraId)
@@ -317,15 +430,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             Surface.ROTATION_90 -> 90
             else -> 0
         }
-
-    fun manageVisibility() {
-        if (binding.chronometer.visibility == View.VISIBLE) {
-            binding.chronometer.visibility = View.INVISIBLE
-        } else {
-            binding.chronometer.visibility = View.VISIBLE
-        }
-    }
-
     fun updateCounter(count: Int?) {
         binding.wasteCounter.text = count.toString()
         if (count != null) {
@@ -333,119 +437,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         }
     }
 
-    private fun getCount(): Int {
-        return wasteCount
-    }
-
-    private fun endDetector() {
-        trackerManager?.let {
-            tracker -> lastTrackerManager = tracker
-        }
-        detectorPaused = true
-        //removes all drawings of the trackingOverlay from the screen
-        trackingOverlay?.invalidate()
-
-        //reset trackers
-        croppedBitmap = null
-        cropToFrameTransform = null
-        trackerManager = null
-        trackingOverlay = null
-    }
-
-    private fun startDetector() {
-        val context = this
-        try {
-            //create detector only one time
-            if (detector == null) {
-                binding.loadingPanel.visibility = View.VISIBLE
-                detector = YoloDetector.create(
-                    assets,
-                    MODEL_STRING,
-                    LABEL_FILENAME,
-                    CONFIDENCE_THRESHOLD,
-                    IS_QUANTIZED,
-                    IS_V8,
-                    INPUT_SIZE
-                )
-
-            }
-            detector?.useGpu()
-            detector?.setNumThreads(NUM_THREADS)
-            detectorPaused = false
-        } catch (e: IOException) {
-            e.printStackTrace()
-            Timber.e(e, "Exception initializing Detector!")
-            val toast = Toast.makeText(
-                applicationContext, "Detector could not be initialized", Toast.LENGTH_SHORT
-            )
-            toast.show()
-            finish()
-        }
-        trackerManager = if (lastTrackerManager != null)
-            lastTrackerManager
-        else
-            TrackerManager()
-        if (trackerManager != null) {
-            bottomSheet.displayDetection(trackerManager!!)
-        }
-        val cropSize = detector?.inputSize
-        cropSize?.let {
-            croppedBitmap = Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888)
-            frameToCropTransform = ImageUtils.getTransformationMatrix(
-                previewWidth,
-                previewHeight,
-                it,
-                it,
-                sensorOrientation,
-                MAINTAIN_ASPECT
-            )
-        }
-
-        cropToFrameTransform = Matrix()
-        frameToCropTransform?.invert(cropToFrameTransform)
-        trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
-
-        trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
-            override fun drawCallback(canvas: Canvas?) {
-                if (canvas != null) {
-                    trackerManager?.draw(canvas, context, previewWidth, previewHeight, bottomSheet.showOF)
-                    // drawOFLines(canvas)
-
-                    if(bottomSheet.showOF) {
-                        drawOFLinesPRK(canvas, outputLinesFlow, previewWidth, previewHeight)
-                    }
-                    if(bottomSheet.showBoxes) {
-                        drawDetections(canvas, latestDetections, previewWidth, previewHeight)
-                    }
-
-                }
-                if (isDebug) {
-                    if (canvas != null) {
-                        trackerManager?.drawDebug(canvas)
-                    }
-                }
-                binding.loadingPanel.visibility = View.INVISIBLE
-                trackerManager?.let { tracker ->
-                    updateCounter(tracker.detectedWaste.size)
-                }
-                // ImageUtils.drawDebugScreen(canvas, previewWidth, previewHeight, cropToFrameTransform)
-            }
-        })
-
-        lifecycleScope.launch(threadOpticalFlow) {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                while(true) {
-                    if(!detectorPaused) {
-                        scheduledOpticalFlow()
-                        scheduledUpdateTrackers()
-                        delay(FLOW_REFRESH_RATE_MILLIS)
-                    }
-                }
-            }
-        }
-    }
-
-    private suspend fun scheduledOpticalFlow() {
+    private fun computeOF() {
+        computingOF = true
         // get IMU variables
         val velocity: FloatArray = imuEstimator.velocity
         val imuPosition: FloatArray = imuEstimator.position
@@ -460,28 +453,39 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             kotlin.math.sqrt((xVelocity * xVelocity + yVelocity * yVelocity + zVelocity * zVelocity).toDouble())
                 .toFloat()
 
-        if(flowRegionUpdateNeeded) {
-            flowRegionUpdateNeeded = false
-            mutex.withLock {
-                avgFlowSpeed = trackerManager?.associateFlowWithTrackers(outputLinesFlow, FLOW_REFRESH_RATE_MILLIS)
-                currROIs = trackerManager?.getCurrentRois(1280, 720, DOWNSAMPLING_FACTOR_FLOW, 60)
-            }
-        }
+        currFrameMat = imageProcessor.getMatFromRGB(
+            previewWidth,
+            previewHeight,
+            DOWNSAMPLING_FACTOR_FLOW
+        )
 
-        val currFrame = imageProcessor.getMatFromRGB(previewWidth, previewHeight, DOWNSAMPLING_FACTOR_FLOW)
+        lifecycleScope.launch(threadOpticalFlow) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                mutex.withLock {
+                    avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
+                        outputLinesFlow,
+                        FLOW_REFRESH_RATE_MILLIS
+                    )
+                    if (flowRegionUpdateNeeded) {
+                        flowRegionUpdateNeeded = false
+                        currROIs =
+                            trackerManager?.getCurrentRois(1280, 720, DOWNSAMPLING_FACTOR_FLOW, 60)
+                    }
+                }
 
-        currFrame?.let {
-            outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
-        }
+                currFrameMat?.let {
+                    outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
+                }
+                computingOF = false
 
-        bottomSheet.showIMUStats(arrayOf(imuPosition[0], imuPosition[1], imuPosition[2],
-                                         speed, avgFlowSpeed?.x?:0.0F, avgFlowSpeed?.y?:0.0F))
-    }
-
-    private suspend fun scheduledUpdateTrackers() {
-        mutex.withLock {
-            trackerManager?.let {
-                it.updateTrackers()
+                runOnUiThread {
+                    bottomSheet.showIMUStats(
+                        arrayOf(
+                            imuPosition[0], imuPosition[1], imuPosition[2],
+                            speed, avgFlowSpeed?.x ?: 0.0F, avgFlowSpeed?.y ?: 0.0F
+                        )
+                    )
+                }
             }
         }
     }
@@ -506,10 +510,22 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         trackingOverlay?.postInvalidate()
 
         // No mutex needed as this method is not reentrant.
-        if (computingDetection) {
+        if (computingDetection && computingOF) {
             imageProcessor.readyForNextImage()
             return
         }
+        if(!computingOF) {
+            // will run its own thread
+            computeOF()
+        }
+        if(!computingDetection) {
+            // will run its own thread
+            detect()
+        }
+
+    }
+
+    private fun detect() {
         computingDetection = true
 
         imageProcessor.getRgbBytes()?.let {
@@ -519,9 +535,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         }
         imageProcessor.readyForNextImage()
 
-        trackerManager?.let {
+        /*trackerManager?.let {
             it.updateTrackers()
-        }
+        }*/
 
         if (croppedBitmap != null && rgbFrameBitmap != null && frameToCropTransform != null) {
             val canvas = Canvas(croppedBitmap!!)
@@ -532,7 +548,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             }
         }
 
-        lifecycleScope.launch(threadImageProcessor) {
+        lifecycleScope.launch(threadDetector) {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 val startTime = SystemClock.uptimeMillis()
                 val results: List<Detector.Recognition>? = croppedBitmap?.let {
@@ -545,6 +561,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                     ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
                 mutex.withLock {
                     trackerManager?.processDetections(mappedRecognitions, location)
+                    trackerManager?.updateTrackers()
                 }
                 flowRegionUpdateNeeded = true
 

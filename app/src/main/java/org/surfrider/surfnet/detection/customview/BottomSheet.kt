@@ -6,13 +6,13 @@ import android.view.ViewTreeObserver
 import android.widget.LinearLayout
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import org.surfrider.surfnet.detection.R
-import org.surfrider.surfnet.detection.databinding.TfeOdActivityCameraBinding
+import org.surfrider.surfnet.detection.databinding.ActivityCameraBinding
 
 import java.text.DecimalFormat
 import org.surfrider.surfnet.detection.tracking.TrackerManager
 
 
-class BottomSheet(binding: TfeOdActivityCameraBinding) {
+class BottomSheet(binding: ActivityCameraBinding) {
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     private var bottomSheetLayout = binding.bottomSheetLayout
     private var df = DecimalFormat("#.##")
