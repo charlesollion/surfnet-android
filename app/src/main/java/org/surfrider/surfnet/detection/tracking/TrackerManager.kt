@@ -29,6 +29,7 @@ class TrackerManager {
 
     private var bmpYellow: Bitmap? = null
     private var bmpGreen: Bitmap? = null
+    private var bmpWhite: Bitmap? = null
 
     private var trackerIndex = 0
 
@@ -113,7 +114,10 @@ class TrackerManager {
             bmpYellow = context?.let { getBitmap(it, R.drawable.yellow_dot) }
         }
         if(bmpGreen == null) {
-            bmpGreen = context?.let { getBitmap(it, R.drawable.green_dot) }
+            bmpGreen = context?.let { getBitmap(it, R.drawable.check_icon) }
+        }
+        if(bmpWhite == null) {
+            bmpWhite = context?.let { getBitmap(it, R.drawable.white_dot) }
         }
 
         for (tracker in trackers) {
@@ -130,8 +134,12 @@ class TrackerManager {
                         }
                         bmpGreen
                     } else {
-                        bmpYellow
+                        if (tracker.status == Tracker.TrackerStatus.LOADING)
+                        bmpWhite
+                        else
+                            bmpYellow
                     }
+
                 }
 
                 // Draw the speed line to show displacement of the tracker depending on camera motion
