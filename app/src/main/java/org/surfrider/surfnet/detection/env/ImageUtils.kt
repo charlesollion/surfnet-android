@@ -242,6 +242,25 @@ object ImageUtils {
         canvas?.drawRect(rectCrop, paint)
     }
 
+    fun drawBorder(canvas: Canvas?, previewWidth: Int, previewHeight: Int) {
+        // Debug function to show frame size and crop size
+        val paint = Paint()
+        paint.color = Color.RED
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 10.0f
+        // Slightly smaller than Camera frame width to see all borders
+        val rectCam = RectF(5.0F, 5.0F, previewWidth.toFloat()-5.0F, previewHeight.toFloat()-5.0F)
+
+        val frameToCanvasTransform = Matrix()
+        val scale = Math.min(canvas!!.width / previewWidth.toFloat(), canvas!!.height / previewHeight.toFloat())
+        frameToCanvasTransform.postScale(scale, scale)
+
+        // Draw Camera frame
+        frameToCanvasTransform.mapRect(rectCam)
+        canvas?.drawRect(rectCam, paint)
+    }
+
+
     fun drawDetections(canvas: Canvas?, results: List<Detector.Recognition>?, previewWidth: Int, previewHeight: Int) {
         val paint = Paint()
         paint.color = Color.RED
