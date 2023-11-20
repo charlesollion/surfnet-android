@@ -4,7 +4,6 @@ import android.graphics.PointF
 import android.graphics.RectF
 import android.location.Location
 import org.surfrider.surfnet.detection.tflite.Detector
-import timber.log.Timber
 import java.util.*
 import kotlin.math.abs
 import kotlin.math.pow
