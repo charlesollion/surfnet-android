@@ -334,7 +334,7 @@ class TrackerManager {
                         date = iso8601DateString,
                         lat = it.location?.latitude,
                         lng = it.location?.longitude,
-                        name = "unknown"
+                        name = it.computeMajorityClass()
                     )
                 )
             }
