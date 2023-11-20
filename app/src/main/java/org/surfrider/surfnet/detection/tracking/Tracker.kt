@@ -109,7 +109,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         var rect: RectF = RectF(det.location)
         var detectionConfidence: Float = det.confidence
         var timestamp: Long = System.currentTimeMillis()
-        var classId: String = det.id
+        var classId: String = det.title
         var associatedId = -1
 
         fun getCenter(): PointF {
