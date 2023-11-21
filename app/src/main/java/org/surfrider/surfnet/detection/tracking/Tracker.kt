@@ -16,12 +16,12 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
     var index = idx
     var location: Location? = lctn
-    var status : TrackerStatus = TrackerStatus.RED
+    var status: TrackerStatus = TrackerStatus.RED
     var animation = false
     var alreadyAssociated = false
 
     private var lastUpdatedTimestamp: Long = 0
-    private var animationTimeStamp : Long? = null
+    private var animationTimeStamp: Long? = null
 
     private val firstDetection = det
     val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
@@ -34,6 +34,11 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
     init {
         trackedObjects.addLast(firstDetection)
+    }
+
+    fun computeMajorityClass(): String? {
+        return trackedObjects.groupBy { it.classId }
+            .maxByOrNull { it.value.size }?.key
     }
 
     fun distTo(newPos: PointF): Float {
@@ -49,12 +54,12 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         trackedObjects.addLast(newDet)
         position = newDet.getCenter()
         strength += 0.2F
-        if(strength > 1.0F) {
+        if (strength > 1.0F) {
             strength = 1.0F
         }
         alreadyAssociated = true
 
-        if(trackedObjects.size > NUM_CONSECUTIVE_DET && status == TrackerStatus.RED) {
+        if (trackedObjects.size > NUM_CONSECUTIVE_DET && status == TrackerStatus.RED) {
             status = TrackerStatus.GREEN
             animation = true
             animationTimeStamp = newDet.timestamp
@@ -72,8 +77,10 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         val speedYSquared = speed.y * speed.y / (scale * scale)
 
         // Update the estimated covariance using EMA
-        speedCov.x = COVARIANCE_SMOOTHING_FACTOR * speedCov.x + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedXSquared
-        speedCov.y = COVARIANCE_SMOOTHING_FACTOR * speedCov.y + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedYSquared
+        speedCov.x =
+            COVARIANCE_SMOOTHING_FACTOR * speedCov.x + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedXSquared
+        speedCov.y =
+            COVARIANCE_SMOOTHING_FACTOR * speedCov.y + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedYSquared
     }
 
 
@@ -85,7 +92,8 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         // Timber.i("AGE +> ${age.toString()} | MAX TIMESTAMP +> $MAX_TIMESTAMP")
 
         val ageOfAnimation = animationTimeStamp?.let {
-            timeDiffInMilli(currTimeStamp,
+            timeDiffInMilli(
+                currTimeStamp,
                 it
             )
         }
@@ -96,7 +104,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         }
 
         // Green last twice as long as red
-        if((status == TrackerStatus.RED && age > MAX_TIMESTAMP) || (status == TrackerStatus.GREEN && age > MAX_TIMESTAMP * 2)) {
+        if ((status == TrackerStatus.RED && age > MAX_TIMESTAMP) || (status == TrackerStatus.GREEN && age > MAX_TIMESTAMP * 2)) {
             status = TrackerStatus.INACTIVE
         }
 
@@ -107,11 +115,15 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         return abs(timestamp1 - timestamp2)
     }
 
+    fun isValid(): Boolean {
+        return status == TrackerStatus.GREEN
+    }
+
     class TrackedDetection(det: Detector.Recognition) {
         var rect: RectF = RectF(det.location)
         var detectionConfidence: Float = det.confidence
         var timestamp: Long = System.currentTimeMillis()
-        var classId: String = det.id
+        var classId: String = det.title
         var associatedId = -1
 
         fun getCenter(): PointF {
@@ -125,7 +137,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
     companion object {
         @JvmStatic
-        private fun dist(p1: PointF, p2:PointF): Float {
+        private fun dist(p1: PointF, p2: PointF): Float {
             return kotlin.math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
         }
 
