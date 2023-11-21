@@ -52,7 +52,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.sync.Mutex
@@ -99,6 +98,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var flowRegionUpdateNeeded = false
     private var wasteCount = 0
     private var location: Location? = null
+    private var fastSelfMotionTimestamp: Long = 0
 
     private val threadDetector = newSingleThreadContext("InferenceThread")
     private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
@@ -265,11 +265,14 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                     if (isDebug) {
                         trackerManager?.drawDebug(it)
                     }
+                    if (fastSelfMotionTimestamp > 0) {
+                        ImageUtils.drawBorder(it, previewWidth, previewHeight)
+                    }
+                    // ImageUtils.drawDebugScreen(it, previewWidth, previewHeight, cropToFrameTransform)
                 }
                 trackerManager?.let { tracker ->
                     updateCounter(tracker.detectedWaste.size)
                 }
-                // ImageUtils.drawDebugScreen(canvas, previewWidth, previewHeight, cropToFrameTransform)
             }
         })
 
@@ -460,6 +463,16 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             kotlin.math.sqrt((xVelocity * xVelocity + yVelocity * yVelocity + zVelocity * zVelocity).toDouble())
                 .toFloat()
 
+        if(speed > MAX_SELF_VELOCITY) {
+            fastSelfMotionTimestamp = System.currentTimeMillis()
+        } else {
+            // If the time since last timestamp is over VELOCITY_PAUSE_STICKINESS, we reset the timestamp
+            if(System.currentTimeMillis() - fastSelfMotionTimestamp > VELOCITY_PAUSE_STICKINESS) {
+                fastSelfMotionTimestamp = 0
+            }
+        }
+
+
         currFrameMat = imageProcessor.getMatFromRGB(
             previewWidth,
             previewHeight,
@@ -469,14 +482,21 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         lifecycleScope.launch(threadOpticalFlow) {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                 mutex.withLock {
-                    avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
-                        outputLinesFlow,
-                        FLOW_REFRESH_RATE_MILLIS
-                    )
-                    if (flowRegionUpdateNeeded) {
-                        flowRegionUpdateNeeded = false
-                        currROIs =
-                            trackerManager?.getCurrentRois(1280, 720, DOWNSAMPLING_FACTOR_FLOW, 60)
+                    if (fastSelfMotionTimestamp == 0L) {
+                        avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
+                            outputLinesFlow,
+                            FLOW_REFRESH_RATE_MILLIS
+                        )
+                        if (flowRegionUpdateNeeded) {
+                            flowRegionUpdateNeeded = false
+                            currROIs =
+                                trackerManager?.getCurrentRois(
+                                    1280,
+                                    720,
+                                    DOWNSAMPLING_FACTOR_FLOW,
+                                    60
+                                )
+                        }
                     }
                 }
 
@@ -567,8 +587,10 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 val mappedRecognitions =
                     ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
                 mutex.withLock {
-                    trackerManager?.processDetections(mappedRecognitions, location)
-                    trackerManager?.updateTrackers()
+                    if(fastSelfMotionTimestamp == 0L) {
+                        trackerManager?.processDetections(mappedRecognitions, location)
+                        trackerManager?.updateTrackers()
+                    }
                 }
                 flowRegionUpdateNeeded = true
 
@@ -587,6 +609,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     companion object {
         private const val FLOW_REFRESH_RATE_MILLIS: Long = 50
         private const val DOWNSAMPLING_FACTOR_FLOW: Int = 2
+        private const val MAX_SELF_VELOCITY = 5.0
+        private const val VELOCITY_PAUSE_STICKINESS: Long = 500
 
         private const val CONFIDENCE_THRESHOLD = 0.3f
         private const val MODEL_STRING = "yolov8n_float16.tflite"
