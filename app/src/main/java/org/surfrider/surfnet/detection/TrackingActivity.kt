@@ -96,6 +96,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var previewHeight = 0
     private var detectorPaused = true
     private var flowRegionUpdateNeeded = false
+    private var avgFlowSpeed: PointF? = null
     private var wasteCount = 0
     private var location: Location? = null
     private var fastSelfMotionTimestamp: Long = 0
@@ -456,7 +457,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         val xVelocity = velocity[0] * 3.6f
         val yVelocity = velocity[1] * 3.6f
         val zVelocity = velocity[2] * 3.6f
-        var avgFlowSpeed: PointF? = null
+
 
         // Get the magnitude of the velocity vector
         val speed =
