@@ -75,6 +75,7 @@ import org.surfrider.surfnet.detection.tflite.YoloDetector
 import org.surfrider.surfnet.detection.tracking.TrackerManager
 import timber.log.Timber
 import java.io.IOException
+import java.text.SimpleDateFormat
 import java.util.*
 
 
@@ -177,9 +178,13 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     }
 
     private fun endDetector() {
+        //adapt screen
         binding.startButton.visibility = View.VISIBLE
         binding.stopButton.visibility = View.INVISIBLE
         binding.redLine.visibility = View.VISIBLE
+        val stopRecordDialog = trackerManager?.let { StopRecordDialog(wasteCount, 2F, it) }
+        stopRecordDialog?.show(supportFragmentManager, "stop_record_dialog")
+
         trackerManager?.let { tracker ->
             lastTrackerManager = tracker
         }
@@ -195,8 +200,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
         lastPause = SystemClock.elapsedRealtime()
         binding.chronometer.stop()
-        val stopRecordDialog = StopRecordDialog(wasteCount, 2F)
-        stopRecordDialog.show(supportFragmentManager, "stop_record_dialog")
     }
 
     private fun startDetector() {
@@ -337,6 +340,12 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private fun updateLocation() {
         locationHandler.postDelayed({
             getLocation()
+            trackerManager?.let {
+                val date = Calendar.getInstance().time
+                val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+                val iso8601DateString = iso8601Format.format(date)
+                it.addPosition(location = location, date= iso8601DateString)
+            }
             locationHandler.postDelayed({
                 updateLocation()
             }, 1000)
@@ -512,11 +521,11 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             imageProcessor.readyForNextImage()
             return
         }
-        if(!computingOF) {
+        if (!computingOF) {
             // will run its own thread
             computeOF()
         }
-        if(!computingDetection) {
+        if (!computingDetection) {
             // will run its own thread
             detect()
         }
