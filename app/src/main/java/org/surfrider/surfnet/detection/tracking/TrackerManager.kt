@@ -26,7 +26,7 @@ class TrackerManager {
 
     private val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
-    private val positions: ArrayList<TrackerPosition> = ArrayList()
+    val positions: ArrayList<TrackerPosition> = ArrayList()
 
     var displayDetection = true
 
@@ -40,9 +40,12 @@ class TrackerManager {
     }
 
     fun addPosition(location: Location?, date: String) {
-        val position =
-            TrackerPosition(lat = location?.latitude, lng = location?.longitude, date = date)
-        positions.add(position)
+        location?.let {
+            val position =
+                TrackerPosition(lat = it.latitude, lng = it.longitude, date = date)
+
+            positions.add(position)
+        }
     }
 
     @Synchronized
@@ -96,7 +99,8 @@ class TrackerManager {
             val iou = 1.0 - calculateIoU(det.rect, tracker.trackedObjects.last.rect)
             val classMatch = if (det.classId == tracker.trackedObjects.last.classId) 0.0 else 1.0
             val strength = 1.0 - tracker.strength
-            val cost = W_DIST * dist + W_CONF * confidence + W_IOU * iou + W_CLASS * classMatch + W_TRACKER_STRENGTH * strength
+            val cost =
+                W_DIST * dist + W_CONF * confidence + W_IOU * iou + W_CLASS * classMatch + W_TRACKER_STRENGTH * strength
             // Timber.i("${tracker.index}/${det.rect}:$cost --- dist:${dist} confidence:${confidence} iou:$iou classmatch:$classMatch strength:${strength}")
             return cost
 

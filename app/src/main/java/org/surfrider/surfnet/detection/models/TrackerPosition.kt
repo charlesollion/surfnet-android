@@ -4,9 +4,9 @@ import com.google.gson.annotations.SerializedName
 
 data class TrackerPosition(
     @SerializedName("lat")
-    var lat: Double? = null,
+    var lat: Double,
     @SerializedName("lng")
-    var lng: Double? = null,
+    var lng: Double,
     @SerializedName("date")
-    var date: String? = null
+    var date: String
 )

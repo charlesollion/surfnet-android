@@ -183,7 +183,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         binding.startButton.visibility = View.VISIBLE
         binding.stopButton.visibility = View.INVISIBLE
         binding.redLine.visibility = View.VISIBLE
-        val stopRecordDialog = trackerManager?.let { StopRecordDialog(wasteCount, 2F, it) }
+        val stopRecordDialog = trackerManager?.let { StopRecordDialog(it) }
         stopRecordDialog?.show(supportFragmentManager, "stop_record_dialog")
 
         trackerManager?.let { tracker ->
