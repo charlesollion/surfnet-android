@@ -266,9 +266,9 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                         trackerManager?.drawDebug(it)
                     }
                     if (fastSelfMotionTimestamp > 0) {
-                        ImageUtils.drawBorder(canvas, previewWidth, previewHeight)
+                        ImageUtils.drawBorder(it, previewWidth, previewHeight)
                     }
-                    // ImageUtils.drawDebugScreen(canvas, previewWidth, previewHeight, cropToFrameTransform)
+                    // ImageUtils.drawDebugScreen(it, previewWidth, previewHeight, cropToFrameTransform)
                 }
                 trackerManager?.let { tracker ->
                     updateCounter(tracker.detectedWaste.size)
