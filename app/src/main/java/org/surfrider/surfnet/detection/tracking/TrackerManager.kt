@@ -349,8 +349,11 @@ class TrackerManager {
             positions = positions,
             comment = "email : $email"
         )
+        val actualDate = Calendar.getInstance().time
+        val saveFileDateFormat = SimpleDateFormat("yyyyMMddHHmmss")
+        val saveFileDateString = saveFileDateFormat.format(actualDate)
         //Save JSON file to "Downloads" folder
-        JsonFileWriter.writeResultToJsonFile(context, result)
+        JsonFileWriter.writeResultToJsonFile(context, result, saveFileDateString)
     }
 
     companion object {

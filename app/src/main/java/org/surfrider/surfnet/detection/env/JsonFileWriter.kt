@@ -20,7 +20,7 @@ class JsonFileWriter {
 
         private const val TAG = "JsonFileWriter"
 
-        fun writeResultToJsonFile(context: Context, result: TrackerResult) {
+        fun writeResultToJsonFile(context: Context, result: TrackerResult, traceDate: String) {
             val gson = Gson()
             val jsonString = gson.toJson(result)
 
@@ -28,7 +28,7 @@ class JsonFileWriter {
                 // Use MediaStore to write to the Downloads folder
                 val resolver: ContentResolver = context.contentResolver
                 val contentValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.DISPLAY_NAME, "trace.json")
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, "trace_$traceDate.json")
                     put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
                     put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
                 }
@@ -52,7 +52,7 @@ class JsonFileWriter {
                 try {
                     val dir =
                         Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    val file = File(dir, "output.json")
+                    val file = File(dir, "trace_$traceDate.json")
                     val writer = FileWriter(file)
                     writer.use {
                         it.write(jsonString)
