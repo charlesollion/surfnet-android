@@ -242,7 +242,7 @@ class TrackerManager {
                         val x = xCenter + i
                         val y = yCenter + j
 
-                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                        if (x in 0..<width && y >= 0 && y < height) {
                             currRois.put(y, x, byteArrayOf(1))
                         }
                     }

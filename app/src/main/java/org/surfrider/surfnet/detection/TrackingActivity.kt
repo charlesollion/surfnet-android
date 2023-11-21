@@ -346,7 +346,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             getLocation()
             trackerManager?.let {
                 val date = Calendar.getInstance().time
-                val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
+                val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
                 val iso8601DateString = iso8601Format.format(date)
                 it.addPosition(location = location, date= iso8601DateString)
             }
