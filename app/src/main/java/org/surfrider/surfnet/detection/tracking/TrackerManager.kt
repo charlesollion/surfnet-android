@@ -38,8 +38,8 @@ class TrackerManager {
     }
 
     @Synchronized
-    fun processDetections(results: List<Recognition>, location : Location?) {
-        if(results.isEmpty()) {
+    fun processDetections(results: List<Recognition>, location: Location?) {
+        if (results.isEmpty()) {
             return
         }
         // Store all Recognition objects in a list of TrackedDetections
@@ -49,7 +49,7 @@ class TrackerManager {
         }
 
         // Create cost matrix
-        if(trackers.size > 0) {
+        if (trackers.size > 0) {
             val costMatrix = Array(dets.size) { _ ->
                 DoubleArray(trackers.size)
             }
@@ -69,7 +69,7 @@ class TrackerManager {
             }
         }
         // create new trackers for unassigned detections
-        for(det in dets) {
+        for (det in dets) {
             if (det.associatedId == -1) {
                 trackers.addLast(Tracker(det, trackerIndex, location))
                 trackerIndex++
@@ -81,7 +81,7 @@ class TrackerManager {
     private fun cost(det: Tracker.TrackedDetection, tracker: Tracker): Double {
         if (tracker.status != Tracker.TrackerStatus.INACTIVE && !tracker.alreadyAssociated) {
             val dist = tracker.distTo(det.getCenter()).toDouble() / SCREEN_DIAGONAL
-            if(dist > ASSOCIATION_THRESHOLD) {
+            if (dist > ASSOCIATION_THRESHOLD) {
                 return Double.MAX_VALUE
             }
             val confidence = 1.0 - det.detectionConfidence
@@ -98,25 +98,25 @@ class TrackerManager {
 
     @Synchronized
     fun draw(
-        canvas: Canvas,
-        context: Context?,
-        previewWidth: Int,
-        previewHeight: Int,
-        showOF: Boolean
+            canvas: Canvas,
+            context: Context?,
+            previewWidth: Int,
+            previewHeight: Int,
+            showOF: Boolean
     ) {
         // Build transform matrix from canvas and context
         val frameToCanvasTransform = Matrix()
         val scale = min(
-            canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
+                canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
         )
         frameToCanvasTransform.postScale(scale, scale)
-        if(bmpYellow == null) {
+        if (bmpYellow == null) {
             bmpYellow = context?.let { getBitmap(it, R.drawable.yellow_dot) }
         }
-        if(bmpGreen == null) {
+        if (bmpGreen == null) {
             bmpGreen = context?.let { getBitmap(it, R.drawable.check_icon) }
         }
-        if(bmpWhite == null) {
+        if (bmpWhite == null) {
             bmpWhite = context?.let { getBitmap(it, R.drawable.yellow_dashed_circle) }
         }
 
@@ -125,9 +125,7 @@ class TrackerManager {
             //Only draw tracker if not inactive
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
                 var bmp: Bitmap? = null
-                if (!displayDetection &&  tracker.status == Tracker.TrackerStatus.RED) {
-                    null
-                } else {
+                if (displayDetection || !(tracker.status == Tracker.TrackerStatus.RED || tracker.status == Tracker.TrackerStatus.LOADING)) {
                     bmp = if (tracker.status == Tracker.TrackerStatus.GREEN) {
                         if (!detectedWaste.contains(tracker)) {
                             detectedWaste.add(tracker)
@@ -135,7 +133,7 @@ class TrackerManager {
                         bmpGreen
                     } else {
                         if (tracker.status == Tracker.TrackerStatus.LOADING)
-                         bmpYellow
+                            bmpYellow
                         else
                             bmpWhite
                     }
@@ -143,7 +141,7 @@ class TrackerManager {
                 }
 
                 // Draw the speed line to show displacement of the tracker depending on camera motion
-                if(showOF) {
+                if (showOF) {
                     drawOF(canvas, tracker, frameToCanvasTransform)
                 }
 
@@ -152,7 +150,7 @@ class TrackerManager {
                     val bmpHeight = bmp.height.div(scale)
 
                     val point =
-                        floatArrayOf(trackedPos.x - bmpWidth / 2, trackedPos.y - bmpHeight / 2)
+                            floatArrayOf(trackedPos.x - bmpWidth / 2, trackedPos.y - bmpHeight / 2)
                     frameToCanvasTransform.mapPoints(point)
 
                     canvas.drawBitmap(bmp, point[0], point[1], null)
@@ -167,8 +165,8 @@ class TrackerManager {
                         val shouldShowBottomAnimation = trackedPos.y < canvas.height.div(scale) / 2
                         val animation = context?.let {
                             getBitmap(
-                                it,
-                                if (shouldShowBottomAnimation) R.drawable.animation_down else R.drawable.animation
+                                    it,
+                                    if (shouldShowBottomAnimation) R.drawable.animation_down else R.drawable.animation
                             )
                         } ?: return
 
@@ -176,15 +174,15 @@ class TrackerManager {
                         val animationHeight = animation.height.div(scale)
 
                         val animationPoint = floatArrayOf(
-                            trackedPos.x - (animationWidth / 2) + 3,
-                            if (shouldShowBottomAnimation) trackedPos.y + bmpHeight / 2 else trackedPos.y - bmpHeight / 2 - (animationHeight)
+                                trackedPos.x - (animationWidth / 2) + 3,
+                                if (shouldShowBottomAnimation) trackedPos.y + bmpHeight / 2 else trackedPos.y - bmpHeight / 2 - (animationHeight)
                         )
                         frameToCanvasTransform.mapPoints(animationPoint)
                         canvas.drawBitmap(
-                            animation,
-                            animationPoint[0],
-                            animationPoint[1],
-                            null
+                                animation,
+                                animationPoint[0],
+                                animationPoint[1],
+                                null
                         )
                     }
                 }
@@ -193,12 +191,12 @@ class TrackerManager {
         }
     }
 
-    private fun drawOF(canvas: Canvas, tracker: Tracker, transform:Matrix) {
+    private fun drawOF(canvas: Canvas, tracker: Tracker, transform: Matrix) {
         val speedLine = floatArrayOf(
-            tracker.position.x,
-            tracker.position.y,
-            tracker.position.x + tracker.speed.x,
-            tracker.position.y + tracker.speed.y
+                tracker.position.x,
+                tracker.position.y,
+                tracker.position.x + tracker.speed.x,
+                tracker.position.y + tracker.speed.y
         )
         transform.mapPoints(speedLine)
         val paintLine = Paint()
@@ -207,15 +205,15 @@ class TrackerManager {
         canvas.drawLines(speedLine, paintLine)
     }
 
-    private fun drawEllipses(canvas: Canvas, tracker: Tracker, transform:Matrix) {
+    private fun drawEllipses(canvas: Canvas, tracker: Tracker, transform: Matrix) {
         val paint = Paint()
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 4.0F
         paint.color = Color.BLUE
-        val dims = PointF((1.0F + tracker.speedCov.x * 0.0F)  * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL,
-            (1.0F + tracker.speedCov.y * 0.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
+        val dims = PointF((1.0F + tracker.speedCov.x * 0.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL,
+                (1.0F + tracker.speedCov.y * 0.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
         val rect = RectF(tracker.position.x - dims.x, tracker.position.y - dims.y,
-            tracker.position.x + dims.x, tracker.position.y + dims.y)
+                tracker.position.x + dims.x, tracker.position.y + dims.y)
         transform.mapRect(rect)
         canvas.drawOval(rect, paint)
     }
@@ -253,7 +251,7 @@ class TrackerManager {
 
         // Compute the average flow for debug purposes
         var avgMotionSpeed = PointF(0.0F, 0.0F)
-        if(listOfFlowLines.size > 0) {
+        if (listOfFlowLines.size > 0) {
             for (line in listOfFlowLines) {
                 avgMotionSpeed.x += (line[2] - line[0])
                 avgMotionSpeed.y += (line[3] - line[1])
@@ -262,7 +260,7 @@ class TrackerManager {
             avgMotionSpeed.y /= listOfFlowLines.size * flowRefreshRateInMillis / 1000.0F
         }
 
-        for(tracker in trackers) {
+        for (tracker in trackers) {
             var medianSpeed = calculateMedianFlowSpeedForTrack(tracker.position, listOfFlowLines, 6)
 
             // scale speed depending on optical flow refresh rate
@@ -271,7 +269,8 @@ class TrackerManager {
                 it.y /= flowRefreshRateInMillis / 1000.0F
             }*/
 
-            tracker.updateSpeed(medianSpeed?:avgMotionSpeed, ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
+            tracker.updateSpeed(medianSpeed
+                    ?: avgMotionSpeed, ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
 
         }
         return avgMotionSpeed
@@ -292,7 +291,7 @@ class TrackerManager {
     private fun getBitmap(vectorDrawable: VectorDrawable?): Bitmap? {
         vectorDrawable?.let {
             val bitmap = Bitmap.createBitmap(
-                it.intrinsicWidth, it.intrinsicHeight, Bitmap.Config.ARGB_8888
+                    it.intrinsicWidth, it.intrinsicHeight, Bitmap.Config.ARGB_8888
             )
             val canvas = Canvas(bitmap)
             it.setBounds(0, 0, canvas.width, canvas.height)
@@ -325,32 +324,32 @@ class TrackerManager {
             val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
             val iso8601DateString = iso8601Format.format(date)
             trashes.add(
-                TrackerTrash(
-                    date = iso8601DateString,
-                    lat = it.location?.latitude,
-                    lng = it.location?.longitude,
-                    name = "unknown"
-                )
+                    TrackerTrash(
+                            date = iso8601DateString,
+                            lat = it.location?.latitude,
+                            lng = it.location?.longitude,
+                            name = "unknown"
+                    )
             )
         }
 
         var result = TrackerResult(
-            move = null,
-            bank = null,
-            trackingMode = "automatic",
-            files = ArrayList(),
-            trashes = trashes,
-            positions = ArrayList(),
-            comment = "email : $email"
+                move = null,
+                bank = null,
+                trackingMode = "automatic",
+                files = ArrayList(),
+                trashes = trashes,
+                positions = ArrayList(),
+                comment = "email : $email"
         )
     }
 
     companion object {
         @JvmStatic
         fun calculateMedianFlowSpeedForTrack(
-            trackPoint: PointF,
-            opticalFlowData: ArrayList<FloatArray>,
-            k: Int
+                trackPoint: PointF,
+                opticalFlowData: ArrayList<FloatArray>,
+                k: Int
         ): PointF? {
             val kNearestOpticalFlowPoints = findKNearestOpticalFlowPoints(trackPoint, opticalFlowData, k)
 
@@ -364,14 +363,14 @@ class TrackerManager {
 
         @JvmStatic
         private fun findKNearestOpticalFlowPoints(
-            trackPoint: PointF,
-            opticalFlowData: ArrayList<FloatArray>,
-            k: Int
+                trackPoint: PointF,
+                opticalFlowData: ArrayList<FloatArray>,
+                k: Int
         ): List<PointF> {
             return opticalFlowData
-                .sortedBy { dist(it, trackPoint) }
-                .map { PointF(it[2]-it[0], it[3]-it[1]) }
-                .take(k)
+                    .sortedBy { dist(it, trackPoint) }
+                    .map { PointF(it[2] - it[0], it[3] - it[1]) }
+                    .take(k)
         }
 
         @JvmStatic
@@ -393,12 +392,14 @@ class TrackerManager {
 
             return PointF(medianFlowSpeedX.toFloat(), medianFlowSpeedY.toFloat())
         }
+
         @JvmStatic
-        private fun dist(p1: FloatArray, p2:PointF): Float {
+        private fun dist(p1: FloatArray, p2: PointF): Float {
             return kotlin.math.sqrt((p1[0] - p2.x) * (p1[0] - p2.x) + (p1[1] - p2.y) * (p1[1] - p2.y))
         }
+
         @JvmStatic
-        private fun dist(p1: PointF, p2:PointF): Float {
+        private fun dist(p1: PointF, p2: PointF): Float {
             return kotlin.math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
         }
 
