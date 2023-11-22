@@ -117,7 +117,7 @@ class TrackerManager {
             bmpGreen = context?.let { getBitmap(it, R.drawable.check_icon) }
         }
         if(bmpWhite == null) {
-            bmpWhite = context?.let { getBitmap(it, R.drawable.white_dot) }
+            bmpWhite = context?.let { getBitmap(it, R.drawable.yellow_dashed_circle) }
         }
 
         for (tracker in trackers) {
