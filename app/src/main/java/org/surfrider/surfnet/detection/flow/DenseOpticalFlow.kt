@@ -10,7 +10,7 @@ class DenseOpticalFlow {
     private var prevPts = MatOfPoint2f()
     private var currPts = MatOfPoint2f()
     private val maxCorners = 50
-    private val minDistance = 40.0
+    private val minDistance = 80.0
     private var flowPtsCount = 50
     private var status = MatOfByte()
     private var err = MatOfFloat()
