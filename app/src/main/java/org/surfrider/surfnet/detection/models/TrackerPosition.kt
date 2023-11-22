@@ -1,4 +1,4 @@
-package org.surfrider.surfnet.detection.model
+package org.surfrider.surfnet.detection.models
 
 import com.google.gson.annotations.SerializedName
 

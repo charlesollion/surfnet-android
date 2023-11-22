@@ -1,6 +1,9 @@
 package org.surfrider.surfnet.detection.env
 
+import android.graphics.PointF
 import android.graphics.RectF
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 object MathUtils {
 
@@ -80,6 +83,16 @@ object MathUtils {
 
         // Calculate IoU
         return intersectionArea / (areaRect1 + areaRect2 - intersectionArea)
+    }
+
+    fun malDist(p1: PointF, p2: PointF, dx: PointF): Float {
+        val diffX = p1.x - p2.x
+        val diffY = p1.y - p2.y
+        val mahalanobisDistanceX = (diffX / (1.0F + dx.x)).pow(2)
+        val mahalanobisDistanceY = (diffY / (1.0F + dx.y)).pow(2)
+
+        // Calculate the Mahalanobis distance by summing the squared components
+        return sqrt(mahalanobisDistanceX + mahalanobisDistanceY)
     }
 
 }
