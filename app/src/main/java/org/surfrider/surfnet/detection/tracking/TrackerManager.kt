@@ -9,8 +9,10 @@ import androidx.core.content.ContextCompat
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.R
+import org.surfrider.surfnet.detection.env.JsonFileWriter
 import org.surfrider.surfnet.detection.env.MathUtils.calculateIoU
 import org.surfrider.surfnet.detection.env.MathUtils.solveLinearSumAssignment
+import org.surfrider.surfnet.detection.models.TrackerPosition
 import org.surfrider.surfnet.detection.models.TrackerResult
 import org.surfrider.surfnet.detection.models.TrackerTrash
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
@@ -333,34 +335,34 @@ class TrackerManager {
             if (it.isValid()) {
                 val date = Date(it.startDate)
                 val iso8601Format =
-                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+                        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
                 val iso8601DateString = iso8601Format.format(date)
                 trashes.add(
-                    TrackerTrash(
-                            date = iso8601DateString,
-                            lat = it.location?.latitude,
-                            lng = it.location?.longitude,
-                            name = "unknown"
-                    )
+                        TrackerTrash(
+                                date = iso8601DateString,
+                                lat = it.location?.latitude,
+                                lng = it.location?.longitude,
+                                name = "unknown"
+                        )
+                )
+            }
+
+            val result = TrackerResult(
+                    move = null,
+                    bank = null,
+                    trackingMode = "automatic",
+                    files = ArrayList(),
+                    trashes = trashes,
+                    positions = positions,
+                    comment = "email : $email"
             )
+            val actualDate = Calendar.getInstance().time
+            val saveFileDateFormat = SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault())
+            val saveFileDateString = saveFileDateFormat.format(actualDate)
+            //Save JSON file to "Downloads" folder
+            JsonFileWriter.writeResultToJsonFile(context, result, saveFileDateString)
         }
-
-        val result = TrackerResult(
-            move = null,
-            bank = null,
-            trackingMode = "automatic",
-            files = ArrayList(),
-            trashes = trashes,
-            positions = positions,
-            comment = "email : $email"
-        )
-        val actualDate = Calendar.getInstance().time
-        val saveFileDateFormat = SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault())
-        val saveFileDateString = saveFileDateFormat.format(actualDate)
-        //Save JSON file to "Downloads" folder
-        JsonFileWriter.writeResultToJsonFile(context, result, saveFileDateString)
     }
-
     companion object {
         @JvmStatic
         fun calculateMedianFlowSpeedForTrack(
@@ -425,5 +427,4 @@ class TrackerManager {
         private const val W_CLASS = 0.1
         private const val W_TRACKER_STRENGTH = 0.1
     }
-
 }

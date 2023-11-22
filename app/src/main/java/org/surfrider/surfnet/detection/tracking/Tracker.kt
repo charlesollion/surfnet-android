@@ -3,6 +3,7 @@ package org.surfrider.surfnet.detection.tracking
 import android.graphics.PointF
 import android.graphics.RectF
 import android.location.Location
+import org.surfrider.surfnet.detection.env.MathUtils.malDist
 import org.surfrider.surfnet.detection.tflite.Detector
 import java.util.*
 import kotlin.math.abs
@@ -11,15 +12,14 @@ import kotlin.math.sqrt
 import kotlin.math.min
 
 class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
-
     var index = idx
     var location: Location? = lctn
-    var status : TrackerStatus = TrackerStatus.RED
+    var status: TrackerStatus = TrackerStatus.RED
     var animation = false
     var alreadyAssociated = false
 
     private var lastUpdatedTimestamp: Long = 0
-    private var animationTimeStamp : Long? = null
+    private var animationTimeStamp: Long? = null
 
     private val firstDetection = det
     val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
@@ -34,14 +34,18 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         trackedObjects.addLast(firstDetection)
     }
 
-    fun distTo(newPos: PointF): Float {
-        val diffX = position.x - newPos.x
-        val diffY = position.y - newPos.y
-        val mahalanobisDistanceX = (diffX / (1.0F + speedCov.x)).pow(2)
-        val mahalanobisDistanceY = (diffY / (1.0F + speedCov.y)).pow(2)
+    fun computeMajorityClass(): String? {
+        return trackedObjects.groupBy { it.classId }
+                .maxByOrNull { it.value.size }?.key
+    }
 
-        // Calculate the Mahalanobis distance by summing the squared components
-        return sqrt(mahalanobisDistanceX + mahalanobisDistanceY)
+    fun distTo(newPos: PointF): Float {
+        // Computes an adjusted distance between a point and a newPos.
+        // Also anticipates the movement with speed, and computes the minimum of both distances
+        val distance = malDist(position, newPos, speedCov)
+        val anticipatedPosition = PointF(position.x+speed.x, position.y + speed.y)
+        val anticipatedDistance = malDist(anticipatedPosition, newPos, speedCov)
+        return min(distance, anticipatedDistance)
     }
 
     fun addDetection(newDet: TrackedDetection) {
@@ -75,10 +79,11 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         val speedYSquared = speed.y * speed.y / (scale * scale)
 
         // Update the estimated covariance using EMA
-        speedCov.x = COVARIANCE_SMOOTHING_FACTOR * speedCov.x + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedXSquared
-        speedCov.y = COVARIANCE_SMOOTHING_FACTOR * speedCov.y + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedYSquared
+        speedCov.x =
+                COVARIANCE_SMOOTHING_FACTOR * speedCov.x + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedXSquared
+        speedCov.y =
+                COVARIANCE_SMOOTHING_FACTOR * speedCov.y + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedYSquared
     }
-
 
     fun update() {
         alreadyAssociated = false
@@ -88,8 +93,9 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         // Timber.i("AGE +> ${age.toString()} | MAX TIMESTAMP +> $MAX_TIMESTAMP")
 
         val ageOfAnimation = animationTimeStamp?.let {
-            timeDiffInMilli(currTimeStamp,
-                it
+            timeDiffInMilli(
+                    currTimeStamp,
+                    it
             )
         }
         if (ageOfAnimation != null) {
@@ -99,7 +105,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         }
 
         // Green last twice as long as red
-        if((status == TrackerStatus.RED && age > MAX_TIMESTAMP) || (status == TrackerStatus.GREEN && age > MAX_TIMESTAMP * 2)) {
+        if ((status == TrackerStatus.RED && age > MAX_TIMESTAMP) || (status == TrackerStatus.GREEN && age > MAX_TIMESTAMP * 2)) {
             status = TrackerStatus.INACTIVE
         }
 
@@ -110,18 +116,21 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         return abs(timestamp1 - timestamp2)
     }
 
+    fun isValid(): Boolean {
+        return status == TrackerStatus.GREEN
+    }
+
     class TrackedDetection(det: Detector.Recognition) {
         var rect: RectF = RectF(det.location)
         var detectionConfidence: Float = det.confidence
         var timestamp: Long = System.currentTimeMillis()
-        var classId: String = det.id
+        var classId: String = det.title
         var associatedId = -1
 
         fun getCenter(): PointF {
             return PointF(rect.centerX(), rect.centerY())
         }
     }
-
     enum class TrackerStatus {
         GREEN, RED, INACTIVE, LOADING
     }
