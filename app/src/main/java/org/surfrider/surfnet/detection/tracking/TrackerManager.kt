@@ -249,6 +249,17 @@ class TrackerManager {
                 }
             }
         }
+
+        // Add a central region always available for tracking
+        val centerH = height / downScale / 2
+        val centerW = width / downScale / 2
+        val centerSquareSize = 40
+        for (i in -centerSquareSize / 2..centerSquareSize / 2) {
+            for (j in -centerSquareSize / 2..centerSquareSize / 2) {
+                currRois.put(centerH + i, centerW + j, byteArrayOf(1))
+            }
+        }
+
         return currRois
     }
 
