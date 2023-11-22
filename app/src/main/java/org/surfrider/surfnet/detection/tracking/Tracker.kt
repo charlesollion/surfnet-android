@@ -6,11 +6,8 @@ import android.location.Location
 import org.surfrider.surfnet.detection.env.MathUtils.malDist
 import org.surfrider.surfnet.detection.tflite.Detector
 import java.util.*
-import kotlin.jvm.internal.Intrinsics.Kotlin
 import kotlin.math.abs
 import kotlin.math.min
-import kotlin.math.pow
-import kotlin.math.sqrt
 
 class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
@@ -136,11 +133,6 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     }
 
     companion object {
-        @JvmStatic
-        private fun dist(p1: PointF, p2: PointF): Float {
-            return kotlin.math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
-        }
-
         private const val MAX_TIMESTAMP = 2000
         private const val MAX_ANIMATION_TIMESTAMP = 1000
         private const val NUM_CONSECUTIVE_DET = 5
