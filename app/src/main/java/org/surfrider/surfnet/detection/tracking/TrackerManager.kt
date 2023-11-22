@@ -14,7 +14,6 @@ import org.surfrider.surfnet.detection.env.MathUtils.solveLinearSumAssignment
 import org.surfrider.surfnet.detection.models.TrackerResult
 import org.surfrider.surfnet.detection.models.TrackerTrash
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
-import timber.log.Timber
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
@@ -24,6 +23,7 @@ class TrackerManager {
 
     val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
+    val positions: ArrayList<TrackerPosition> = ArrayList()
 
     var displayDetection = true
 
@@ -35,6 +35,15 @@ class TrackerManager {
 
     fun updateTrackers() {
         trackers.forEach { tracker -> tracker.update() }
+    }
+
+    fun addPosition(location: Location?, date: String) {
+        location?.let {
+            val position =
+                TrackerPosition(lat = it.latitude, lng = it.longitude, date = date)
+
+            positions.add(position)
+        }
     }
 
     @Synchronized
@@ -88,7 +97,8 @@ class TrackerManager {
             val iou = 1.0 - calculateIoU(det.rect, tracker.trackedObjects.last.rect)
             val classMatch = if (det.classId == tracker.trackedObjects.last.classId) 0.0 else 1.0
             val strength = 1.0 - tracker.strength
-            val cost = W_DIST * dist + W_CONF * confidence + W_IOU * iou + W_CLASS * classMatch + W_TRACKER_STRENGTH * strength
+            val cost =
+                W_DIST * dist + W_CONF * confidence + W_IOU * iou + W_CLASS * classMatch + W_TRACKER_STRENGTH * strength
             // Timber.i("${tracker.index}/${det.rect}:$cost --- dist:${dist} confidence:${confidence} iou:$iou classmatch:$classMatch strength:${strength}")
             return cost
 
@@ -236,7 +246,7 @@ class TrackerManager {
                         val x = xCenter + i
                         val y = yCenter + j
 
-                        if (x >= 0 && x < width && y >= 0 && y < height) {
+                        if (x in 0..<width && y >= 0 && y < height) {
                             currRois.put(y, x, byteArrayOf(1))
                         }
                     }
@@ -250,7 +260,7 @@ class TrackerManager {
         // Associate each tracker with flow speed
 
         // Compute the average flow for debug purposes
-        var avgMotionSpeed = PointF(0.0F, 0.0F)
+        val avgMotionSpeed = PointF(0.0F, 0.0F)
         if (listOfFlowLines.size > 0) {
             for (line in listOfFlowLines) {
                 avgMotionSpeed.x += (line[2] - line[0])
@@ -261,7 +271,7 @@ class TrackerManager {
         }
 
         for (tracker in trackers) {
-            var medianSpeed = calculateMedianFlowSpeedForTrack(tracker.position, listOfFlowLines, 6)
+            val medianSpeed = calculateMedianFlowSpeedForTrack(tracker.position, listOfFlowLines, 6)
 
             // scale speed depending on optical flow refresh rate
             /*medianSpeed?.let {
@@ -317,13 +327,15 @@ class TrackerManager {
         }
     }
 
-    fun sendData(email: String) {
-        var trashes = ArrayList<TrackerTrash>()
+    fun sendData(context: Context, email: String?) {
+        val trashes = ArrayList<TrackerTrash>()
         trackers.forEach {
-            val date = Date(it.startDate)
-            val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'")
-            val iso8601DateString = iso8601Format.format(date)
-            trashes.add(
+            if (it.isValid()) {
+                val date = Date(it.startDate)
+                val iso8601Format =
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+                val iso8601DateString = iso8601Format.format(date)
+                trashes.add(
                     TrackerTrash(
                             date = iso8601DateString,
                             lat = it.location?.latitude,
@@ -333,15 +345,20 @@ class TrackerManager {
             )
         }
 
-        var result = TrackerResult(
-                move = null,
-                bank = null,
-                trackingMode = "automatic",
-                files = ArrayList(),
-                trashes = trashes,
-                positions = ArrayList(),
-                comment = "email : $email"
+        val result = TrackerResult(
+            move = null,
+            bank = null,
+            trackingMode = "automatic",
+            files = ArrayList(),
+            trashes = trashes,
+            positions = positions,
+            comment = "email : $email"
         )
+        val actualDate = Calendar.getInstance().time
+        val saveFileDateFormat = SimpleDateFormat("yyyyMMddHHmmss", Locale.getDefault())
+        val saveFileDateString = saveFileDateFormat.format(actualDate)
+        //Save JSON file to "Downloads" folder
+        JsonFileWriter.writeResultToJsonFile(context, result, saveFileDateString)
     }
 
     companion object {
@@ -396,11 +413,6 @@ class TrackerManager {
         @JvmStatic
         private fun dist(p1: FloatArray, p2: PointF): Float {
             return kotlin.math.sqrt((p1[0] - p2.x) * (p1[0] - p2.x) + (p1[1] - p2.y) * (p1[1] - p2.y))
-        }
-
-        @JvmStatic
-        private fun dist(p1: PointF, p2: PointF): Float {
-            return kotlin.math.sqrt((p1.x - p2.x) * (p1.x - p2.x) + (p1.y - p2.y) * (p1.y - p2.y))
         }
 
         private const val SCREEN_DIAGONAL = 960.0F // sqrt(720x1280)
