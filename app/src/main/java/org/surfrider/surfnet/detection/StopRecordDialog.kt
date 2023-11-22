@@ -1,6 +1,7 @@
 package org.surfrider.surfnet.detection
 
 import android.content.Context
+import android.location.Location
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -10,8 +11,6 @@ import org.surfrider.surfnet.detection.databinding.FragmentStopRecordDialogBindi
 import org.surfrider.surfnet.detection.tracking.TrackerManager
 
 class StopRecordDialog(
-    private var wasteCount: Int,
-    private var metersTravelled: Float,
     private var trackerManager: TrackerManager
 ) : DialogFragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -42,7 +41,27 @@ class StopRecordDialog(
                     sharedPreference?.getString("email", "null")
                 )
             }
-            val sendDataDialog = SendDataDialog(wasteCount, metersTravelled)
+            //Calculate the distance the user made
+            var distance = 0F
+            if (trackerManager.positions.size >= 2) {
+                for (i in 0 until trackerManager.positions.size - 1) {
+                    val results = FloatArray(1)
+                    Location.distanceBetween(
+                        trackerManager.positions[i].lat,
+                        trackerManager.positions[i].lng,
+                        trackerManager.positions[i + 1].lat,
+                        trackerManager.positions[i + 1].lng,
+                        results
+                    )
+                    distance += results[0]
+                }
+            }
+
+            val sendDataDialog =
+                SentDataDialog(
+                    wasteCount = trackerManager.detectedWaste.size,
+                    metersTravelled = distance
+                )
             sendDataDialog.show(parentFragmentManager, "send_data_dialog")
             dismiss() // Close the dialog
         }
