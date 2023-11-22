@@ -41,17 +41,27 @@ class StopRecordDialog(
                     sharedPreference?.getString("email", "null")
                 )
             }
-            val results = FloatArray(1)
-            Location.distanceBetween(
-                trackerManager.positions.first().lat,
-                trackerManager.positions.first().lng,
-                trackerManager.positions.last().lat,
-                trackerManager.positions.last().lng,
-                results
-            )
+            //Calculate the distance the user made
+            var distance = 0F
+            if (trackerManager.positions.size >= 2) {
+                for (i in 0 until trackerManager.positions.size - 1) {
+                    val results = FloatArray(1)
+                    Location.distanceBetween(
+                        trackerManager.positions[i].lat,
+                        trackerManager.positions[i].lng,
+                        trackerManager.positions[i + 1].lat,
+                        trackerManager.positions[i + 1].lng,
+                        results
+                    )
+                    distance += results[0]
+                }
+            }
 
             val sendDataDialog =
-                SentDataDialog(wasteCount = trackerManager.detectedWaste.size, metersTravelled = results[0])
+                SentDataDialog(
+                    wasteCount = trackerManager.detectedWaste.size,
+                    metersTravelled = distance
+                )
             sendDataDialog.show(parentFragmentManager, "send_data_dialog")
             dismiss() // Close the dialog
         }
