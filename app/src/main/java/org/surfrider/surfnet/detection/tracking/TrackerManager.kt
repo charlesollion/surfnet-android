@@ -140,9 +140,9 @@ class TrackerManager {
                         bmpGreen
                     } else {
                         if (tracker.status == Tracker.TrackerStatus.LOADING)
-                        bmpWhite
+                         bmpYellow
                         else
-                            bmpYellow
+                            bmpWhite
                     }
 
                 }
