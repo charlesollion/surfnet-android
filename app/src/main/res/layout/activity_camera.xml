@@ -101,6 +101,23 @@
                 </TableRow>
             </TableLayout>
 
+            <RelativeLayout
+                android:id="@+id/loadingPanel"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="invisible"
+                android:gravity="center"
+                tools:visibility="visible">
+
+                <ProgressBar
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:indeterminateTintMode="src_atop"
+                    android:indeterminateTint="@color/loader_dark"
+                    android:indeterminate="true"
+                    />
+            </RelativeLayout>
+
             <Button
                 android:id="@+id/close_button"
                 android:layout_width="35dp"
@@ -111,6 +128,8 @@
                 app:layout_constraintEnd_toEndOf="parent"
                 android:background="@drawable/close_button">
             </Button>
+
+
 
 
 

@@ -236,6 +236,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         val context = this
         try {
             //create detector only one time
+            binding.loadingPanel.visibility = View.VISIBLE
             detector = detector ?: YoloDetector.create(
                 assets,
                 MODEL_STRING,
@@ -247,6 +248,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             )
             detector?.useGpu()
             detector?.setNumThreads(NUM_THREADS)
+            binding.loadingPanel.visibility = View.INVISIBLE
             detectorPaused = false
         } catch (e: IOException) {
             e.printStackTrace()
