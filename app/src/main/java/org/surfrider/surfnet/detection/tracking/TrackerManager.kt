@@ -23,7 +23,7 @@ import kotlin.math.min
 
 class TrackerManager {
 
-    val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
+    private val trackers: LinkedList<Tracker> = LinkedList<Tracker>()
     val detectedWaste: LinkedList<Tracker> = LinkedList<Tracker>()
     val positions: ArrayList<TrackerPosition> = ArrayList()
 
@@ -99,11 +99,8 @@ class TrackerManager {
             val iou = 1.0 - calculateIoU(det.rect, tracker.trackedObjects.last.rect)
             val classMatch = if (det.classId == tracker.trackedObjects.last.classId) 0.0 else 1.0
             val strength = 1.0 - tracker.strength
-            val cost =
-                W_DIST * dist + W_CONF * confidence + W_IOU * iou + W_CLASS * classMatch + W_TRACKER_STRENGTH * strength
+            return W_DIST * dist + W_CONF * confidence + W_IOU * iou + W_CLASS * classMatch + W_TRACKER_STRENGTH * strength
             // Timber.i("${tracker.index}/${det.rect}:$cost --- dist:${dist} confidence:${confidence} iou:$iou classmatch:$classMatch strength:${strength}")
-            return cost
-
         }
         return Double.MAX_VALUE
     }
@@ -217,18 +214,18 @@ class TrackerManager {
         canvas.drawLines(speedLine, paintLine)
     }
 
-    private fun drawEllipses(canvas: Canvas, tracker: Tracker, transform: Matrix) {
-        val paint = Paint()
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 4.0F
-        paint.color = Color.BLUE
-        val dims = PointF((1.0F + tracker.speedCov.x * 0.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL,
-                (1.0F + tracker.speedCov.y * 0.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
-        val rect = RectF(tracker.position.x - dims.x, tracker.position.y - dims.y,
-                tracker.position.x + dims.x, tracker.position.y + dims.y)
-        transform.mapRect(rect)
-        canvas.drawOval(rect, paint)
-    }
+//    private fun drawEllipses(canvas: Canvas, tracker: Tracker, transform: Matrix) {
+//        val paint = Paint()
+//        paint.style = Paint.Style.STROKE
+//        paint.strokeWidth = 4.0F
+//        paint.color = Color.BLUE
+//        val dims = PointF((1.0F + tracker.speedCov.x * 0.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL,
+//                (1.0F + tracker.speedCov.y * 0.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
+//        val rect = RectF(tracker.position.x - dims.x, tracker.position.y - dims.y,
+//                tracker.position.x + dims.x, tracker.position.y + dims.y)
+//        transform.mapRect(rect)
+//        canvas.drawOval(rect, paint)
+//    }
 
     fun getCurrentRois(width: Int, height: Int, downScale: Int, squareSize: Int): Mat? {
         // Get regions of interest within the frame: areas around each tracker
