@@ -5,37 +5,31 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.util.Log;
 
 import java.util.concurrent.Semaphore;
+
+import timber.log.Timber;
 
 public class IMU_estimator implements SensorEventListener {
 
 
-    private SensorManager sensorManager;
-    private Sensor accelerometer;
-    private Sensor gyroscope;
-    private Sensor magnetometer;
-
-
     private float[] gravity = new float[3];
     private float[] magnitude = new float[3];
-    private float[] linearAcceleration = new float[3];
-    private float[] rotationVector = new float[3];
+    private final float[] linearAcceleration = new float[3];
     private float[] angularVelocity = new float[3];
-    private float[] velocity = new float[3];
-    private float[] position = new float[3];
+    private final float[] velocity = new float[3];
+    private final float[] position = new float[3];
     private long lastUpdateTime;
-    private Semaphore semaphore;
+    private final Semaphore semaphore;
 
-    public IMU_estimator(Context context){
+    public IMU_estimator(Context context) {
         // Get a reference to the SensorManager
-        sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
+        SensorManager sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
 
         // Get references to the accelerometer and gyroscope sensors
-        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-        gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        Sensor magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        Sensor gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
 
         // Register this class as a listener for the sensors
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_FASTEST);
@@ -60,18 +54,12 @@ public class IMU_estimator implements SensorEventListener {
 
         // Handle the sensor data
         switch (event.sensor.getType()) {
-            case Sensor.TYPE_ACCELEROMETER:
+            case Sensor.TYPE_ACCELEROMETER ->
                 // Save the gravity vector
-                gravity = event.values.clone();
-                break;
-            case Sensor.TYPE_GYROSCOPE:
-                // Save the rotation vector and angular velocity
-                rotationVector = event.values.clone();
-                angularVelocity = event.values.clone();
-                break;
-            case Sensor.TYPE_MAGNETIC_FIELD:
-                magnitude = event.values.clone();
-                break;
+                    gravity = event.values.clone();
+            case Sensor.TYPE_GYROSCOPE -> // Save the rotation vector and angular velocity
+                    angularVelocity = event.values.clone();
+            case Sensor.TYPE_MAGNETIC_FIELD -> magnitude = event.values.clone();
         }
         // Calculate the linear acceleration by subtracting the gravity vector
         // from the accelerometer readings
@@ -106,14 +94,13 @@ public class IMU_estimator implements SensorEventListener {
             position[1] += velocity[1] * deltaTime;
             position[2] += velocity[2] * deltaTime;
             semaphore.release();
-        }
-        catch (Exception e){
-            Log.e("IMU", "Failed to acquire semaphore");
+        } catch (Exception e) {
+            Timber.tag("IMU").e("Failed to acquire semaphore");
         }
     }
 
-    private void convertToDegrees(float[] vector){
-        for (int i = 0; i < vector.length; i++){
+    private void convertToDegrees(float[] vector) {
+        for (int i = 0; i < vector.length; i++) {
             vector[i] = Math.round(Math.toDegrees(vector[i]));
         }
     }
@@ -131,18 +118,13 @@ public class IMU_estimator implements SensorEventListener {
     public float[] getPosition() {
         // Return the current position estimate
         float[] output = new float[3];
-        try{
+        try {
             semaphore.acquire();
             output = position.clone();
             semaphore.release();
-        }catch (Exception e){
-            Log.e("IMU", "Failed to acquire semaphore");
+        } catch (Exception e) {
+            Timber.tag("IMU").e("Failed to acquire semaphore");
         }
         return output;
-    }
-
-    public void stop() {
-        // Unregister this class as a listener for the sensors
-        sensorManager.unregisterListener(this);
     }
 }
