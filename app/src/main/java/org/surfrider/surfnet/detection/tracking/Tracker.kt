@@ -7,8 +7,6 @@ import org.surfrider.surfnet.detection.env.MathUtils.malDist
 import org.surfrider.surfnet.detection.tflite.Detector
 import java.util.*
 import kotlin.math.abs
-import kotlin.math.pow
-import kotlin.math.sqrt
 import kotlin.math.min
 
 class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
@@ -17,6 +15,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     var status: TrackerStatus = TrackerStatus.RED
     var animation = false
     var alreadyAssociated = false
+    private var justUpdated = true
 
     private var lastUpdatedTimestamp: Long = 0
     private var animationTimeStamp: Long? = null
@@ -56,6 +55,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
             strength = 1.0F
         }
         alreadyAssociated = true
+        justUpdated = true
 
         if(trackedObjects.size > NUM_CONSECUTIVE_DET && (status == TrackerStatus.RED || status == TrackerStatus.LOADING)) {
             status = TrackerStatus.GREEN
@@ -69,11 +69,14 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     }
 
     fun updateSpeed(measuredSpeed: PointF, scale: Float) {
-        // Move tracker directly
-        position.x += measuredSpeed.x
-        position.y += measuredSpeed.y
-        speed = measuredSpeed
-
+        // Move tracker directly unless it was just updated with a new detection
+        if(!justUpdated) {
+            position.x += measuredSpeed.x
+            position.y += measuredSpeed.y
+            speed = measuredSpeed
+        } else {
+            justUpdated = false
+        }
         // Calculate the squared speed components
         val speedXSquared = speed.x * speed.x / (scale * scale)
         val speedYSquared = speed.y * speed.y / (scale * scale)
