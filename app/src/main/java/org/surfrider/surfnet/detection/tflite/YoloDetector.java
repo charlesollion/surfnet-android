@@ -18,11 +18,13 @@ package org.surfrider.surfnet.detection.tflite;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.RectF;
+import android.os.Build;
 
 import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.Tensor;
 import org.surfrider.surfnet.detection.env.Utils;
 import org.tensorflow.lite.gpu.GpuDelegate;
+import org.tensorflow.lite.nnapi.NnApiDelegate;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -33,6 +35,7 @@ import java.nio.ByteOrder;
 import java.nio.MappedByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.PriorityQueue;
@@ -43,12 +46,12 @@ import timber.log.Timber;
 
 /**
  * Wrapper for frozen detection models trained using the Tensorflow Object Detection API:
- * - <a href="https://github.com/tensorflow/models/tree/master/research/object_detection">https://github.com/tensorflow/models/tree/master/research/object_detection</a>
+ * - https://github.com/tensorflow/models/tree/master/research/object_detection
  * where you can find the training code.
  * <p>
  * To use pretrained models in the API or convert to TF Lite models, please see docs for details:
- * - <a href="https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md">https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md</a>
- * - <a href="https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/running_on_mobile_tensorflowlite.md#running-our-model-on-android">https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/running_on_mobile_tensorflowlite.md#running-our-model-on-android</a>
+ * - https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md
+ * - https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/running_on_mobile_tensorflowlite.md#running-our-model-on-android
  */
 public class YoloDetector implements Detector {
 
@@ -85,6 +88,27 @@ public class YoloDetector implements Detector {
             Interpreter.Options options = (new Interpreter.Options());
 
             options.setNumThreads(NUM_THREADS);
+            if (isNNAPI) {
+                d.nnapiDelegate = null;
+                // Initialize interpreter with NNAPI delegate for Android Pie or above
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    d.nnapiDelegate = new NnApiDelegate();
+                    options.addDelegate(d.nnapiDelegate);
+                    options.setNumThreads(NUM_THREADS);
+//                    options.setUseNNAPI(false);
+//                    options.setAllowFp16PrecisionForFp32(true);
+//                    options.setAllowBufferHandleOutput(true);
+                    options.setUseNNAPI(true);
+                }
+            }
+            if (isGPU) {
+                GpuDelegate.Options gpu_options = new GpuDelegate.Options();
+                gpu_options.setPrecisionLossAllowed(true); // It seems that the default is true
+                gpu_options.setQuantizedModelsAllowed(false);
+                gpu_options.setInferencePreference(GpuDelegate.Options.INFERENCE_PREFERENCE_SUSTAINED_SPEED);
+                d.gpuDelegate = new GpuDelegate(gpu_options);
+                options.addDelegate(d.gpuDelegate);
+            }
             d.tfliteModel = Utils.loadModelFile(assetManager, modelFilename);
             d.tfLite = new Interpreter(d.tfliteModel, options);
         } catch (Exception e) {
@@ -102,26 +126,29 @@ public class YoloDetector implements Detector {
             numBytesPerChannel = 4; // Floating point
         }
         d.INPUT_SIZE = inputSize;
-        d.imgData = ByteBuffer.allocateDirect(d.INPUT_SIZE * d.INPUT_SIZE * 3 * numBytesPerChannel);
+        d.imgData = ByteBuffer.allocateDirect(1 * d.INPUT_SIZE * d.INPUT_SIZE * 3 * numBytesPerChannel);
         d.imgData.order(ByteOrder.nativeOrder());
+        d.intValues = new int[d.INPUT_SIZE * d.INPUT_SIZE];
 
-        double calculation = Math.pow((inputSize / 32d), 2) + Math.pow((inputSize / 16d), 2) + Math.pow((inputSize / 8d), 2);
         if(!isV8) {
             // yolov5 case (20² + 40² + 80²)*3 = 25200
-            d.output_box = (int) (calculation * 3);
+            d.output_box = (int) ((Math.pow((inputSize / 32), 2) + Math.pow((inputSize / 16), 2) + Math.pow((inputSize / 8), 2)) * 3);
         } else {
             // yolov8 case (20² + 40² + 80²) = 8400
-            d.output_box = (int) calculation;
+            d.output_box = (int) (Math.pow((inputSize / 32), 2) + Math.pow((inputSize / 16), 2) + Math.pow((inputSize / 8), 2));
         }
         if (d.isModelQuantized){
+            Tensor inpten = d.tfLite.getInputTensor(0);
+            d.inp_scale = inpten.quantizationParams().getScale();
+            d.inp_zero_point = inpten.quantizationParams().getZeroPoint();
             Tensor oupten = d.tfLite.getOutputTensor(0);
             d.oup_scale = oupten.quantizationParams().getScale();
             d.oup_zero_point = oupten.quantizationParams().getZeroPoint();
         }
 
         int[] shape = d.tfLite.getOutputTensor(0).shape();
-        Timber.i("out shape ==== %s", Arrays.toString(shape));
-        int numClass;
+        Timber.i("out shape ==== "+Arrays.toString(shape));
+        int numClass = 0;
         if(!isV8) {
             // yolov5 case: (1, num_anchors, num_class+5)
             numClass = shape[shape.length - 1] - 5;
@@ -140,7 +167,6 @@ public class YoloDetector implements Detector {
     public int getInputSize() {
         return INPUT_SIZE;
     }
-
     public void setNumThreads(int num_threads) {
     }
 
@@ -163,13 +189,30 @@ public class YoloDetector implements Detector {
         recreateInterpreter();
     }
 
+    public void useNNAPI() {
+        nnapiDelegate = new NnApiDelegate();
+        tfliteOptions.addDelegate(nnapiDelegate);
+        recreateInterpreter();
+    }
+
+    // Float model
+    private final float IMAGE_MEAN = 0;
+
+    private final float IMAGE_STD = 255.0f;
+
     //config yolo
     private int INPUT_SIZE = -1;
 
     private  int output_box;
 
+    private static final float[] XYSCALE = new float[]{1.2f, 1.1f, 1.05f};
+
+    private static final int NUM_BOXES_PER_BLOCK = 3;
+
     // Number of threads in the java app
     private static final int NUM_THREADS = 1;
+    private static boolean isNNAPI = false;
+    private static boolean isGPU = false;
 
     private boolean isModelQuantized;
 
@@ -179,6 +222,8 @@ public class YoloDetector implements Detector {
 
     /** holds a gpu delegate */
     GpuDelegate gpuDelegate = null;
+    /** holds an nnapi delegate */
+    NnApiDelegate nnapiDelegate = null;
 
     /** The loaded TensorFlow Lite model. */
     private MappedByteBuffer tfliteModel;
@@ -189,11 +234,15 @@ public class YoloDetector implements Detector {
     // Config values.
 
     // Pre-allocated buffers.
-    private final Vector<String> labels = new Vector<>();
+    private Vector<String> labels = new Vector<String>();
+    private int[] intValues;
+
     private ByteBuffer imgData;
     private ByteBuffer outData;
 
     private Interpreter tfLite;
+    private float inp_scale;
+    private int inp_zero_point;
     private float oup_scale;
     private int oup_zero_point;
     private int numClass;
@@ -202,16 +251,19 @@ public class YoloDetector implements Detector {
 
     //non maximum suppression
     protected ArrayList<Recognition> nms(ArrayList<Recognition> list) {
-        ArrayList<Recognition> nmsList = new ArrayList<>();
+        ArrayList<Recognition> nmsList = new ArrayList<Recognition>();
 
         for (int k = 0; k < labels.size(); k++) {
             //1.find max confidence per class
             PriorityQueue<Recognition> pq =
-                    new PriorityQueue<>(
+                    new PriorityQueue<Recognition>(
                             50,
-                            (lhs, rhs) -> {
-                                // Intentionally reversed to put high confidence at the head of the queue.
-                                return Float.compare(rhs.getConfidence(), lhs.getConfidence());
+                            new Comparator<Recognition>() {
+                                @Override
+                                public int compare(final Recognition lhs, final Recognition rhs) {
+                                    // Intentionally reversed to put high confidence at the head of the queue.
+                                    return Float.compare(rhs.getConfidence(), lhs.getConfidence());
+                                }
                             });
 
             for (int i = 0; i < list.size(); ++i) {
@@ -253,24 +305,59 @@ public class YoloDetector implements Detector {
         float h = overlap((a.top + a.bottom) / 2, a.bottom - a.top,
                 (b.top + b.bottom) / 2, b.bottom - b.top);
         if (w < 0 || h < 0) return 0;
-        return w * h;
+        float area = w * h;
+        return area;
     }
 
     protected float box_union(RectF a, RectF b) {
         float i = box_intersection(a, b);
-        return (a.right - a.left) * (a.bottom - a.top) + (b.right - b.left) * (b.bottom - b.top) - i;
+        float u = (a.right - a.left) * (a.bottom - a.top) + (b.right - b.left) * (b.bottom - b.top) - i;
+        return u;
     }
 
     protected float overlap(float x1, float w1, float x2, float w2) {
         float l1 = x1 - w1 / 2;
         float l2 = x2 - w2 / 2;
-        float left = Math.max(l1, l2);
+        float left = l1 > l2 ? l1 : l2;
         float r1 = x1 + w1 / 2;
         float r2 = x2 + w2 / 2;
-        float right = Math.min(r1, r2);
+        float right = r1 < r2 ? r1 : r2;
         return right - left;
     }
+
+    protected static final int BATCH_SIZE = 1;
+    protected static final int PIXEL_SIZE = 3;
+
+    /**
+     * Writes Image data into a {@code ByteBuffer}.
+     */
+    protected ByteBuffer convertBitmapToByteBuffer(Bitmap bitmap) {
+
+        bitmap.getPixels(intValues, 0, bitmap.getWidth(), 0, 0, bitmap.getWidth(), bitmap.getHeight());
+        int pixel = 0;
+
+        imgData.rewind();
+        for (int i = 0; i < INPUT_SIZE; ++i) {
+            for (int j = 0; j < INPUT_SIZE; ++j) {
+                int pixelValue = intValues[i * INPUT_SIZE + j];
+                if (isModelQuantized) {
+                    // Quantized model
+                    imgData.put((byte) ((((pixelValue >> 16) & 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point));
+                    imgData.put((byte) ((((pixelValue >> 8) & 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point));
+                    imgData.put((byte) (((pixelValue & 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point));
+                } else { // Float model
+                    imgData.putFloat((((pixelValue >> 16) & 0xFF) - IMAGE_MEAN) / IMAGE_STD);
+                    imgData.putFloat((((pixelValue >> 8) & 0xFF) - IMAGE_MEAN) / IMAGE_STD);
+                    imgData.putFloat(((pixelValue & 0xFF) - IMAGE_MEAN) / IMAGE_STD);
+                }
+            }
+        }
+        return imgData;
+    }
+
     public ArrayList<Recognition> recognizeImage(Bitmap bitmap) {
+        ByteBuffer byteBuffer_ = convertBitmapToByteBuffer(bitmap);
+
         Map<Integer, Object> outputMap = new HashMap<>();
 
         outData.rewind();
@@ -281,10 +368,9 @@ public class YoloDetector implements Detector {
         tfLite.runForMultipleInputsOutputs(inputArray, outputMap);
 
         ByteBuffer byteBuffer = (ByteBuffer) outputMap.get(0);
-        assert byteBuffer != null;
         byteBuffer.rewind();
 
-        ArrayList<Recognition> detections = new ArrayList<>();
+        ArrayList<Recognition> detections = new ArrayList<Recognition>();
 
         float[][][] out = new float[1][output_box][numClass + 5];
         if(!isV8) {
@@ -363,6 +449,59 @@ public class YoloDetector implements Detector {
         }
         // Timber.tag("YoloDetector").d("detect end");
 
-        return nms(detections);
+        final ArrayList<Recognition> recognitions = nms(detections);
+        return recognitions;
+    }
+
+    public boolean checkInvalidateBox(float x, float y, float width, float height, float oriW, float oriH, int intputSize) {
+        // (1) (x, y, w, h) --> (xmin, ymin, xmax, ymax)
+        float halfHeight = height / 2.0f;
+        float halfWidth = width / 2.0f;
+
+        float[] pred_coor = new float[]{x - halfWidth, y - halfHeight, x + halfWidth, y + halfHeight};
+
+        // (2) (xmin, ymin, xmax, ymax) -> (xmin_org, ymin_org, xmax_org, ymax_org)
+        float resize_ratioW = 1.0f * intputSize / oriW;
+        float resize_ratioH = 1.0f * intputSize / oriH;
+
+        float resize_ratio = resize_ratioW > resize_ratioH ? resize_ratioH : resize_ratioW; //min
+
+        float dw = (intputSize - resize_ratio * oriW) / 2;
+        float dh = (intputSize - resize_ratio * oriH) / 2;
+
+        pred_coor[0] = 1.0f * (pred_coor[0] - dw) / resize_ratio;
+        pred_coor[2] = 1.0f * (pred_coor[2] - dw) / resize_ratio;
+
+        pred_coor[1] = 1.0f * (pred_coor[1] - dh) / resize_ratio;
+        pred_coor[3] = 1.0f * (pred_coor[3] - dh) / resize_ratio;
+
+        // (3) clip some boxes those are out of range
+        pred_coor[0] = pred_coor[0] > 0 ? pred_coor[0] : 0;
+        pred_coor[1] = pred_coor[1] > 0 ? pred_coor[1] : 0;
+
+        pred_coor[2] = pred_coor[2] < (oriW - 1) ? pred_coor[2] : (oriW - 1);
+        pred_coor[3] = pred_coor[3] < (oriH - 1) ? pred_coor[3] : (oriH - 1);
+
+        if ((pred_coor[0] > pred_coor[2]) || (pred_coor[1] > pred_coor[3])) {
+            pred_coor[0] = 0;
+            pred_coor[1] = 0;
+            pred_coor[2] = 0;
+            pred_coor[3] = 0;
+        }
+
+        // (4) discard some invalid boxes
+        float temp1 = pred_coor[2] - pred_coor[0];
+        float temp2 = pred_coor[3] - pred_coor[1];
+        float temp = temp1 * temp2;
+        if (temp < 0) {
+            Timber.tag("checkInvalidateBox").e("temp < 0");
+            return false;
+        }
+        if (Math.sqrt(temp) > Float.MAX_VALUE) {
+            Timber.tag("checkInvalidateBox").e("temp max");
+            return false;
+        }
+
+        return true;
     }
 }
