@@ -24,7 +24,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
     var position = firstDetection.getCenter()
     var speed = PointF(0.0F, 0.0F)
-    private var speedCov: PointF = PointF(0.0f, 0.0f)
+    var speedCov: PointF = PointF(0.0f, 0.0f)
 
     var strength = 0.0F
     var startDate = firstDetection.timestamp
