@@ -7,8 +7,6 @@ import org.surfrider.surfnet.detection.env.MathUtils.malDist
 import org.surfrider.surfnet.detection.tflite.Detector
 import java.util.*
 import kotlin.math.abs
-import kotlin.math.pow
-import kotlin.math.sqrt
 import kotlin.math.min
 
 class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
@@ -25,7 +23,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
     var position = firstDetection.getCenter()
     var speed = PointF(0.0F, 0.0F)
-    var speedCov: PointF = PointF(0.0f, 0.0f)
+    private var speedCov: PointF = PointF(0.0f, 0.0f)
 
     var strength = 0.0F
     var startDate = firstDetection.timestamp

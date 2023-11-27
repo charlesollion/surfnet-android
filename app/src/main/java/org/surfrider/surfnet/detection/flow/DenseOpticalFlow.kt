@@ -1,11 +1,8 @@
 package org.surfrider.surfnet.detection.flow
 
-import android.graphics.Canvas
 import org.opencv.core.*
-import org.opencv.core.Core.multiply
 import org.opencv.imgproc.Imgproc
 import org.opencv.video.Video
-import timber.log.Timber
 
 
 class DenseOpticalFlow {
@@ -50,11 +47,11 @@ class DenseOpticalFlow {
 
 
     fun run(newFrame: Mat, mask:Mat?, scalingFactor: Int): ArrayList<FloatArray> {
-        return  PyrLK(newFrame, mask, scalingFactor)
-        // return Farneback(newFrame)
+        return  pyrLK(newFrame, mask, scalingFactor)
+        // return farneback(newFrame)
     }
 
-    private fun PyrLK(newFrame: Mat, mask: Mat?, scalingFactor: Int) : ArrayList<FloatArray> {
+    private fun pyrLK(newFrame: Mat, mask: Mat?, scalingFactor: Int) : ArrayList<FloatArray> {
         // convert the frame to Gray
         Imgproc.cvtColor(newFrame, currGreyImage, Imgproc.COLOR_RGBA2GRAY)
         // if this is the first loop, find good features
@@ -87,64 +84,6 @@ class DenseOpticalFlow {
 
         // returns the lines
         return lines
-    }
-
-    private fun Farneback(newFrame: Mat) : Mat {
-        // Downsample and convert to Gray
-        val downscaledFrame = Mat()
-        Imgproc.resize(newFrame, downscaledFrame, Size(), 0.5, 0.5)
-        Imgproc.cvtColor(downscaledFrame, currGreyImage, Imgproc.COLOR_RGBA2GRAY)
-
-        val flow = Mat(currGreyImage.size(), CvType.CV_32FC2)
-
-        if (prevGreyImage.empty()) {
-            currGreyImage.copyTo(prevGreyImage)
-            return flow
-            //return Point(0.0, 0.0)
-        }
-        Video.calcOpticalFlowFarneback(prevGreyImage, currGreyImage, flow,
-            0.5, 3, 15, 3, 5, 1.2, Video.OPTFLOW_FARNEBACK_GAUSSIAN)
-
-        val kernel = Mat.ones(3,3, CvType.CV_32FC1)
-        val factor = Scalar(0.11111111)
-        Core.multiply(kernel, factor, kernel)
-        val flow2 = Mat(flow.size(), CvType.CV_32FC2)
-        Imgproc.filter2D(flow, flow2, flow.depth(), kernel)
-        Imgproc.resize(flow2, flow2, Size(), 0.25, 0.25, Imgproc.INTER_LINEAR)
-        if(flow2 != null)
-            Core.transpose(flow2, flow2)
-        //val avgMV : Scalar = Core.mean(flow)
-        //Point(avgMV.`val`[0], avgMV.`val`[1])
-
-        return flow2
-    }
-
-    private fun avgMotionVector() : Point {
-        val statusArr = status.toArray()
-        val prevPtsArr = prevPts.toArray()
-        val currPtsArr = currPts.toArray()
-        var pt1Avg = Point(0.0, 0.0)
-        var pt2Avg = Point(0.0, 0.0)
-        for (i in 0 until prevPts.rows()) {
-            if (statusArr[i].toInt() == 1) {
-                val pt1x = prevPtsArr[i].x
-                val pt1y = prevPtsArr[i].y
-                val pt2x = currPtsArr[i].x
-                val pt2y = currPtsArr[i].y
-                pt1Avg.x += pt1x
-                pt1Avg.y += pt1y
-                pt2Avg.x += pt2x
-                pt2Avg.y += pt2y
-                flowPtsCount++
-            }
-        }
-
-        // Calculate the average motion vector
-        pt1Avg.x *= 1.0 / flowPtsCount.toDouble()
-        pt1Avg.y *= 1.0 / flowPtsCount.toDouble()
-        pt2Avg.x *= 1.0 / flowPtsCount.toDouble()
-        pt2Avg.y *= 1.0 / flowPtsCount.toDouble()
-        return Point(pt2Avg.x - pt1Avg.x, pt2Avg.y - pt1Avg.y)
     }
 
     private fun createLines(scalingFactor: Int): ArrayList<FloatArray> {

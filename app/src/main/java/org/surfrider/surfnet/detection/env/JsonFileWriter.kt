@@ -37,8 +37,8 @@ class JsonFileWriter {
                 var outputStream: OutputStream? = null
 
                 try {
-                    val contentUri = resolver.insert(contentUri, contentValues)
-                    contentUri?.let { uri ->
+                    val contentUriWithValues = resolver.insert(contentUri, contentValues)
+                    contentUriWithValues?.let { uri ->
                         outputStream = resolver.openOutputStream(uri)
                         outputStream?.use { it.write(jsonString.toByteArray()) }
                         Timber.tag(TAG).i("JSON written to Downloads folder successfully")
