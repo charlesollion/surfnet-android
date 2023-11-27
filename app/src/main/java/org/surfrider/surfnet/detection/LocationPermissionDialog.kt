@@ -1,17 +1,14 @@
 package org.surfrider.surfnet.detection
 
-import android.content.DialogInterface
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Chronometer
 import androidx.fragment.app.DialogFragment
-import androidx.fragment.app.FragmentManager
 import org.surfrider.surfnet.detection.databinding.FragmentNoLocationDialogBinding
 
 
-class LocationPermissionDialog() : DialogFragment() {
+class LocationPermissionDialog : DialogFragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,7 +17,7 @@ class LocationPermissionDialog() : DialogFragment() {
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View? {
+    ): View {
         // Use DataBindingUtil to inflate the layout with data binding
         val binding = FragmentNoLocationDialogBinding.inflate(
             layoutInflater

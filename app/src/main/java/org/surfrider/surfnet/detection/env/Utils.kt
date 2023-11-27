@@ -5,8 +5,6 @@ import android.content.res.AssetManager
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import timber.log.Timber
 import java.io.*
 import java.nio.MappedByteBuffer
