@@ -18,7 +18,10 @@ package org.surfrider.surfnet.detection.tflite;
 import android.graphics.Bitmap;
 import android.graphics.RectF;
 
+import androidx.annotation.NonNull;
+
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Generic interface for interacting with different recognition engines.
@@ -26,20 +29,12 @@ import java.util.List;
 public interface Detector {
     List<Recognition> recognizeImage(Bitmap bitmap);
 
-    void enableStatLogging(final boolean debug);
-
-    String getStatString();
-
-    void close();
-
     void setNumThreads(int num_threads);
-
-    void setUseNNAPI(boolean isChecked);
 
     /**
      * An immutable result returned by a Classifier describing what was recognized.
      */
-    public class Recognition {
+    class Recognition {
         /**
          * A unique identifier for what has been recognized. Specific to the class, not the instance of
          * the object.
@@ -61,15 +56,7 @@ public interface Detector {
          */
         private RectF location;
 
-        private int detectedClass;
-
-        public Recognition(
-                final String id, final String title, final Float confidence, final RectF location) {
-            this.id = id;
-            this.title = title;
-            this.confidence = confidence;
-            this.location = location;
-        }
+        private final int detectedClass;
 
         public Recognition(final String id, final String title, final Float confidence, final RectF location, int detectedClass) {
             this.id = id;
@@ -103,10 +90,7 @@ public interface Detector {
             return detectedClass;
         }
 
-        public void setDetectedClass(int detectedClass) {
-            this.detectedClass = detectedClass;
-        }
-
+        @NonNull
         @Override
         public String toString() {
             String resultString = "";
@@ -119,7 +103,7 @@ public interface Detector {
             }
 
             if (confidence != null) {
-                resultString += String.format("(%.1f%%) ", confidence * 100.0f);
+                resultString += String.format(Locale.getDefault(), "(%.1f%%) ", confidence * 100.0f);
             }
 
             if (location != null) {

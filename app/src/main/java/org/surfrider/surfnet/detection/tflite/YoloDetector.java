@@ -173,36 +173,7 @@ public class YoloDetector implements Detector {
     public int getInputSize() {
         return INPUT_SIZE;
     }
-    @Override
-    public void enableStatLogging(final boolean logStats) {
-    }
-
-    @Override
-    public String getStatString() {
-        return "";
-    }
-
-    @Override
-    public void close() {
-        tfLite.close();
-        tfLite = null;
-        if (gpuDelegate != null) {
-            gpuDelegate.close();
-            gpuDelegate = null;
-        }
-        if (nnapiDelegate != null) {
-            nnapiDelegate.close();
-            nnapiDelegate = null;
-        }
-        tfliteModel = null;
-    }
-
     public void setNumThreads(int num_threads) {
-    }
-
-    @Override
-    public void setUseNNAPI(boolean isChecked) {
-//        if (tfLite != null) tfLite.setUseNNAPI(isChecked);
     }
 
     private void recreateInterpreter() {

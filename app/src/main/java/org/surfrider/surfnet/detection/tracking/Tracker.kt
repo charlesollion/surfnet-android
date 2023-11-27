@@ -10,12 +10,12 @@ import kotlin.math.abs
 import kotlin.math.min
 
 class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
-
     var index = idx
     var location: Location? = lctn
     var status: TrackerStatus = TrackerStatus.RED
     var animation = false
     var alreadyAssociated = false
+    private var justUpdated = true
 
     private var lastUpdatedTimestamp: Long = 0
     private var animationTimeStamp: Long? = null
@@ -35,7 +35,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
     fun computeMajorityClass(): String? {
         return trackedObjects.groupBy { it.classId }
-            .maxByOrNull { it.value.size }?.key
+                .maxByOrNull { it.value.size }?.key
     }
 
     fun distTo(newPos: PointF): Float {
@@ -51,35 +51,42 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         trackedObjects.addLast(newDet)
         position = newDet.getCenter()
         strength += 0.2F
-        if (strength > 1.0F) {
+        if(strength > 1.0F) {
             strength = 1.0F
         }
         alreadyAssociated = true
+        justUpdated = true
 
-        if (trackedObjects.size > NUM_CONSECUTIVE_DET && status == TrackerStatus.RED) {
+        if(trackedObjects.size > NUM_CONSECUTIVE_DET && (status == TrackerStatus.RED || status == TrackerStatus.LOADING)) {
             status = TrackerStatus.GREEN
             animation = true
             animationTimeStamp = newDet.timestamp
         }
+
+        if(trackedObjects.size in NUM_CONSECUTIVE_LOADING_DET..NUM_CONSECUTIVE_DET && status == TrackerStatus.RED) {
+            status = TrackerStatus.LOADING
+        }
     }
 
     fun updateSpeed(measuredSpeed: PointF, scale: Float) {
-        // Move tracker directly
-        position.x += measuredSpeed.x
-        position.y += measuredSpeed.y
-        speed = measuredSpeed
-
+        // Move tracker directly unless it was just updated with a new detection
+        if(!justUpdated) {
+            position.x += measuredSpeed.x
+            position.y += measuredSpeed.y
+            speed = measuredSpeed
+        } else {
+            justUpdated = false
+        }
         // Calculate the squared speed components
         val speedXSquared = speed.x * speed.x / (scale * scale)
         val speedYSquared = speed.y * speed.y / (scale * scale)
 
         // Update the estimated covariance using EMA
         speedCov.x =
-            COVARIANCE_SMOOTHING_FACTOR * speedCov.x + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedXSquared
+                COVARIANCE_SMOOTHING_FACTOR * speedCov.x + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedXSquared
         speedCov.y =
-            COVARIANCE_SMOOTHING_FACTOR * speedCov.y + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedYSquared
+                COVARIANCE_SMOOTHING_FACTOR * speedCov.y + (1 - COVARIANCE_SMOOTHING_FACTOR) * speedYSquared
     }
-
 
     fun update() {
         alreadyAssociated = false
@@ -90,8 +97,8 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
 
         val ageOfAnimation = animationTimeStamp?.let {
             timeDiffInMilli(
-                currTimeStamp,
-                it
+                    currTimeStamp,
+                    it
             )
         }
         if (ageOfAnimation != null) {
@@ -127,15 +134,15 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
             return PointF(rect.centerX(), rect.centerY())
         }
     }
-
     enum class TrackerStatus {
-        GREEN, RED, INACTIVE
+        GREEN, RED, INACTIVE, LOADING
     }
 
     companion object {
         private const val MAX_TIMESTAMP = 2000
         private const val MAX_ANIMATION_TIMESTAMP = 1000
         private const val NUM_CONSECUTIVE_DET = 5
+        private const val NUM_CONSECUTIVE_LOADING_DET = 3
         private const val COVARIANCE_SMOOTHING_FACTOR = 0.2F
     }
 }

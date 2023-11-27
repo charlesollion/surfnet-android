@@ -12,8 +12,6 @@ object MathUtils {
         val numRows = costMatrix.size
         val numCols = costMatrix[0].size
 
-        val maxDim = maxOf(numRows, numCols)
-
         // Step 1: Subtract the minimum value from each row
         for (i in 0 until numRows) {
             val minVal = costMatrix[i].minOrNull() ?: 0.0
@@ -25,7 +23,7 @@ object MathUtils {
 
         // Step 2: Subtract the minimum value from each column
         for (j in 0 until numCols) {
-            val minVal = (0 until numRows).map { costMatrix[it][j] }.minOrNull() ?: 0.0
+            val minVal = (0 until numRows).minOfOrNull { costMatrix[it][j] } ?: 0.0
             if(minVal == Double.MAX_VALUE) break
             for (i in 0 until numRows) {
                 costMatrix[i][j] -= minVal

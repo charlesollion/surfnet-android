@@ -32,6 +32,7 @@ import android.media.ImageReader.OnImageAvailableListener
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.util.Size
 import android.view.Surface
@@ -57,6 +58,7 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.sync.Mutex
@@ -106,7 +108,10 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var location: Location? = null
     private var fastSelfMotionTimestamp: Long = 0
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val threadDetector = newSingleThreadContext("InferenceThread")
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
 
     private var trackingOverlay: OverlayView? = null
@@ -124,7 +129,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private var latestDetections: List<Detector.Recognition>? = null
     private var currROIs: Mat? = null
     private val mutex = Mutex()
-    private val locationHandler = Handler()
+    private val locationHandler = Handler(Looper.getMainLooper())
     private var lastTrackerManager: TrackerManager? = null
     private lateinit var bindingDialog: FragmentSendDataDialogBinding
     private val isDebug = false
@@ -155,16 +160,14 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
 
-        val mLocationRequest: LocationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000).apply {
-            setMinUpdateDistanceMeters(1F)
-            setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
-            setWaitForAccurateLocation(true)
-        }.build()
+        val mLocationRequest: LocationRequest =
+            LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000).apply {
+                setMinUpdateDistanceMeters(1F)
+                setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
+                setWaitForAccurateLocation(true)
+            }.build()
         val mLocationCallback: LocationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
-                if (locationResult == null) {
-                    return
-                }
                 location = locationResult.lastLocation
             }
         }
@@ -307,6 +310,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         binding.chronometer.start()
     }
 
+    @Suppress("DEPRECATION")
     private fun hideSystemUI() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.hide(WindowInsets.Type.statusBars())
@@ -368,9 +372,10 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             getLocation()
             trackerManager?.let {
                 val date = Calendar.getInstance().time
-                val iso8601Format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
+                val iso8601Format =
+                    SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.getDefault())
                 val iso8601DateString = iso8601Format.format(date)
-                it.addPosition(location = location, date= iso8601DateString)
+                it.addPosition(location = location, date = iso8601DateString)
             }
             locationHandler.postDelayed({
                 updateLocation()
@@ -456,13 +461,25 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         supportFragmentManager.beginTransaction().replace(R.id.container, camera2Fragment).commit()
     }
 
+    @Suppress("DEPRECATION")
     private val screenOrientation: Int
-        get() = when (windowManager.defaultDisplay.rotation) {
-            Surface.ROTATION_270 -> 270
-            Surface.ROTATION_180 -> 180
-            Surface.ROTATION_90 -> 90
-            else -> 0
+        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            when (display?.rotation) {
+                Surface.ROTATION_270 -> 270
+                Surface.ROTATION_180 -> 180
+                Surface.ROTATION_90 -> 90
+                else -> 0
+            }
+        } else {
+            when (windowManager.defaultDisplay.rotation) {
+                Surface.ROTATION_270 -> 270
+                Surface.ROTATION_180 -> 180
+                Surface.ROTATION_90 -> 90
+                else -> 0
+            }
         }
+
+
     fun updateCounter(count: Int?) {
         binding.wasteCounter.text = count.toString()
         if (count != null) {
@@ -486,11 +503,11 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             kotlin.math.sqrt((xVelocity * xVelocity + yVelocity * yVelocity + zVelocity * zVelocity).toDouble())
                 .toFloat()
 
-        if(speed > MAX_SELF_VELOCITY) {
+        if (speed > MAX_SELF_VELOCITY) {
             fastSelfMotionTimestamp = System.currentTimeMillis()
         } else {
             // If the time since last timestamp is over VELOCITY_PAUSE_STICKINESS, we reset the timestamp
-            if(System.currentTimeMillis() - fastSelfMotionTimestamp > VELOCITY_PAUSE_STICKINESS) {
+            if (System.currentTimeMillis() - fastSelfMotionTimestamp > VELOCITY_PAUSE_STICKINESS) {
                 fastSelfMotionTimestamp = 0
             }
         }
@@ -504,6 +521,12 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
         lifecycleScope.launch(threadOpticalFlow) {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                // Run OF
+                currFrameMat?.let {
+                    outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
+                }
+
+                // Update trackers and regions of interests
                 mutex.withLock {
                     if (fastSelfMotionTimestamp == 0L) {
                         avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
@@ -523,13 +546,11 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                     }
                 }
 
-                currFrameMat?.let {
-                    outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
-                }
                 computingOF = false
 
                 runOnUiThread {
                     bottomSheet.showIMUStats(
+                        applicationContext,
                         arrayOf(
                             imuPosition[0], imuPosition[1], imuPosition[2],
                             speed, avgFlowSpeed?.x ?: 0.0F, avgFlowSpeed?.y ?: 0.0F
@@ -610,7 +631,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 val mappedRecognitions =
                     ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
                 mutex.withLock {
-                    if(fastSelfMotionTimestamp == 0L) {
+                    if (fastSelfMotionTimestamp == 0L) {
                         trackerManager?.processDetections(mappedRecognitions, location)
                         trackerManager?.updateTrackers()
                     }

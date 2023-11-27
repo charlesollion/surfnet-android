@@ -21,4 +21,9 @@
     <string name="send_dialog_title">Merci pour ta contributon !</string>
     <string name="send_dialog_body">%1$s déchets identifiés pour %2$sm parcourus</string>
     <string name="send_dialog_button">Lancer un nouveau suivi vidéo</string>
+
+    <!-- region DEBUG STRINGS -->
+    <string name="debug_three_vars">%1$s %2$s %3$s</string>
+    <string name="debug_two_vars">%1$s %2$s</string>
+    <!-- endregion -->
 </resources>

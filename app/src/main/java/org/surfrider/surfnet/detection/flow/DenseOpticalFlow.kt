@@ -46,10 +46,10 @@ class DenseOpticalFlow {
 
 
     fun run(newFrame: Mat, mask:Mat?, scalingFactor: Int): ArrayList<FloatArray> {
-        return  PyrLK(newFrame, mask, scalingFactor)
+        return pyrLK(newFrame, mask, scalingFactor)
     }
 
-    private fun PyrLK(newFrame: Mat, mask: Mat?, scalingFactor: Int) : ArrayList<FloatArray> {
+    private fun pyrLK(newFrame: Mat, mask: Mat?, scalingFactor: Int) : ArrayList<FloatArray> {
         // convert the frame to Gray
         Imgproc.cvtColor(newFrame, currGreyImage, Imgproc.COLOR_RGBA2GRAY)
 

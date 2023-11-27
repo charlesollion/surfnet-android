@@ -1,6 +1,6 @@
 package org.surfrider.surfnet.detection.customview
 
-import android.util.Log
+import android.content.Context
 import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.LinearLayout
@@ -16,8 +16,8 @@ class BottomSheet(binding: ActivityCameraBinding) {
     private var sheetBehavior: BottomSheetBehavior<LinearLayout?>? = null
     private var bottomSheetLayout = binding.bottomSheetLayout
     private var df = DecimalFormat("#.##")
-    var switchOF = bottomSheetLayout.switch1
-    var switchBoxes = bottomSheetLayout.switch2
+    private var switchOF = bottomSheetLayout.switch1
+    private var switchBoxes = bottomSheetLayout.switch2
     var showOF = false
     var showBoxes = false
 
@@ -47,21 +47,23 @@ class BottomSheet(binding: ActivityCameraBinding) {
                         bottomSheetLayout.bottomSheetArrow.setImageResource(R.drawable.icn_chevron_up)
                     }
 
+                    BottomSheetBehavior.STATE_HALF_EXPANDED -> {}
                     BottomSheetBehavior.STATE_DRAGGING -> {}
                     BottomSheetBehavior.STATE_SETTLING -> bottomSheetLayout.bottomSheetArrow.setImageResource(
                         R.drawable.icn_chevron_up
                     )
                 }
             }
+
             override fun onSlide(bottomSheet: View, slideOffset: Float) {}
         })
-        bottomSheetLayout.materialSwitch.setChecked(true);
+        bottomSheetLayout.materialSwitch.isChecked = true
 
-        switchOF.setOnCheckedChangeListener {
-                _, isChecked -> showOF = isChecked
+        switchOF.setOnCheckedChangeListener { _, isChecked ->
+            showOF = isChecked
         }
-        switchBoxes.setOnCheckedChangeListener {
-                _, isChecked -> showBoxes = isChecked
+        switchBoxes.setOnCheckedChangeListener { _, isChecked ->
+            showBoxes = isChecked
         }
     }
 
@@ -74,22 +76,26 @@ class BottomSheet(binding: ActivityCameraBinding) {
             bottomSheetLayout.latitudeInfo.text = coordinates[0]
             bottomSheetLayout.longitudeInfo.text = coordinates[1]
         } else {
-            bottomSheetLayout.latitudeInfo.text = "null"
-            bottomSheetLayout.longitudeInfo.text = "null"
+            bottomSheetLayout.latitudeInfo.text = ""
+            bottomSheetLayout.longitudeInfo.text = ""
         }
     }
 
-    fun showIMUStats(stats: Array<Float>?) {
+    fun showIMUStats(context: Context, stats: Array<Float>?) {
         if (stats != null && stats.size == 6) {
-            bottomSheetLayout.positionInfo.text =
-                df.format(stats[0]) + " " + df.format(stats[1]) + " " + df.format(stats[2])
+            bottomSheetLayout.positionInfo.text = context.getString(
+                R.string.debug_three_vars,
+                df.format(stats[0]),
+                df.format(stats[1]),
+                df.format(stats[2])
+            )
             bottomSheetLayout.speedInfo.text = df.format(stats[3])
             bottomSheetLayout.flowInfo.text =
-                df.format(stats[4]) + " " + df.format(stats[5])
+                context.getString(R.string.debug_two_vars, df.format(stats[4]), df.format(stats[5]))
         } else {
-            bottomSheetLayout.positionInfo.text = "null"
-            bottomSheetLayout.speedInfo.text = "null"
-            bottomSheetLayout.flowInfo.text = "null"
+            bottomSheetLayout.positionInfo.text = ""
+            bottomSheetLayout.speedInfo.text = ""
+            bottomSheetLayout.flowInfo.text = ""
         }
     }
 
