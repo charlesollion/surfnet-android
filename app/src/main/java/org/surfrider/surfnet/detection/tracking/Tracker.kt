@@ -15,6 +15,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     var status: TrackerStatus = TrackerStatus.RED
     var animation = false
     var alreadyAssociated = false
+    private var justUpdated = true
 
     private var lastUpdatedTimestamp: Long = 0
     private var animationTimeStamp: Long? = null
@@ -23,7 +24,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     val trackedObjects: LinkedList<TrackedDetection> = LinkedList()
     var position = firstDetection.getCenter()
     var speed = PointF(0.0F, 0.0F)
-    private var speedCov: PointF = PointF(0.0f, 0.0f)
+    var speedCov: PointF = PointF(0.0f, 0.0f)
 
     var strength = 0.0F
     var startDate = firstDetection.timestamp
@@ -54,6 +55,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
             strength = 1.0F
         }
         alreadyAssociated = true
+        justUpdated = true
 
         if(trackedObjects.size > NUM_CONSECUTIVE_DET && (status == TrackerStatus.RED || status == TrackerStatus.LOADING)) {
             status = TrackerStatus.GREEN
@@ -67,11 +69,14 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     }
 
     fun updateSpeed(measuredSpeed: PointF, scale: Float) {
-        // Move tracker directly
-        position.x += measuredSpeed.x
-        position.y += measuredSpeed.y
-        speed = measuredSpeed
-
+        // Move tracker directly unless it was just updated with a new detection
+        if(!justUpdated) {
+            position.x += measuredSpeed.x
+            position.y += measuredSpeed.y
+            speed = measuredSpeed
+        } else {
+            justUpdated = false
+        }
         // Calculate the squared speed components
         val speedXSquared = speed.x * speed.x / (scale * scale)
         val speedYSquared = speed.y * speed.y / (scale * scale)

@@ -152,6 +152,7 @@ class TrackerManager {
                 // Draw the speed line to show displacement of the tracker depending on camera motion
                 if (showOF) {
                     drawOF(canvas, tracker, frameToCanvasTransform)
+                    drawEllipses(canvas, tracker, frameToCanvasTransform)
                 }
 
                 if (bmp != null) {
@@ -213,18 +214,18 @@ class TrackerManager {
         canvas.drawLines(speedLine, paintLine)
     }
 
-//    private fun drawEllipses(canvas: Canvas, tracker: Tracker, transform: Matrix) {
-//        val paint = Paint()
-//        paint.style = Paint.Style.STROKE
-//        paint.strokeWidth = 4.0F
-//        paint.color = Color.BLUE
-//        val dims = PointF((1.0F + tracker.speedCov.x * 0.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL,
-//                (1.0F + tracker.speedCov.y * 0.0F) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
-//        val rect = RectF(tracker.position.x - dims.x, tracker.position.y - dims.y,
-//                tracker.position.x + dims.x, tracker.position.y + dims.y)
-//        transform.mapRect(rect)
-//        canvas.drawOval(rect, paint)
-//    }
+    private fun drawEllipses(canvas: Canvas, tracker: Tracker, transform: Matrix) {
+        val paint = Paint()
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 4.0F
+        paint.color = Color.BLUE
+        val dims = PointF((1.0F + kotlin.math.sqrt(tracker.speedCov.x) ) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL,
+                (1.0F + kotlin.math.sqrt(tracker.speedCov.y)) * ASSOCIATION_THRESHOLD * SCREEN_DIAGONAL)
+        val rect = RectF(tracker.position.x - dims.x, tracker.position.y - dims.y,
+                tracker.position.x + dims.x, tracker.position.y + dims.y)
+        transform.mapRect(rect)
+        canvas.drawOval(rect, paint)
+    }
 
     fun getCurrentRois(width: Int, height: Int, downScale: Int, squareSize: Int): Mat? {
         // Get regions of interest within the frame: areas around each tracker
@@ -251,6 +252,17 @@ class TrackerManager {
                 }
             }
         }
+
+        // Add a central region always available for tracking
+        val centerH = height / downScale / 2
+        val centerW = width / downScale / 2
+        val centerSquareSize = 40
+        for (i in -centerSquareSize / 2..centerSquareSize / 2) {
+            for (j in -centerSquareSize / 2..centerSquareSize / 2) {
+                currRois.put(centerH + i, centerW + j, byteArrayOf(1))
+            }
+        }
+
         return currRois
     }
 
@@ -414,7 +426,7 @@ class TrackerManager {
         }
 
         private const val SCREEN_DIAGONAL = 960.0F // sqrt(720x1280)
-        private const val ASSOCIATION_THRESHOLD = 40.0F / SCREEN_DIAGONAL
+        private const val ASSOCIATION_THRESHOLD = 60.0F / SCREEN_DIAGONAL
 
         // Weights of different scores
         private const val W_DIST = 1.0

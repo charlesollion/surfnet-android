@@ -520,6 +520,12 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
         lifecycleScope.launch(threadOpticalFlow) {
             lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                // Run OF
+                currFrameMat?.let {
+                    outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
+                }
+
+                // Update trackers and regions of interests
                 mutex.withLock {
                     if (fastSelfMotionTimestamp == 0L) {
                         avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
@@ -539,9 +545,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                     }
                 }
 
-                currFrameMat?.let {
-                    outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
-                }
                 computingOF = false
 
                 runOnUiThread {
