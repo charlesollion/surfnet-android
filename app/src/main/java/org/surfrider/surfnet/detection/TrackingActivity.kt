@@ -653,7 +653,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     companion object {
         private const val FLOW_REFRESH_RATE_MILLIS: Long = 50
         private const val DOWNSAMPLING_FACTOR_FLOW: Int = 2
-        private const val MAX_SELF_VELOCITY = 5.0
+        private const val MAX_SELF_VELOCITY = 6.0
         private const val VELOCITY_PAUSE_STICKINESS: Long = 500
 
         private const val CONFIDENCE_THRESHOLD = 0.3f
