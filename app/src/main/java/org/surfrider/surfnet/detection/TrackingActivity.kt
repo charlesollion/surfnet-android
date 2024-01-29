@@ -141,7 +141,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         super.onCreate(null)
         Timber.d("onCreate $this")
 
-        if (OpenCVLoader.initDebug()) Timber.i("Successful opencv loading")
+        if (OpenCVLoader.initLocal()) Timber.i("Successful opencv loading")
 
         //initialize binding & UI
         binding = ActivityCameraBinding.inflate(layoutInflater)
