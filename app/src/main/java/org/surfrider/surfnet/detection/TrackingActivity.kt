@@ -401,27 +401,31 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 processImage()
             }*/
             val image = reader.acquireLatestImage()
-            trackingOverlay?.postInvalidate()
             if (!computingOF && !detectorPaused)  {
+                val currFrameMat =
+                    imageProcessor.getMatFromCamera(image, previewWidth, previewHeight, 1)
                 lifecycleScope.launch(threadOpticalFlow) {
                     lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
                         computingOF = true
-                        val currFrameMat =
-                            imageProcessor.getMatFromCamera(image, previewWidth, previewHeight, 1)
+                        val startTime = SystemClock.uptimeMillis()
 
                         // Run OF
                         currFrameMat?.let {
                             outputLinesFlow = opticalFlow.run(it, currROIs, 1)
                         }
 
+                        lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
                         // Update trackers and regions of interests
-
+                        runOnUiThread {
+                            bottomSheet.showInference(lastProcessingTimeMs.toString() + "ms")
+                        }
                         computingOF = false
                     }
                 }
             } else {
                 image.close()
             }
+            trackingOverlay?.postInvalidate()
         } catch (e: Exception) {
             Timber.e(e, "Exception in ImageListener!")
             return

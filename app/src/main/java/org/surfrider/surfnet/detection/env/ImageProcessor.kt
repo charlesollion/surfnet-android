@@ -126,7 +126,7 @@ class ImageProcessor {
             val bytes = ImageUtils.rgbIntToByteArray(downsampledRGBInts)
             mat.put(0,0, bytes)
         }
-        readyForNextImage()
+        // readyForNextImage()
 
         return mat
     }
