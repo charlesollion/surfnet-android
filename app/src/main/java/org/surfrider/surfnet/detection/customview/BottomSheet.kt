@@ -18,7 +18,7 @@ class BottomSheet(binding: ActivityCameraBinding) {
     private var df = DecimalFormat("#.##")
     private var switchOF = bottomSheetLayout.switch1
     private var switchBoxes = bottomSheetLayout.switch2
-    var showOF = false
+    var showOF = true
     var showBoxes = false
 
     init {

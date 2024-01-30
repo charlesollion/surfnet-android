@@ -237,39 +237,16 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         }
 
         val context = this
-        try {
-            //create detector only one time
-            detector = detector ?: YoloDetector.create(
-                assets,
-                MODEL_STRING,
-                LABEL_FILENAME,
-                CONFIDENCE_THRESHOLD,
-                IS_QUANTIZED,
-                IS_V8,
-                INPUT_SIZE
-            )
-            detector?.useGpu()
-            detector?.setNumThreads(NUM_THREADS)
-            detectorPaused = false
-        } catch (e: IOException) {
-            e.printStackTrace()
-            Timber.e(e, "Exception initializing Detector!")
-            val toast = Toast.makeText(
-                applicationContext, "Detector could not be initialized", Toast.LENGTH_SHORT
-            )
-            toast.show()
-            finish()
-        }
+
         trackerManager = lastTrackerManager ?: TrackerManager()
 
         bottomSheet.displayDetection(trackerManager!!)
+        detectorPaused = false
 
-        detector?.inputSize?.let {
-            croppedBitmap = Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888)
-            frameToCropTransform = ImageUtils.getTransformationMatrix(
-                previewWidth, previewHeight, it, it, sensorOrientation, MAINTAIN_ASPECT
-            )
-        }
+        croppedBitmap = Bitmap.createBitmap(640, 640, Bitmap.Config.ARGB_8888)
+        frameToCropTransform = ImageUtils.getTransformationMatrix(
+            previewWidth, previewHeight, 640, 640, sensorOrientation, MAINTAIN_ASPECT
+        )
 
         cropToFrameTransform = Matrix()
         frameToCropTransform?.invert(cropToFrameTransform)
@@ -417,11 +394,33 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     /** Callback for Camera2 API  */
     override fun onImageAvailable(reader: ImageReader) {
         try {
-            imageProcessor.openCameraImage(reader, previewWidth, previewHeight)
+            /*imageProcessor.openCameraImage(reader, previewWidth, previewHeight)
             if (detectorPaused) {
                 imageProcessor.readyForNextImage()
             } else {
                 processImage()
+            }*/
+            val image = reader.acquireLatestImage()
+            trackingOverlay?.postInvalidate()
+            if (!computingOF && !detectorPaused)  {
+                lifecycleScope.launch(threadOpticalFlow) {
+                    lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                        computingOF = true
+                        val currFrameMat =
+                            imageProcessor.getMatFromCamera(image, previewWidth, previewHeight, 1)
+
+                        // Run OF
+                        currFrameMat?.let {
+                            outputLinesFlow = opticalFlow.run(it, currROIs, 1)
+                        }
+
+                        // Update trackers and regions of interests
+
+                        computingOF = false
+                    }
+                }
+            } else {
+                image.close()
             }
         } catch (e: Exception) {
             Timber.e(e, "Exception in ImageListener!")
@@ -450,7 +449,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         val camera2Fragment = CameraConnectionFragment.newInstance(
             { size: Size?, rotation: Int ->
                 previewHeight = size!!.height
-                previewWidth = size.width
+                previewWidth = size!!.width
                 onPreviewSizeChosen(size, rotation)
             },
             this, desiredPreviewFrameSize,
@@ -578,6 +577,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
     private fun processImage() {
         trackingOverlay?.postInvalidate()
+        Timber.i("ProcessingDetection ${computingDetection} processingOF ${computingOF}")
 
         // No mutex needed as this method is not reentrant.
         if (computingDetection && computingOF) {

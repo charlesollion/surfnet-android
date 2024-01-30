@@ -67,6 +67,18 @@ object ImageUtils {
         }
     }
 
+    public fun rgbIntToByteArray(rgbInts: IntArray): ByteArray {
+        val outputBytes = ByteArray(rgbInts.size * 3)
+        for(i: Int in rgbInts.indices) {
+            val rgb = rgbInts[i]
+            outputBytes[i*3] = ((rgb shr 16) and 0xff).toByte()
+            outputBytes[i*3+1] = ((rgb shr 8) and 0xff).toByte()
+            outputBytes[i*3+2] = (rgb and 0xff).toByte()
+        }
+        return outputBytes
+    }
+
+    @JvmStatic
     private fun mapYUVtoRGB(valY: Int, valU: Int, valV: Int): Int {
         // Adjust and check YUV values
         var y = valY
@@ -203,6 +215,9 @@ object ImageUtils {
 
     @JvmStatic
     fun downsampleRGBInts(rgbInts: IntArray, originalWidth: Int, originalHeight: Int, downsampleFactor: Int): IntArray {
+        if (downsampleFactor == 1) {
+            return rgbInts
+        }
         val newWidth = originalWidth / downsampleFactor
         val newHeight = originalHeight / downsampleFactor
         val outputInts = IntArray(newWidth * newHeight)
