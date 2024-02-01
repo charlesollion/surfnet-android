@@ -50,15 +50,24 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.InternalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.internal.synchronized
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.sync.Mutex
 import org.opencv.android.CameraActivity
 import org.opencv.android.CameraBridgeViewBase
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2
 import org.opencv.android.OpenCVLoader
+import org.opencv.android.Utils
 import org.opencv.core.*
+import org.opencv.imgproc.Imgproc
+import org.opencv.imgproc.Imgproc.cvtColor
 import org.surfrider.surfnet.detection.customview.BottomSheet
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.databinding.ActivityCameraBinding
@@ -92,11 +101,12 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private lateinit var opticalFlow: DenseOpticalFlow
     private lateinit var openCvCameraView: CameraBridgeViewBase
     private lateinit var frameRgba: Mat
+    private lateinit var frameDetection: Mat
     private lateinit var frameIntermediateMat: Mat
+    private lateinit var cropRect: Rect
     private lateinit var frameGray: Mat
 
     private var previewWidth = 0
-
     private var previewHeight = 0
     private var detectorPaused = true
     private var flowRegionUpdateNeeded = false
@@ -110,6 +120,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
+    private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private var trackingOverlay: OverlayView? = null
     private var sensorOrientation: Int = 0
@@ -231,11 +242,13 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     override fun onCameraViewStarted(width: Int, height: Int) {
         Timber.i("CameraViewStarted ${width}x${height}")
         frameRgba = Mat(height, width, CvType.CV_8UC4)
+        frameDetection = Mat(height, width, CvType.CV_8UC3)
         frameIntermediateMat = Mat(height, width, CvType.CV_8UC4)
         frameGray = Mat(height, width, CvType.CV_8UC1)
 
         previewWidth = width
         previewHeight = height
+        cropRect = Rect(previewWidth / 2 - INPUT_SIZE/2, previewHeight/2- INPUT_SIZE/2, INPUT_SIZE, INPUT_SIZE)
         /*if (openCvCameraView.rotation != null) {
             sensorOrientation = openCvCameraView.rotation - screenOrientation
         }
@@ -245,16 +258,29 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
     override fun onCameraViewStopped() {
         frameRgba.release()
+        frameDetection.release()
         frameGray.release()
         frameIntermediateMat.release()
     }
 
     override fun onCameraFrame(inputFrame: CameraBridgeViewBase.CvCameraViewFrame?): Mat {
 
+        // optical flow
         inputFrame?.let {
             outputLinesFlow = opticalFlow.run(it.gray(), 1)
         }
+
+        // devidce acceleration
         computeIMU()
+
+        // detection (only if not already detecting)
+        if(!detectorPaused) {
+            if (!computingDetection) {
+                detect(frameRgba)
+            }
+        }
+
+        // display
         frameRgba = inputFrame!!.rgba()
         return frameRgba
     }
@@ -572,70 +598,42 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
     }
 
-    private fun processImage() {
-        trackingOverlay?.postInvalidate()
-        Timber.i("ProcessingDetection ${computingDetection} processingOF ${computingOF}")
-
-        // No mutex needed as this method is not reentrant.
-        if (computingDetection && computingOF) {
-            imageProcessor.readyForNextImage()
-            return
-        }
-        if (!computingOF) {
-            // will run its own thread
-            computeOF()
-        }
-        if (!computingDetection) {
-            // will run its own thread
-            detect()
-        }
-
-    }
-
-    private fun detect() {
+    private fun detect(frame: Mat) {
         computingDetection = true
-
-        imageProcessor.getRgbBytes()?.let {
-            rgbFrameBitmap?.setPixels(
-                it, 0, previewWidth, 0, 0, previewWidth, previewHeight
-            )
+        Timber.i("frame: ${frame.size()} rect: ${cropRect}")
+        val rgbaInnerWindow = frame.submat(cropRect)
+        Utils.matToBitmap(rgbaInnerWindow, croppedBitmap);
+        if (SAVE_PREVIEW_BITMAP) {
+            ImageUtils.saveBitmap(croppedBitmap!!)
         }
-        imageProcessor.readyForNextImage()
-
         /*trackerManager?.let {
             it.updateTrackers()
         }*/
 
-        if (croppedBitmap != null && rgbFrameBitmap != null && frameToCropTransform != null) {
-            val canvas = Canvas(croppedBitmap!!)
-            canvas.drawBitmap(rgbFrameBitmap!!, frameToCropTransform!!, null)
-            // For examining the actual TF input.
-            if (SAVE_PREVIEW_BITMAP) {
-                ImageUtils.saveBitmap(croppedBitmap!!)
+        // run in background
+        backgroundScope.launch(threadDetector) {
+            val startTime = SystemClock.uptimeMillis()
+            val results: List<Detector.Recognition>? = croppedBitmap?.let {
+                detector?.recognizeImage(it)
             }
-        }
-        // TODO replace this part
-        val startTime = SystemClock.uptimeMillis()
-        val results: List<Detector.Recognition>? = croppedBitmap?.let {
-            detector?.recognizeImage(croppedBitmap)
-        }
-        latestDetections = results
+            @Synchronized
+            latestDetections = results
 
-        lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
-        val mappedRecognitions =
-            ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
-        //mutex.withLock {
-            if (fastSelfMotionTimestamp == 0L) {
-                trackerManager?.processDetections(mappedRecognitions, location)
-                trackerManager?.updateTrackers()
+            lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
+            val mappedRecognitions =
+                ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
+            /*mutex.withLock {
+                if (fastSelfMotionTimestamp == 0L) {
+                    trackerManager?.processDetections(mappedRecognitions, location)
+                    trackerManager?.updateTrackers()
+                }
+            }*/
+
+            trackingOverlay?.postInvalidate()
+            computingDetection = false
+            runOnUiThread {
+                bottomSheet.showInference(lastProcessingTimeMs.toString() + "ms")
             }
-        //}
-        flowRegionUpdateNeeded = true
-
-        trackingOverlay?.postInvalidate()
-        computingDetection = false
-        runOnUiThread {
-            bottomSheet.showInference(lastProcessingTimeMs.toString() + "ms")
         }
     }
 
