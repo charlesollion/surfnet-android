@@ -158,6 +158,11 @@
                 app:layout_constraintVertical_bias="0.60"
                 app:layout_constraintWidth_percent="0.95"/>
 
+            <org.surfrider.surfnet.detection.customview.OverlayView
+                android:id="@+id/tracking_overlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"/>
+
         </androidx.constraintlayout.widget.ConstraintLayout>
 
         <include

@@ -65,6 +65,8 @@ import org.surfrider.surfnet.detection.databinding.ActivityCameraBinding
 import org.surfrider.surfnet.detection.databinding.FragmentSendDataDialogBinding
 import org.surfrider.surfnet.detection.env.ImageProcessor
 import org.surfrider.surfnet.detection.env.ImageUtils
+import org.surfrider.surfnet.detection.env.ImageUtils.drawDetections
+import org.surfrider.surfnet.detection.env.ImageUtils.drawOFLinesPRK
 import org.surfrider.surfnet.detection.flow.DenseOpticalFlow
 import org.surfrider.surfnet.detection.flow.IMU_estimator
 import org.surfrider.surfnet.detection.tflite.Detector
@@ -144,7 +146,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         /*bindingDialog = FragmentSendDataDialogBinding.inflate(
             layoutInflater
         )*/
-        setContentView(R.layout.activity_camera);
         openCvCameraView = findViewById(R.id.camera_view) as CameraBridgeViewBase
         openCvCameraView.visibility = CameraBridgeViewBase.VISIBLE
         openCvCameraView.setCvCameraViewListener(this)
@@ -154,7 +155,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         chronoContainer = binding.chronoContainer
         binding.wasteCounter.text = "0"
         bottomSheet = BottomSheet(binding)
-         hideSystemUI()
+        hideSystemUI()
 
         setupPermissions()
 
@@ -190,15 +191,18 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         outputLinesFlow = arrayListOf()
 
         binding.closeButton.setOnClickListener {
+            Timber.i("close button")
             val intent = Intent(applicationContext, TutorialActivity::class.java)
             startActivity(intent)
         }
 
         binding.startButton.setOnClickListener {
+            Timber.i("start button")
             startDetector()
         }
 
         binding.stopButton.setOnClickListener {
+            Timber.i("stop button")
             endDetector()
         }
 
@@ -319,7 +323,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         cropToFrameTransform = Matrix()
         frameToCropTransform?.invert(cropToFrameTransform)
 
-        /*trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
+        trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
         trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
                 canvas?.let {
@@ -344,7 +348,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                     updateCounter(tracker.detectedWaste.size)
                 }
             }
-        })*/
+        })
 
         binding.chronometer.base = if (lastPause == 0L) {
             SystemClock.elapsedRealtime()
