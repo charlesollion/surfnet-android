@@ -250,10 +250,10 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     }
 
     override fun onCameraFrame(inputFrame: CameraBridgeViewBase.CvCameraViewFrame?): Mat {
-        /*
-        inputFrame.let {
-            outputLinesFlow = opticalFlow.run(it, currROIs, 1)
-        }*/
+
+        inputFrame?.let {
+            outputLinesFlow = opticalFlow.run(it.gray(), 1)
+        }
         computeIMU()
         frameRgba = inputFrame!!.rgba()
         return frameRgba
@@ -545,7 +545,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         // Run OF
         currFrameMat?.let {
-            outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
+            outputLinesFlow = opticalFlow.run(it, DOWNSAMPLING_FACTOR_FLOW)
         }
 
         // Update trackers and regions of interests
