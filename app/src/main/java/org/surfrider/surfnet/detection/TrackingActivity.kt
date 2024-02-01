@@ -31,7 +31,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Size
 import android.view.Surface
 import android.view.View
 import android.view.WindowInsets
@@ -54,9 +53,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.InternalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.internal.synchronized
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.sync.Mutex
@@ -66,12 +63,9 @@ import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.*
-import org.opencv.imgproc.Imgproc
-import org.opencv.imgproc.Imgproc.cvtColor
 import org.surfrider.surfnet.detection.customview.BottomSheet
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.databinding.ActivityCameraBinding
-import org.surfrider.surfnet.detection.databinding.FragmentSendDataDialogBinding
 import org.surfrider.surfnet.detection.env.ImageProcessor
 import org.surfrider.surfnet.detection.env.ImageUtils
 import org.surfrider.surfnet.detection.env.ImageUtils.drawDetections
@@ -109,7 +103,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private var previewWidth = 0
     private var previewHeight = 0
     private var detectorPaused = true
-    private var flowRegionUpdateNeeded = false
     private var avgFlowSpeed: PointF? = null
     private var wasteCount = 0
     private var location: Location? = null
@@ -118,8 +111,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     @OptIn(ExperimentalCoroutinesApi::class)
     private val threadDetector = newSingleThreadContext("InferenceThread")
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
     private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private var trackingOverlay: OverlayView? = null
@@ -135,11 +126,9 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private var cropToFrameTransform: Matrix? = null
     private var trackerManager: TrackerManager? = null
     private var latestDetections: List<Detector.Recognition>? = null
-    private var currROIs: Mat? = null
     private val mutex = Mutex()
     private val locationHandler = Handler(Looper.getMainLooper())
     private var lastTrackerManager: TrackerManager? = null
-    private lateinit var bindingDialog: FragmentSendDataDialogBinding
     private val isDebug = false
     private var isGpsActivate = false
 
@@ -154,9 +143,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         //initialize binding & UI
         binding = ActivityCameraBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        /*bindingDialog = FragmentSendDataDialogBinding.inflate(
-            layoutInflater
-        )*/
         openCvCameraView = findViewById(R.id.camera_view) as CameraBridgeViewBase
         openCvCameraView.visibility = CameraBridgeViewBase.VISIBLE
         openCvCameraView.setCvCameraViewListener(this)
@@ -217,8 +203,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             Timber.i("stop button")
             endDetector()
         }
-
     }
+
     override fun onPause() {
         super.onPause()
         if (openCvCameraView != null) openCvCameraView.disableView()
@@ -264,14 +250,19 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     }
 
     override fun onCameraFrame(inputFrame: CameraBridgeViewBase.CvCameraViewFrame?): Mat {
+        // device acceleration
+        computeIMU()
 
         // optical flow
         inputFrame?.let {
             outputLinesFlow = opticalFlow.run(it.gray(), 1)
+            if (fastSelfMotionTimestamp == 0L) {
+                avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
+                    outputLinesFlow,
+                    FLOW_REFRESH_RATE_MILLIS
+                )
+            }
         }
-
-        // devidce acceleration
-        computeIMU()
 
         // detection (only if not already detecting)
         if(!detectorPaused) {
@@ -282,6 +273,9 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         // display
         frameRgba = inputFrame!!.rgba()
+        trackingOverlay?.let {
+            it.postInvalidate()
+        }
         return frameRgba
     }
 
@@ -477,6 +471,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             PERMISSION_CAMERA, PERMISSION_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION
         )
         if (!checkPermissions(permissions)) {
+            // TODO add dialog for permissions
             //val locationPermissionDialog = LocationPermissionDialog()
             //locationPermissionDialog.show(supportFragmentManager, "stop_record_dialog")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -498,24 +493,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         return true
     }
 
-    @Suppress("DEPRECATION")
-    private val screenOrientation: Int
-        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            when (display?.rotation) {
-                Surface.ROTATION_270 -> 270
-                Surface.ROTATION_180 -> 180
-                Surface.ROTATION_90 -> 90
-                else -> 0
-            }
-        } else {
-            when (windowManager.defaultDisplay.rotation) {
-                Surface.ROTATION_270 -> 270
-                Surface.ROTATION_180 -> 180
-                Surface.ROTATION_90 -> 90
-                else -> 0
-            }
-        }
-
     fun updateCounter(count: Int?) {
         binding.wasteCounter.text = count.toString()
         if (count != null) {
@@ -531,7 +508,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         val xVelocity = velocity[0] * 3.6f
         val yVelocity = velocity[1] * 3.6f
         val zVelocity = velocity[2] * 3.6f
-
 
         // Get the magnitude of the velocity vector
         val speed =
@@ -554,48 +530,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                     speed, avgFlowSpeed?.x ?: 0.0F, avgFlowSpeed?.y ?: 0.0F
                 )
             )
-            trackingOverlay?.let {
-                it.invalidate()
-            }
         }
-    }
-
-    private fun computeOF() {
-        // TODO replace this part
-        computingOF = true
-        currFrameMat = imageProcessor.getMatFromRGB(
-            previewWidth,
-            previewHeight,
-            DOWNSAMPLING_FACTOR_FLOW
-        )
-
-        // Run OF
-        currFrameMat?.let {
-            outputLinesFlow = opticalFlow.run(it, DOWNSAMPLING_FACTOR_FLOW)
-        }
-
-        // Update trackers and regions of interests
-        // mutex.withLock {
-            if (fastSelfMotionTimestamp == 0L) {
-                avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
-                    outputLinesFlow,
-                    FLOW_REFRESH_RATE_MILLIS
-                )
-                if (flowRegionUpdateNeeded) {
-                    flowRegionUpdateNeeded = false
-                    currROIs =
-                        trackerManager?.getCurrentRois(
-                            1280,
-                            720,
-                            DOWNSAMPLING_FACTOR_FLOW,
-                            60
-                        )
-                }
-            }
-        // }
-
-        computingOF = false
-
     }
 
     private fun detect(frame: Mat) {
@@ -604,7 +539,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         val rgbaInnerWindow = frame.submat(cropRect)
         Utils.matToBitmap(rgbaInnerWindow, croppedBitmap);
         if (SAVE_PREVIEW_BITMAP) {
-            ImageUtils.saveBitmap(croppedBitmap!!)
+            ImageUtils.saveBitmap(croppedBitmap!!, applicationContext)
         }
         /*trackerManager?.let {
             it.updateTrackers()
@@ -637,9 +572,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         }
     }
 
-    private val desiredPreviewFrameSize: Size
-        get() = Size(1280, 720)
-
     companion object {
         private const val FLOW_REFRESH_RATE_MILLIS: Long = 50
         private const val DOWNSAMPLING_FACTOR_FLOW: Int = 2
@@ -655,7 +587,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         private const val NUM_THREADS = 1
         private const val MAINTAIN_ASPECT = true
-        private const val SAVE_PREVIEW_BITMAP = false
+        private const val SAVE_PREVIEW_BITMAP = true
         private const val REQUEST_LOCATION_PERMISSION = 2
         private const val PERMISSIONS_REQUEST = 1
         private const val PERMISSION_CAMERA = Manifest.permission.CAMERA

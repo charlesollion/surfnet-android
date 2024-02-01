@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 package org.surfrider.surfnet.detection.env
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -44,16 +45,15 @@ object ImageUtils {
      * @param bitmap The bitmap to save.
      */
     @JvmStatic
-    fun saveBitmap(bitmap: Bitmap) {
+    fun saveBitmap(bitmap: Bitmap, context:Context) {
         val filename = "preview.png"
         val root =
-            Environment.getExternalStorageDirectory().absolutePath + File.separator + "tensorflow"
+            File(context.getExternalFilesDir(null), "tensorflow")
         Timber.i("Saving %dx%d bitmap to %s.", bitmap.width, bitmap.height, root)
-        val myDir = File(root)
-        if (!myDir.mkdirs()) {
+        if (!root.mkdirs()) {
             Timber.i("Make dir failed")
         }
-        val file = File(myDir, filename)
+        val file = File(root, filename)
         if (file.exists()) {
             file.delete()
         }
