@@ -40,7 +40,6 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.TableRow
-import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -71,8 +70,6 @@ import org.surfrider.surfnet.detection.databinding.ActivityCameraBinding
 import org.surfrider.surfnet.detection.databinding.FragmentSendDataDialogBinding
 import org.surfrider.surfnet.detection.env.ImageProcessor
 import org.surfrider.surfnet.detection.env.ImageUtils
-import org.surfrider.surfnet.detection.env.ImageUtils.drawDetections
-import org.surfrider.surfnet.detection.env.ImageUtils.drawOFLinesPRK
 import org.surfrider.surfnet.detection.env.Utils.chooseCamera
 import org.surfrider.surfnet.detection.flow.DenseOpticalFlow
 import org.surfrider.surfnet.detection.flow.IMU_estimator
@@ -80,7 +77,6 @@ import org.surfrider.surfnet.detection.tflite.Detector
 import org.surfrider.surfnet.detection.tflite.YoloDetector
 import org.surfrider.surfnet.detection.tracking.TrackerManager
 import timber.log.Timber
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -251,7 +247,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         cropToFrameTransform = Matrix()
         frameToCropTransform?.invert(cropToFrameTransform)
 
-        trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
+        /*trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
         trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
                 canvas?.let {
@@ -276,7 +272,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                     updateCounter(tracker.detectedWaste.size)
                 }
             }
-        })
+        })*/
 
         binding.chronometer.base = if (lastPause == 0L) {
             SystemClock.elapsedRealtime()
@@ -394,13 +390,14 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     /** Callback for Camera2 API  */
     override fun onImageAvailable(reader: ImageReader) {
         try {
+            reader.acquireLatestImage()?.close()
             /*imageProcessor.openCameraImage(reader, previewWidth, previewHeight)
             if (detectorPaused) {
                 imageProcessor.readyForNextImage()
             } else {
                 processImage()
             }*/
-            val image = reader.acquireLatestImage()
+            /*val image = reader.acquireLatestImage()
             if (!computingOF && !detectorPaused)  {
                 val currFrameMat =
                     imageProcessor.getMatFromCamera(image, previewWidth, previewHeight, 1)
@@ -418,14 +415,15 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                         // Update trackers and regions of interests
                         runOnUiThread {
                             bottomSheet.showInference(lastProcessingTimeMs.toString() + "ms")
+                            trackingOverlay?.invalidate()
                         }
                         computingOF = false
                     }
                 }
             } else {
                 image.close()
-            }
-            trackingOverlay?.postInvalidate()
+            }*/
+            //trackingOverlay?.postInvalidate()
         } catch (e: Exception) {
             Timber.e(e, "Exception in ImageListener!")
             return
@@ -453,7 +451,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         val camera2Fragment = CameraConnectionFragment.newInstance(
             { size: Size?, rotation: Int ->
                 previewHeight = size!!.height
-                previewWidth = size!!.width
+                previewWidth = size.width
                 onPreviewSizeChosen(size, rotation)
             },
             this, desiredPreviewFrameSize,

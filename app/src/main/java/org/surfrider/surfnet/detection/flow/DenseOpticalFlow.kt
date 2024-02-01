@@ -21,7 +21,7 @@ class DenseOpticalFlow {
         var numberCorners = maxCorners
         if(!prevPts.empty())
             numberCorners -= prevPts.rows()
-        Imgproc.goodFeaturesToTrack(greyImage, corners, numberCorners, 0.1, minDistance / scalingFactor, mask ?: Mat())
+        Imgproc.goodFeaturesToTrack(greyImage, corners, numberCorners, 0.1, 5.0, mask ?: Mat())
 
         val newCornersArray = corners.toArray()
 
