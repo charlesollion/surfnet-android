@@ -150,6 +150,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         openCvCameraView.visibility = CameraBridgeViewBase.VISIBLE
         openCvCameraView.setCvCameraViewListener(this)
 
+        trackerManager = TrackerManager()
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         chronoContainer = binding.chronoContainer
@@ -232,6 +233,14 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         frameRgba = Mat(height, width, CvType.CV_8UC4)
         frameIntermediateMat = Mat(height, width, CvType.CV_8UC4)
         frameGray = Mat(height, width, CvType.CV_8UC1)
+
+        previewWidth = width
+        previewHeight = height
+        /*if (openCvCameraView.rotation != null) {
+            sensorOrientation = openCvCameraView.rotation - screenOrientation
+        }
+        Timber.i("Camera orientation relative to screen canvas: %d", sensorOrientation)*/
+        rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
     }
 
     override fun onCameraViewStopped() {
@@ -245,6 +254,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         inputFrame.let {
             outputLinesFlow = opticalFlow.run(it, currROIs, 1)
         }*/
+        computeIMU()
         frameRgba = inputFrame!!.rgba()
         return frameRgba
     }
@@ -340,6 +350,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                         trackerManager?.drawDebug(it)
                     }
                     if (fastSelfMotionTimestamp > 0) {
+                        Timber.i("Fast motion! canvas: ${canvas.width}x${canvas.height} - preview:${previewWidth}x${previewHeight}")
                         ImageUtils.drawBorder(it, previewWidth, previewHeight)
                     }
                     // ImageUtils.drawDebugScreen(it, previewWidth, previewHeight, cropToFrameTransform)
@@ -486,8 +497,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         }
     }
 
-    private fun computeOF() {
-        computingOF = true
+    private fun computeIMU() {
         // get IMU variables
         val velocity: FloatArray = imuEstimator.velocity
         val imuPosition: FloatArray = imuEstimator.position
@@ -510,8 +520,23 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 fastSelfMotionTimestamp = 0
             }
         }
+        runOnUiThread {
+            bottomSheet.showIMUStats(
+                applicationContext,
+                arrayOf(
+                    imuPosition[0], imuPosition[1], imuPosition[2],
+                    speed, avgFlowSpeed?.x ?: 0.0F, avgFlowSpeed?.y ?: 0.0F
+                )
+            )
+            trackingOverlay?.let {
+                it.invalidate()
+            }
+        }
+    }
 
-
+    private fun computeOF() {
+        // TODO replace this part
+        computingOF = true
         currFrameMat = imageProcessor.getMatFromRGB(
             previewWidth,
             previewHeight,
@@ -525,7 +550,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         // Update trackers and regions of interests
         // mutex.withLock {
-        // TODO replace this part
             if (fastSelfMotionTimestamp == 0L) {
                 avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
                     outputLinesFlow,
@@ -546,31 +570,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         computingOF = false
 
-        runOnUiThread {
-            bottomSheet.showIMUStats(
-                applicationContext,
-                arrayOf(
-                    imuPosition[0], imuPosition[1], imuPosition[2],
-                    speed, avgFlowSpeed?.x ?: 0.0F, avgFlowSpeed?.y ?: 0.0F
-                )
-            )
-        }
-    }
-
-
-    private fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
-        trackerManager = TrackerManager()
-
-        size?.let {
-            previewWidth = it.width
-            previewHeight = it.height
-        }
-        if (rotation != null) {
-            sensorOrientation = rotation - screenOrientation
-        }
-        Timber.i("Camera orientation relative to screen canvas: %d", sensorOrientation)
-        Timber.i("Initializing at size %dx%d", previewWidth, previewHeight)
-        rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
     }
 
     private fun processImage() {
