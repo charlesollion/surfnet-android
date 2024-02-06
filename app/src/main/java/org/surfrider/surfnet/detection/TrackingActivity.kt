@@ -218,6 +218,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     override fun onDestroy() {
         super.onDestroy()
         if (openCvCameraView != null) openCvCameraView.disableView()
+        endDetector()
         locationHandler.removeCallbacksAndMessages(null)
     }
 
@@ -263,6 +264,9 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     }
 
     override fun onCameraViewStopped() {
+        croppedBitmap = null
+        cropToFrameTransform = null
+        endDetector()
         frameRgba.release()
         frameResized.release()
         frameGray.release()
@@ -315,8 +319,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         trackingOverlay?.invalidate()
 
         //reset trackers
-        croppedBitmap = null
-        cropToFrameTransform = null
         trackerManager = null
         trackingOverlay = null
 
@@ -381,12 +383,14 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                     }
                     if (isDebug) {
                         trackerManager?.drawDebug(it)
+                        cropToFrameTransform?.let {matrix ->
+                            ImageUtils.drawCrop(it, previewWidth, previewHeight, INPUT_SIZE, matrix)
+                        }
                     }
                     if (fastSelfMotionTimestamp > 0) {
                         Timber.i("Fast motion! canvas: ${canvas.width}x${canvas.height} - preview:${previewWidth}x${previewHeight}")
                         ImageUtils.drawBorder(it, previewWidth, previewHeight)
                     }
-                    ImageUtils.drawCrop(it, previewWidth, previewHeight, INPUT_SIZE, cropToFrameTransform!!)
                 }
                 trackerManager?.let { tracker ->
                     updateCounter(tracker.detectedWaste.size)
