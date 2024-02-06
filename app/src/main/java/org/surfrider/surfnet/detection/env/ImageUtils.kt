@@ -23,6 +23,8 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.media.Image
 import android.os.Environment
+import org.opencv.core.CvType
+import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.tflite.Detector
 import timber.log.Timber
 import java.io.File
@@ -54,7 +56,7 @@ object ImageUtils {
             Timber.i("Make dir failed")
         }
         val file = File(root, filename)
-        if (file.exists()) {
+        if (!file.exists()) {
             file.delete()
         }
         try {
@@ -184,7 +186,7 @@ object ImageUtils {
                 // Crop should be centered so we apply translations
                 matrix.postTranslate(-srcWidth / 2.0f, -srcHeight / 2.0f)
                 val scaleFactor = max(scaleFactorX, scaleFactorY)
-                Timber.i("----------------- scaleFactor = ${scaleFactor}, scaleFactorX $scaleFactorX scaleFactorY $scaleFactorY")
+                Timber.i("--------------- scaleFactor = ${scaleFactor}, scaleFactorX $scaleFactorX scaleFactorY $scaleFactorY")
                 matrix.postScale(scaleFactor, scaleFactor)
                 matrix.postTranslate(dstWidth / 2.0f, dstHeight / 2.0f)
             } else {
@@ -198,6 +200,7 @@ object ImageUtils {
         }
         return matrix
     }
+
 
     @JvmStatic
     fun fillBytes(planes: Array<Image.Plane>, yuvBytes: Array<ByteArray?>) {
@@ -228,8 +231,27 @@ object ImageUtils {
         }
         return outputInts
     }
+
+    fun drawCrop(canvas: Canvas, previewWidth: Int, previewHeight: Int, cropSize: Int, cropToFrameTransform:Matrix) {
+        // Debug function to show crop size
+        val paint = Paint()
+        paint.color = Color.GREEN
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 10.0f
+        // Crop size
+        val rectCrop = RectF(0.0F, 0.0F, cropSize * 1.0F, cropSize * 1.0F)
+
+        val frameToCanvasTransform = Matrix()
+        val scale = min(canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat())
+        frameToCanvasTransform.postScale(scale, scale)
+
+        cropToFrameTransform.mapRect(rectCrop)
+        frameToCanvasTransform.mapRect(rectCrop)
+        canvas.drawRect(rectCrop, paint)
+    }
+
     fun drawBorder(canvas: Canvas, previewWidth: Int, previewHeight: Int) {
-        // Debug function to show frame size and crop size
+        // Draw borders of screen
         val paint = Paint()
         paint.color = Color.RED
         paint.style = Paint.Style.STROKE

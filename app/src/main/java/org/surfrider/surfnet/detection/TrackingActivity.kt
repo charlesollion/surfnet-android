@@ -31,7 +31,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.view.Surface
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
@@ -63,6 +62,7 @@ import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
 import org.opencv.core.*
+import org.opencv.imgproc.Imgproc
 import org.surfrider.surfnet.detection.customview.BottomSheet
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.databinding.ActivityCameraBinding
@@ -79,6 +79,7 @@ import timber.log.Timber
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.max
 
 
 @OptIn(DelicateCoroutinesApi::class)
@@ -95,13 +96,14 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private lateinit var opticalFlow: DenseOpticalFlow
     private lateinit var openCvCameraView: CameraBridgeViewBase
     private lateinit var frameRgba: Mat
-    private lateinit var frameDetection: Mat
-    private lateinit var frameIntermediateMat: Mat
+    private lateinit var frameResized: Mat
     private lateinit var cropRect: Rect
     private lateinit var frameGray: Mat
 
     private var previewWidth = 0
     private var previewHeight = 0
+    private var resizedWidth = 0.0
+    private var resizedHeight = 0.0
     private var detectorPaused = true
     private var avgFlowSpeed: PointF? = null
     private var wasteCount = 0
@@ -117,9 +119,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private var sensorOrientation: Int = 0
     private var detector: YoloDetector? = null
     private var lastProcessingTimeMs: Long = 0
-    private var rgbFrameBitmap: Bitmap? = null
     private var croppedBitmap: Bitmap? = null
-    private var currFrameMat: Mat? = null
     private var computingDetection = false
     private var computingOF = false
     private var frameToCropTransform: Matrix? = null
@@ -227,26 +227,45 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
     override fun onCameraViewStarted(width: Int, height: Int) {
         Timber.i("CameraViewStarted ${width}x${height}")
-        frameRgba = Mat(height, width, CvType.CV_8UC4)
-        frameDetection = Mat(height, width, CvType.CV_8UC3)
-        frameIntermediateMat = Mat(height, width, CvType.CV_8UC4)
-        frameGray = Mat(height, width, CvType.CV_8UC1)
-
         previewWidth = width
         previewHeight = height
-        cropRect = Rect(previewWidth / 2 - INPUT_SIZE/2, previewHeight/2- INPUT_SIZE/2, INPUT_SIZE, INPUT_SIZE)
+
         /*if (openCvCameraView.rotation != null) {
-            sensorOrientation = openCvCameraView.rotation - screenOrientation
-        }
+                    sensorOrientation = openCvCameraView.rotation - screenOrientation
+                }
         Timber.i("Camera orientation relative to screen canvas: %d", sensorOrientation)*/
-        rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
+
+        // Get Android Graphics transform matrix
+        frameToCropTransform = ImageUtils.getTransformationMatrix(
+            previewWidth, previewHeight, INPUT_SIZE, INPUT_SIZE, sensorOrientation, MAINTAIN_ASPECT
+        )
+
+        cropToFrameTransform = Matrix()
+        frameToCropTransform?.invert(cropToFrameTransform)
+
+        // Manual transforms for CVMats: first resize, then crop
+        // TODO merge both android graphics and opencv transforms into one single function
+        val scaleFactorX = INPUT_SIZE.toDouble() / previewWidth
+        val scaleFactorY = INPUT_SIZE.toDouble() / previewHeight
+        val scaleFactor = max(scaleFactorX, scaleFactorY)
+        resizedWidth = scaleFactor * previewWidth
+        resizedHeight = scaleFactor * previewHeight
+
+        cropRect = Rect((resizedWidth / 2 - INPUT_SIZE/2).toInt(), (resizedHeight/2- INPUT_SIZE/2).toInt(), INPUT_SIZE, INPUT_SIZE)
+
+        // Initialize CVMat frames
+        frameRgba = Mat(height, width, CvType.CV_8UC4)
+        frameResized = Mat(resizedHeight.toInt(), resizedWidth.toInt(), CvType.CV_8UC3)
+        frameGray = Mat(height, width, CvType.CV_8UC1)
+
+        // Initialize Bitmap as input to detector
+        croppedBitmap = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888)
     }
 
     override fun onCameraViewStopped() {
         frameRgba.release()
-        frameDetection.release()
+        frameResized.release()
         frameGray.release()
-        frameIntermediateMat.release()
     }
 
     override fun onCameraFrame(inputFrame: CameraBridgeViewBase.CvCameraViewFrame?): Mat {
@@ -345,13 +364,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         bottomSheet.displayDetection(trackerManager!!)
         detectorPaused = false
 
-        croppedBitmap = Bitmap.createBitmap(640, 640, Bitmap.Config.ARGB_8888)
-        frameToCropTransform = ImageUtils.getTransformationMatrix(
-            previewWidth, previewHeight, 640, 640, sensorOrientation, MAINTAIN_ASPECT
-        )
 
-        cropToFrameTransform = Matrix()
-        frameToCropTransform?.invert(cropToFrameTransform)
 
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
         trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
@@ -373,7 +386,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                         Timber.i("Fast motion! canvas: ${canvas.width}x${canvas.height} - preview:${previewWidth}x${previewHeight}")
                         ImageUtils.drawBorder(it, previewWidth, previewHeight)
                     }
-                    // ImageUtils.drawDebugScreen(it, previewWidth, previewHeight, cropToFrameTransform)
+                    ImageUtils.drawCrop(it, previewWidth, previewHeight, INPUT_SIZE, cropToFrameTransform!!)
                 }
                 trackerManager?.let { tracker ->
                     updateCounter(tracker.detectedWaste.size)
@@ -535,8 +548,9 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
     private fun detect(frame: Mat) {
         computingDetection = true
-        Timber.i("frame: ${frame.size()} rect: ${cropRect}")
-        val rgbaInnerWindow = frame.submat(cropRect)
+        Imgproc.resize(frame, frameResized, Size(resizedWidth, resizedHeight))
+        Timber.i("input frame: ${frame.size()} frame after resize: ${frameResized.size()} rect: ${cropRect}")
+        val rgbaInnerWindow = frameResized.submat(cropRect)
         Utils.matToBitmap(rgbaInnerWindow, croppedBitmap);
         if (SAVE_PREVIEW_BITMAP) {
             ImageUtils.saveBitmap(croppedBitmap!!, applicationContext)
@@ -587,7 +601,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         private const val NUM_THREADS = 1
         private const val MAINTAIN_ASPECT = true
-        private const val SAVE_PREVIEW_BITMAP = true
+        private const val SAVE_PREVIEW_BITMAP = false
         private const val REQUEST_LOCATION_PERMISSION = 2
         private const val PERMISSIONS_REQUEST = 1
         private const val PERMISSION_CAMERA = Manifest.permission.CAMERA
