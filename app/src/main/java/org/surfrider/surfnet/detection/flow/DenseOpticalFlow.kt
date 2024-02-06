@@ -3,6 +3,7 @@ package org.surfrider.surfnet.detection.flow
 import org.opencv.core.*
 import org.opencv.imgproc.Imgproc
 import org.opencv.video.Video
+import timber.log.Timber
 
 class DenseOpticalFlow {
     private var prevGreyImage = Mat()
@@ -54,6 +55,13 @@ class DenseOpticalFlow {
             currGreyImage.copyTo(prevGreyImage)
             updatePoints(currGreyImage, scalingFactor)
             return arrayListOf()
+        } else {
+            if(prevGreyImage.size() != currGreyImage.size()) {
+                Timber.i("Warning, change of size prev: ${prevGreyImage.size()} cur: ${currGreyImage.size()}, dropping current OF")
+                currGreyImage.copyTo(prevGreyImage)
+                updatePoints(currGreyImage, scalingFactor)
+                return arrayListOf()
+            }
         }
 
         // If the number of flow points is too low, find new good features
@@ -62,7 +70,13 @@ class DenseOpticalFlow {
         }
 
         // Run the KLT algorithm for Optical Flow
-        Video.calcOpticalFlowPyrLK(prevGreyImage, currGreyImage, prevPts, currPts, status, err)
+        try {
+            Video.calcOpticalFlowPyrLK(prevGreyImage, currGreyImage, prevPts, currPts, status, err)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Timber.e(e, "Error in optical flow")
+            return arrayListOf()
+        }
         flowPtsCount = 0
         val lines = createLines(scalingFactor)
 

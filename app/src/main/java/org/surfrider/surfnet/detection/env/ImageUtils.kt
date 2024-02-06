@@ -232,7 +232,7 @@ object ImageUtils {
         return outputInts
     }
 
-    fun drawCrop(canvas: Canvas, previewWidth: Int, previewHeight: Int, cropSize: Int, cropToFrameTransform:Matrix) {
+    fun drawCrop(canvas: Canvas, frameToCanvasTransform:Matrix, cropSize: Int, cropToFrameTransform:Matrix) {
         // Debug function to show crop size
         val paint = Paint()
         paint.color = Color.GREEN
@@ -241,16 +241,12 @@ object ImageUtils {
         // Crop size
         val rectCrop = RectF(0.0F, 0.0F, cropSize * 1.0F, cropSize * 1.0F)
 
-        val frameToCanvasTransform = Matrix()
-        val scale = min(canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat())
-        frameToCanvasTransform.postScale(scale, scale)
-
         cropToFrameTransform.mapRect(rectCrop)
         frameToCanvasTransform.mapRect(rectCrop)
         canvas.drawRect(rectCrop, paint)
     }
 
-    fun drawBorder(canvas: Canvas, previewWidth: Int, previewHeight: Int) {
+    fun drawBorder(canvas: Canvas, frameToCanvasTransform: Matrix, previewWidth: Int, previewHeight: Int) {
         // Draw borders of screen
         val paint = Paint()
         paint.color = Color.RED
@@ -259,26 +255,17 @@ object ImageUtils {
         // Slightly smaller than Camera frame width to see all borders
         val rectCam = RectF(5.0F, 5.0F, previewWidth.toFloat()-5.0F, previewHeight.toFloat()-5.0F)
 
-        val frameToCanvasTransform = Matrix()
-        val scale = min(canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat())
-        frameToCanvasTransform.postScale(scale, scale)
-
         // Draw Camera frame
         frameToCanvasTransform.mapRect(rectCam)
         canvas.drawRect(rectCam, paint)
     }
 
 
-    fun drawDetections(canvas: Canvas, results: List<Detector.Recognition>?, previewWidth: Int, previewHeight: Int) {
+    fun drawDetections(canvas: Canvas, results: List<Detector.Recognition>?, frameToCanvasTransform: Matrix) {
         val paint = Paint()
         paint.color = Color.RED
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2.0f
-        val frameToCanvasTransform = Matrix()
-        val scale = min(
-            canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
-        )
-        frameToCanvasTransform.postScale(scale, scale)
         if (results != null) {
             for (result in results) {
                 val location = result.location
@@ -290,16 +277,12 @@ object ImageUtils {
         }
     }
 
-    fun drawOFLinesPRK(canvas: Canvas, outputLinesFlow: ArrayList<FloatArray>, previewWidth: Int, previewHeight: Int) {
+    fun drawOFLinesPRK(canvas: Canvas, outputLinesFlow: ArrayList<FloatArray>, frameToCanvasTransform: Matrix) {
         val paint = Paint()
         paint.color = Color.WHITE
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 4.0f
         // Timber.i("output line flow size: ${outputLinesFlow.size}")
-        val frameToCanvasTransform = Matrix()
-        val scale = min(canvas.width / previewWidth.toFloat(),
-            canvas.height / previewHeight.toFloat())
-        frameToCanvasTransform.postScale(scale, scale)
         for(line in outputLinesFlow) {
             val points = line.clone()
             frameToCanvasTransform.mapPoints(points)

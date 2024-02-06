@@ -123,7 +123,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private var lastProcessingTimeMs: Long = 0
     private var croppedBitmap: Bitmap? = null
     private var computingDetection = false
-    private var computingOF = false
+    private var frameToCanvasTransform: Matrix? = null
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
     private var trackerManager: TrackerManager? = null
@@ -260,6 +260,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         frameRgba = Mat(height, width, CvType.CV_8UC4)
         frameResized = Mat(resizedHeight.toInt(), resizedWidth.toInt(), CvType.CV_8UC3)
         frameGray = Mat(height / DOWNSAMPLING_FACTOR_FLOW, width / DOWNSAMPLING_FACTOR_FLOW, CvType.CV_8UC1)
+        Timber.i("initialized gray frame with size: ${frameGray.size()}")
 
         // Initialize Bitmap as input to detector
         croppedBitmap = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888)
@@ -277,7 +278,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     override fun onCameraFrame(inputFrame: CameraBridgeViewBase.CvCameraViewFrame?): Mat {
         // device acceleration
         computeIMU()
-
         // optical flow
         inputFrame?.let {
             val grayMat = it.gray()
@@ -377,24 +377,27 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
                 canvas?.let {
+                    if (frameToCanvasTransform == null) {
+                        frameToCanvasTransform = ImageUtils.getTransformationMatrix(previewWidth, previewHeight, canvas.width, canvas.height,0, false)
+                    }
                     trackerManager?.draw(
-                        it, context, previewWidth, previewHeight, bottomSheet.showOF
+                        it, context, frameToCanvasTransform!!, bottomSheet.showOF
                     )
                     if (bottomSheet.showOF) {
-                        drawOFLinesPRK(it, outputLinesFlow, previewWidth, previewHeight)
+                        drawOFLinesPRK(it, outputLinesFlow, frameToCanvasTransform!!)
                     }
                     if (bottomSheet.showBoxes) {
-                        drawDetections(it, latestDetections, previewWidth, previewHeight)
+                        drawDetections(it, latestDetections, frameToCanvasTransform!!)
                     }
                     if (isDebug) {
                         trackerManager?.drawDebug(it)
                         cropToFrameTransform?.let {matrix ->
-                            ImageUtils.drawCrop(it, previewWidth, previewHeight, INPUT_SIZE, matrix)
+                            ImageUtils.drawCrop(it, frameToCanvasTransform!!, INPUT_SIZE, matrix)
                         }
                     }
                     if (fastSelfMotionTimestamp > 0) {
                         Timber.i("Fast motion! canvas: ${canvas.width}x${canvas.height} - preview:${previewWidth}x${previewHeight}")
-                        ImageUtils.drawBorder(it, previewWidth, previewHeight)
+                        ImageUtils.drawBorder(it, frameToCanvasTransform!!, previewWidth, previewHeight)
                     }
                 }
                 trackerManager?.let { tracker ->
@@ -574,12 +577,12 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             val results: List<Detector.Recognition>? = croppedBitmap?.let {
                 detector?.recognizeImage(it)
             }
-            @Synchronized
-            latestDetections = results
 
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
             val mappedRecognitions =
                 ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
+            @Synchronized
+            latestDetections = mappedRecognitions
             mutex.withLock {
                 if (fastSelfMotionTimestamp == 0L) {
                     trackerManager?.processDetections(mappedRecognitions, location)

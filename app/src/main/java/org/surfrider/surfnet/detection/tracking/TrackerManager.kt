@@ -6,6 +6,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.VectorDrawable
 import android.location.Location
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.values
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.R
@@ -109,16 +110,11 @@ class TrackerManager {
     fun draw(
             canvas: Canvas,
             context: Context?,
-            previewWidth: Int,
-            previewHeight: Int,
+            frameToCanvasTransform: Matrix,
             showOF: Boolean
     ) {
         // Build transform matrix from canvas and context
-        val frameToCanvasTransform = Matrix()
-        val scale = min(
-                canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
-        )
-        frameToCanvasTransform.postScale(scale, scale)
+        val scale = 1.0F
         if (bmpYellow == null) {
             bmpYellow = context?.let { getBitmap(it, R.drawable.yellow_dot) }
         }
