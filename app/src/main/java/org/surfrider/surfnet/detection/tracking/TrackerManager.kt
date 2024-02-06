@@ -283,6 +283,7 @@ class TrackerManager {
         for (tracker in trackers) {
             val medianSpeed = calculateMedianFlowSpeedForTrack(tracker.position, listOfFlowLines, 6)
 
+
             // scale speed depending on optical flow refresh rate
             /*medianSpeed?.let {
                 it.x /= flowRefreshRateInMillis / 1000.0F

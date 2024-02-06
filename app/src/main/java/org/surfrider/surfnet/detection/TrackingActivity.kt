@@ -56,6 +56,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.opencv.android.CameraActivity
 import org.opencv.android.CameraBridgeViewBase
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2
@@ -112,6 +113,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val threadDetector = newSingleThreadContext("InferenceThread")
+    private val threadTracker = newSingleThreadContext("TrackerThread")
 
     private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
@@ -280,10 +282,14 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         inputFrame?.let {
             outputLinesFlow = opticalFlow.run(it.gray(), 1)
             if (fastSelfMotionTimestamp == 0L) {
-                avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
-                    outputLinesFlow,
-                    FLOW_REFRESH_RATE_MILLIS
-                )
+                backgroundScope.launch(threadTracker) {
+                    mutex.withLock {
+                        avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
+                            outputLinesFlow,
+                            FLOW_REFRESH_RATE_MILLIS
+                        )
+                    }
+                }
             }
         }
 
@@ -360,13 +366,10 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             finish()
         }
 
-
         trackerManager = lastTrackerManager ?: TrackerManager()
 
         bottomSheet.displayDetection(trackerManager!!)
         detectorPaused = false
-
-
 
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
         trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
@@ -575,12 +578,12 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
             val mappedRecognitions =
                 ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
-            /*mutex.withLock {
+            mutex.withLock {
                 if (fastSelfMotionTimestamp == 0L) {
                     trackerManager?.processDetections(mappedRecognitions, location)
                     trackerManager?.updateTrackers()
                 }
-            }*/
+            }
 
             trackingOverlay?.postInvalidate()
             computingDetection = false
