@@ -259,7 +259,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         // Initialize CVMat frames
         frameRgba = Mat(height, width, CvType.CV_8UC4)
         frameResized = Mat(resizedHeight.toInt(), resizedWidth.toInt(), CvType.CV_8UC3)
-        frameGray = Mat(height, width, CvType.CV_8UC1)
+        frameGray = Mat(height / DOWNSAMPLING_FACTOR_FLOW, width / DOWNSAMPLING_FACTOR_FLOW, CvType.CV_8UC1)
 
         // Initialize Bitmap as input to detector
         croppedBitmap = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888)
@@ -280,7 +280,9 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         // optical flow
         inputFrame?.let {
-            outputLinesFlow = opticalFlow.run(it.gray(), 1)
+            val grayMat = it.gray()
+            Imgproc.resize(grayMat, frameGray, frameGray.size())
+            outputLinesFlow = opticalFlow.run(frameGray, DOWNSAMPLING_FACTOR_FLOW)
             if (fastSelfMotionTimestamp == 0L) {
                 backgroundScope.launch(threadTracker) {
                     mutex.withLock {
@@ -556,7 +558,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private fun detect(frame: Mat) {
         computingDetection = true
         Imgproc.resize(frame, frameResized, Size(resizedWidth, resizedHeight))
-        Timber.i("input frame: ${frame.size()} frame after resize: ${frameResized.size()} rect: ${cropRect}")
+        // Timber.i("input frame: ${frame.size()} frame after resize: ${frameResized.size()} rect: ${cropRect}")
         val rgbaInnerWindow = frameResized.submat(cropRect)
         Utils.matToBitmap(rgbaInnerWindow, croppedBitmap);
         if (SAVE_PREVIEW_BITMAP) {

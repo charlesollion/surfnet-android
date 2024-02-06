@@ -79,9 +79,9 @@ public class YoloDetector implements Detector {
         BufferedReader br = new BufferedReader(new InputStreamReader(labelsInput));
         String line;
         while ((line = br.readLine()) != null) {
-            Timber.w(line);
             d.labels.add(line);
         }
+        Timber.w("First class: " + d.labels.firstElement());
         br.close();
 
         try {
@@ -147,7 +147,7 @@ public class YoloDetector implements Detector {
         }
 
         int[] shape = d.tfLite.getOutputTensor(0).shape();
-        Timber.i("out shape ==== "+Arrays.toString(shape));
+        // Timber.i("out shape ==== "+Arrays.toString(shape));
         int numClass = 0;
         if(!isV8) {
             // yolov5 case: (1, num_anchors, num_class+5)
