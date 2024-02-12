@@ -30,7 +30,6 @@ class TrackerManager {
 
     var displayDetection = true
 
-    private var bmpYellow: Bitmap? = null
     private var bmpGreen: Bitmap? = null
     private var bmpWhite: Bitmap? = null
 
@@ -115,9 +114,13 @@ class TrackerManager {
     ) {
         // Build transform matrix from canvas and context
         val scale = 1.0F
-        if (bmpYellow == null) {
-            bmpYellow = context?.let { getBitmap(it, R.drawable.yellow_dot) }
-        }
+
+        val frameToCanvasTransform = Matrix()
+        /*val scale = min(
+                canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
+        )*/
+        frameToCanvasTransform.postScale(scale, scale)
+
         if (bmpGreen == null) {
             bmpGreen = context?.let { getBitmap(it, R.drawable.check_icon) }
         }
@@ -130,17 +133,14 @@ class TrackerManager {
             //Only draw tracker if not inactive
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
                 var bmp: Bitmap? = null
-                if (displayDetection || !(tracker.status == Tracker.TrackerStatus.RED || tracker.status == Tracker.TrackerStatus.LOADING)) {
+                if (displayDetection || !(tracker.status == Tracker.TrackerStatus.RED)) {
                     bmp = if (tracker.status == Tracker.TrackerStatus.GREEN) {
                         if (!detectedWaste.contains(tracker)) {
                             detectedWaste.add(tracker)
                         }
                         bmpGreen
                     } else {
-                        if (tracker.status == Tracker.TrackerStatus.LOADING)
-                            bmpYellow
-                        else
-                            bmpWhite
+                        bmpWhite
                     }
 
                 }
