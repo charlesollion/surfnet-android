@@ -131,7 +131,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private val mutex = Mutex()
     private val locationHandler = Handler(Looper.getMainLooper())
     private var lastTrackerManager: TrackerManager? = null
-    private val isDebug = false
     private var isGpsActivate = false
 
     private var lastPause: Long = 0
@@ -155,6 +154,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         chronoContainer = binding.chronoContainer
         binding.wasteCounter.text = "0"
         bottomSheet = BottomSheet(binding)
+        bottomSheet.showOF = DEBUG_MODE
+        bottomSheet.showBoxes = DEBUG_MODE
         hideSystemUI()
 
         setupPermissions()
@@ -389,7 +390,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                     if (bottomSheet.showBoxes) {
                         drawDetections(it, latestDetections, frameToCanvasTransform!!)
                     }
-                    if (isDebug) {
+                    if (DEBUG_FRAME) {
                         trackerManager?.drawDebug(it)
                         cropToFrameTransform?.let {matrix ->
                             ImageUtils.drawCrop(it, frameToCanvasTransform!!, INPUT_SIZE, matrix)
@@ -599,6 +600,9 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     }
 
     companion object {
+        private const val DEBUG_FRAME = false
+        private const val DEBUG_MODE = true
+
         private const val FLOW_REFRESH_RATE_MILLIS: Long = 50
         private const val DOWNSAMPLING_FACTOR_FLOW: Int = 2
         private const val MAX_SELF_VELOCITY = 5.0

@@ -21,6 +21,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.min
+import kotlin.math.sqrt
 
 class TrackerManager {
 
@@ -422,8 +423,8 @@ class TrackerManager {
             return kotlin.math.sqrt((p1[0] - p2.x) * (p1[0] - p2.x) + (p1[1] - p2.y) * (p1[1] - p2.y))
         }
 
-        private const val SCREEN_DIAGONAL = 960.0F // sqrt(720x1280)
-        private const val ASSOCIATION_THRESHOLD = 60.0F / SCREEN_DIAGONAL
+        private const val SCREEN_DIAGONAL = 1440 // sqrt(1920*1080)
+        private const val ASSOCIATION_THRESHOLD = 0.1f // 10% of screen diagonal
 
         // Weights of different scores
         private const val W_DIST = 1.0
