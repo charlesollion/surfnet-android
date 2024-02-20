@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 package org.surfrider.surfnet.detection.env
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -22,6 +23,8 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.media.Image
 import android.os.Environment
+import org.opencv.core.CvType
+import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.tflite.Detector
 import timber.log.Timber
 import java.io.File
@@ -44,17 +47,16 @@ object ImageUtils {
      * @param bitmap The bitmap to save.
      */
     @JvmStatic
-    fun saveBitmap(bitmap: Bitmap) {
+    fun saveBitmap(bitmap: Bitmap, context:Context) {
         val filename = "preview.png"
         val root =
-            Environment.getExternalStorageDirectory().absolutePath + File.separator + "tensorflow"
+            File(context.getExternalFilesDir(null), "tensorflow")
         Timber.i("Saving %dx%d bitmap to %s.", bitmap.width, bitmap.height, root)
-        val myDir = File(root)
-        if (!myDir.mkdirs()) {
+        if (!root.mkdirs()) {
             Timber.i("Make dir failed")
         }
-        val file = File(myDir, filename)
-        if (file.exists()) {
+        val file = File(root, filename)
+        if (!file.exists()) {
             file.delete()
         }
         try {
@@ -67,6 +69,18 @@ object ImageUtils {
         }
     }
 
+    public fun rgbIntToByteArray(rgbInts: IntArray): ByteArray {
+        val outputBytes = ByteArray(rgbInts.size * 3)
+        for(i: Int in rgbInts.indices) {
+            val rgb = rgbInts[i]
+            outputBytes[i*3] = ((rgb shr 16) and 0xff).toByte()
+            outputBytes[i*3+1] = ((rgb shr 8) and 0xff).toByte()
+            outputBytes[i*3+2] = (rgb and 0xff).toByte()
+        }
+        return outputBytes
+    }
+
+    @JvmStatic
     private fun mapYUVtoRGB(valY: Int, valU: Int, valV: Int): Int {
         // Adjust and check YUV values
         var y = valY
@@ -172,7 +186,7 @@ object ImageUtils {
                 // Crop should be centered so we apply translations
                 matrix.postTranslate(-srcWidth / 2.0f, -srcHeight / 2.0f)
                 val scaleFactor = max(scaleFactorX, scaleFactorY)
-                Timber.i("----------------- scaleFactor = ${scaleFactor}, scaleFactorX $scaleFactorX scaleFactorY $scaleFactorY")
+                Timber.i("--------------- scaleFactor = ${scaleFactor}, scaleFactorX $scaleFactorX scaleFactorY $scaleFactorY")
                 matrix.postScale(scaleFactor, scaleFactor)
                 matrix.postTranslate(dstWidth / 2.0f, dstHeight / 2.0f)
             } else {
@@ -186,6 +200,7 @@ object ImageUtils {
         }
         return matrix
     }
+
 
     @JvmStatic
     fun fillBytes(planes: Array<Image.Plane>, yuvBytes: Array<ByteArray?>) {
@@ -203,6 +218,9 @@ object ImageUtils {
 
     @JvmStatic
     fun downsampleRGBInts(rgbInts: IntArray, originalWidth: Int, originalHeight: Int, downsampleFactor: Int): IntArray {
+        if (downsampleFactor == 1) {
+            return rgbInts
+        }
         val newWidth = originalWidth / downsampleFactor
         val newHeight = originalHeight / downsampleFactor
         val outputInts = IntArray(newWidth * newHeight)
@@ -213,8 +231,23 @@ object ImageUtils {
         }
         return outputInts
     }
-    fun drawBorder(canvas: Canvas, previewWidth: Int, previewHeight: Int) {
-        // Debug function to show frame size and crop size
+
+    fun drawCrop(canvas: Canvas, frameToCanvasTransform:Matrix, cropSize: Int, cropToFrameTransform:Matrix) {
+        // Debug function to show crop size
+        val paint = Paint()
+        paint.color = Color.GREEN
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 10.0f
+        // Crop size
+        val rectCrop = RectF(0.0F, 0.0F, cropSize * 1.0F, cropSize * 1.0F)
+
+        cropToFrameTransform.mapRect(rectCrop)
+        frameToCanvasTransform.mapRect(rectCrop)
+        canvas.drawRect(rectCrop, paint)
+    }
+
+    fun drawBorder(canvas: Canvas, frameToCanvasTransform: Matrix, previewWidth: Int, previewHeight: Int) {
+        // Draw borders of screen
         val paint = Paint()
         paint.color = Color.RED
         paint.style = Paint.Style.STROKE
@@ -222,26 +255,17 @@ object ImageUtils {
         // Slightly smaller than Camera frame width to see all borders
         val rectCam = RectF(5.0F, 5.0F, previewWidth.toFloat()-5.0F, previewHeight.toFloat()-5.0F)
 
-        val frameToCanvasTransform = Matrix()
-        val scale = min(canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat())
-        frameToCanvasTransform.postScale(scale, scale)
-
         // Draw Camera frame
         frameToCanvasTransform.mapRect(rectCam)
         canvas.drawRect(rectCam, paint)
     }
 
 
-    fun drawDetections(canvas: Canvas, results: List<Detector.Recognition>?, previewWidth: Int, previewHeight: Int) {
+    fun drawDetections(canvas: Canvas, results: List<Detector.Recognition>?, frameToCanvasTransform: Matrix) {
         val paint = Paint()
         paint.color = Color.RED
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2.0f
-        val frameToCanvasTransform = Matrix()
-        val scale = min(
-            canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
-        )
-        frameToCanvasTransform.postScale(scale, scale)
         if (results != null) {
             for (result in results) {
                 val location = result.location
@@ -253,16 +277,12 @@ object ImageUtils {
         }
     }
 
-    fun drawOFLinesPRK(canvas: Canvas, outputLinesFlow: ArrayList<FloatArray>, previewWidth: Int, previewHeight: Int) {
+    fun drawOFLinesPRK(canvas: Canvas, outputLinesFlow: ArrayList<FloatArray>, frameToCanvasTransform: Matrix) {
         val paint = Paint()
         paint.color = Color.WHITE
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 4.0f
         // Timber.i("output line flow size: ${outputLinesFlow.size}")
-        val frameToCanvasTransform = Matrix()
-        val scale = min(canvas.width / previewWidth.toFloat(),
-            canvas.height / previewHeight.toFloat())
-        frameToCanvasTransform.postScale(scale, scale)
         for(line in outputLinesFlow) {
             val points = line.clone()
             frameToCanvasTransform.mapPoints(points)

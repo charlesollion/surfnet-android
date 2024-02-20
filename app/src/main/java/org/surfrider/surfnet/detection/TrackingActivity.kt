@@ -23,33 +23,24 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.PointF
-import android.hardware.camera2.CameraManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
-import android.media.ImageReader
-import android.media.ImageReader.OnImageAvailableListener
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.util.Size
-import android.view.Surface
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.TableRow
 import android.widget.Toast
 import androidx.annotation.RequiresApi
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Granularity
 import com.google.android.gms.location.LocationCallback
@@ -57,23 +48,29 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.opencv.android.CameraActivity
+import org.opencv.android.CameraBridgeViewBase
+import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2
 import org.opencv.android.OpenCVLoader
+import org.opencv.android.Utils
 import org.opencv.core.*
+import org.opencv.imgproc.Imgproc
 import org.surfrider.surfnet.detection.customview.BottomSheet
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.databinding.ActivityCameraBinding
-import org.surfrider.surfnet.detection.databinding.FragmentSendDataDialogBinding
 import org.surfrider.surfnet.detection.env.ImageProcessor
 import org.surfrider.surfnet.detection.env.ImageUtils
 import org.surfrider.surfnet.detection.env.ImageUtils.drawDetections
 import org.surfrider.surfnet.detection.env.ImageUtils.drawOFLinesPRK
-import org.surfrider.surfnet.detection.env.Utils.chooseCamera
 import org.surfrider.surfnet.detection.flow.DenseOpticalFlow
 import org.surfrider.surfnet.detection.flow.IMU_estimator
 import org.surfrider.surfnet.detection.tflite.Detector
@@ -83,10 +80,11 @@ import timber.log.Timber
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.max
 
 
 @OptIn(DelicateCoroutinesApi::class)
-class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, LocationListener {
+class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListener {
 
     private lateinit var locationManager: LocationManager
     private lateinit var binding: ActivityCameraBinding
@@ -97,12 +95,17 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
     private lateinit var outputLinesFlow: ArrayList<FloatArray>
     private lateinit var imuEstimator: IMU_estimator
     private lateinit var opticalFlow: DenseOpticalFlow
+    private lateinit var openCvCameraView: CameraBridgeViewBase
+    private lateinit var frameRgba: Mat
+    private lateinit var frameResized: Mat
+    private lateinit var cropRect: Rect
+    private lateinit var frameGray: Mat
 
     private var previewWidth = 0
-
     private var previewHeight = 0
+    private var resizedWidth = 0.0
+    private var resizedHeight = 0.0
     private var detectorPaused = true
-    private var flowRegionUpdateNeeded = false
     private var avgFlowSpeed: PointF? = null
     private var wasteCount = 0
     private var location: Location? = null
@@ -110,35 +113,30 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val threadDetector = newSingleThreadContext("InferenceThread")
+    private val threadTracker = newSingleThreadContext("TrackerThread")
 
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val threadOpticalFlow = newSingleThreadContext("OpticalFlowThread")
+    private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private var trackingOverlay: OverlayView? = null
     private var sensorOrientation: Int = 0
     private var detector: YoloDetector? = null
     private var lastProcessingTimeMs: Long = 0
-    private var rgbFrameBitmap: Bitmap? = null
     private var croppedBitmap: Bitmap? = null
-    private var currFrameMat: Mat? = null
     private var computingDetection = false
-    private var computingOF = false
+    private var frameToCanvasTransform: Matrix? = null
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
     private var trackerManager: TrackerManager? = null
     private var latestDetections: List<Detector.Recognition>? = null
-    private var currROIs: Mat? = null
     private val mutex = Mutex()
     private val locationHandler = Handler(Looper.getMainLooper())
     private var lastTrackerManager: TrackerManager? = null
-    private lateinit var bindingDialog: FragmentSendDataDialogBinding
-    private val isDebug = false
     private var isGpsActivate = false
 
     private var lastPause: Long = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(null)
+        super.onCreate(savedInstanceState)
         Timber.d("onCreate $this")
 
         if (OpenCVLoader.initLocal()) Timber.i("Successful opencv loading")
@@ -146,13 +144,18 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         //initialize binding & UI
         binding = ActivityCameraBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        bindingDialog = FragmentSendDataDialogBinding.inflate(
-            layoutInflater
-        )
+        openCvCameraView = findViewById(R.id.camera_view) as CameraBridgeViewBase
+        openCvCameraView.visibility = CameraBridgeViewBase.VISIBLE
+        openCvCameraView.setCvCameraViewListener(this)
+
+        trackerManager = TrackerManager()
+
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         chronoContainer = binding.chronoContainer
         binding.wasteCounter.text = "0"
         bottomSheet = BottomSheet(binding)
+        bottomSheet.showOF = DEBUG_MODE
+        bottomSheet.showBoxes = DEBUG_MODE
         hideSystemUI()
 
         setupPermissions()
@@ -179,7 +182,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         isGpsActivate = mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
         if (!isGpsActivate) {
             val locationPermissionDialog = LocationPermissionDialog()
-            locationPermissionDialog.show(supportFragmentManager, "stop_record_dialog")
+            //TODO change supportFragmentManager
+            // locationPermissionDialog.show(supportFragmentManager, "stop_record_dialog")
         }
 
         // init IMU_estimator, optical flow
@@ -188,18 +192,123 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         outputLinesFlow = arrayListOf()
 
         binding.closeButton.setOnClickListener {
+            Timber.i("close button")
             val intent = Intent(applicationContext, TutorialActivity::class.java)
             startActivity(intent)
         }
 
         binding.startButton.setOnClickListener {
+            Timber.i("start button")
             startDetector()
         }
 
         binding.stopButton.setOnClickListener {
+            Timber.i("stop button")
             endDetector()
         }
+    }
 
+    override fun onPause() {
+        super.onPause()
+        if (openCvCameraView != null) openCvCameraView.disableView()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (openCvCameraView != null) openCvCameraView.enableView()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (openCvCameraView != null) openCvCameraView.disableView()
+        endDetector()
+        locationHandler.removeCallbacksAndMessages(null)
+    }
+
+    override fun getCameraViewList(): List<CameraBridgeViewBase?>? {
+        return listOf<CameraBridgeViewBase>(openCvCameraView)
+    }
+
+    override fun onCameraViewStarted(width: Int, height: Int) {
+        Timber.i("CameraViewStarted ${width}x${height}")
+        previewWidth = width
+        previewHeight = height
+
+        /*if (openCvCameraView.rotation != null) {
+                    sensorOrientation = openCvCameraView.rotation - screenOrientation
+                }
+        Timber.i("Camera orientation relative to screen canvas: %d", sensorOrientation)*/
+
+        // Get Android Graphics transform matrix
+        frameToCropTransform = ImageUtils.getTransformationMatrix(
+            previewWidth, previewHeight, INPUT_SIZE, INPUT_SIZE, sensorOrientation, MAINTAIN_ASPECT
+        )
+
+        cropToFrameTransform = Matrix()
+        frameToCropTransform?.invert(cropToFrameTransform)
+
+        // Manual transforms for CVMats: first resize, then crop
+        // TODO merge both android graphics and opencv transforms into one single function
+        val scaleFactorX = INPUT_SIZE.toDouble() / previewWidth
+        val scaleFactorY = INPUT_SIZE.toDouble() / previewHeight
+        val scaleFactor = max(scaleFactorX, scaleFactorY)
+        resizedWidth = scaleFactor * previewWidth
+        resizedHeight = scaleFactor * previewHeight
+
+        cropRect = Rect((resizedWidth / 2 - INPUT_SIZE/2).toInt(), (resizedHeight/2- INPUT_SIZE/2).toInt(), INPUT_SIZE, INPUT_SIZE)
+
+        // Initialize CVMat frames
+        frameRgba = Mat(height, width, CvType.CV_8UC4)
+        frameResized = Mat(resizedHeight.toInt(), resizedWidth.toInt(), CvType.CV_8UC3)
+        frameGray = Mat(height / DOWNSAMPLING_FACTOR_FLOW, width / DOWNSAMPLING_FACTOR_FLOW, CvType.CV_8UC1)
+        Timber.i("initialized gray frame with size: ${frameGray.size()}")
+
+        // Initialize Bitmap as input to detector
+        croppedBitmap = Bitmap.createBitmap(INPUT_SIZE, INPUT_SIZE, Bitmap.Config.ARGB_8888)
+    }
+
+    override fun onCameraViewStopped() {
+        croppedBitmap = null
+        cropToFrameTransform = null
+        endDetector()
+        frameRgba.release()
+        frameResized.release()
+        frameGray.release()
+    }
+
+    override fun onCameraFrame(inputFrame: CameraBridgeViewBase.CvCameraViewFrame?): Mat {
+        // device acceleration
+        computeIMU()
+        // optical flow
+        inputFrame?.let {
+            val grayMat = it.gray()
+            Imgproc.resize(grayMat, frameGray, frameGray.size())
+            outputLinesFlow = opticalFlow.run(frameGray, DOWNSAMPLING_FACTOR_FLOW)
+            if (fastSelfMotionTimestamp == 0L) {
+                backgroundScope.launch(threadTracker) {
+                    mutex.withLock {
+                        avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
+                            outputLinesFlow,
+                            FLOW_REFRESH_RATE_MILLIS
+                        )
+                    }
+                }
+            }
+        }
+
+        // detection (only if not already detecting)
+        if(!detectorPaused) {
+            if (!computingDetection) {
+                detect(frameRgba)
+            }
+        }
+
+        // display
+        frameRgba = inputFrame!!.rgba()
+        trackingOverlay?.let {
+            it.postInvalidate()
+        }
+        return frameRgba
     }
 
     private fun endDetector() {
@@ -208,7 +317,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         binding.stopButton.visibility = View.INVISIBLE
         binding.redLine.visibility = View.VISIBLE
         val stopRecordDialog = trackerManager?.let { StopRecordDialog(it) }
-        stopRecordDialog?.show(supportFragmentManager, "stop_record_dialog")
+        //TODO change supportFragmentManager
+        // stopRecordDialog?.show(supportFragmentManager, "stop_record_dialog")
 
         trackerManager?.let { tracker ->
             lastTrackerManager = tracker
@@ -218,8 +328,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         trackingOverlay?.invalidate()
 
         //reset trackers
-        croppedBitmap = null
-        cropToFrameTransform = null
         trackerManager = null
         trackingOverlay = null
 
@@ -249,6 +357,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 IS_SCALED,
                 INPUT_SIZE,
             )
+
             detector?.useGpu()
             detector?.setNumThreads(NUM_THREADS)
             detectorPaused = false
@@ -256,45 +365,43 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
             e.printStackTrace()
             Timber.e(e, "Exception initializing Detector!")
             val toast = Toast.makeText(
-                applicationContext, "Detector could not be initialized", Toast.LENGTH_SHORT
-            )
+                    applicationContext, "Detector could not be initialized", Toast.LENGTH_SHORT
+                        )
             toast.show()
             finish()
         }
+
         trackerManager = lastTrackerManager ?: TrackerManager()
 
         bottomSheet.displayDetection(trackerManager!!)
-
-        detector?.inputSize?.let {
-            croppedBitmap = Bitmap.createBitmap(it, it, Bitmap.Config.ARGB_8888)
-            frameToCropTransform = ImageUtils.getTransformationMatrix(
-                previewWidth, previewHeight, it, it, sensorOrientation, MAINTAIN_ASPECT
-            )
-        }
-
-        cropToFrameTransform = Matrix()
-        frameToCropTransform?.invert(cropToFrameTransform)
+        detectorPaused = false
 
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
         trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
                 canvas?.let {
+                    if (frameToCanvasTransform == null) {
+                        frameToCanvasTransform = ImageUtils.getTransformationMatrix(previewWidth, previewHeight, canvas.width, canvas.height,0, false)
+                    }
                     trackerManager?.draw(
-                        it, context, previewWidth, previewHeight, bottomSheet.showOF
+                        it, context, frameToCanvasTransform!!, bottomSheet.showOF
                     )
                     if (bottomSheet.showOF) {
-                        drawOFLinesPRK(it, outputLinesFlow, previewWidth, previewHeight)
+                        drawOFLinesPRK(it, outputLinesFlow, frameToCanvasTransform!!)
                     }
                     if (bottomSheet.showBoxes) {
-                        drawDetections(it, latestDetections, previewWidth, previewHeight)
+                        drawDetections(it, latestDetections, frameToCanvasTransform!!)
                     }
-                    if (isDebug) {
+                    if (DEBUG_FRAME) {
                         trackerManager?.drawDebug(it)
+                        cropToFrameTransform?.let {matrix ->
+                            ImageUtils.drawCrop(it, frameToCanvasTransform!!, INPUT_SIZE, matrix)
+                        }
                     }
                     if (fastSelfMotionTimestamp > 0) {
-                        ImageUtils.drawBorder(it, previewWidth, previewHeight)
+                        Timber.i("Fast motion! canvas: ${canvas.width}x${canvas.height} - preview:${previewWidth}x${previewHeight}")
+                        ImageUtils.drawBorder(it, frameToCanvasTransform!!, previewWidth, previewHeight)
                     }
-                    // ImageUtils.drawDebugScreen(it, previewWidth, previewHeight, cropToFrameTransform)
                 }
                 trackerManager?.let { tracker ->
                     updateCounter(tracker.detectedWaste.size)
@@ -391,9 +498,8 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         val permissions = arrayOf(
             PERMISSION_CAMERA, PERMISSION_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION
         )
-        if (checkPermissions(permissions)) {
-            setFragment()
-        } else {
+        if (!checkPermissions(permissions)) {
+            // TODO add dialog for permissions
             //val locationPermissionDialog = LocationPermissionDialog()
             //locationPermissionDialog.show(supportFragmentManager, "stop_record_dialog")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -415,71 +521,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         return true
     }
 
-    /** Callback for Camera2 API  */
-    override fun onImageAvailable(reader: ImageReader) {
-        try {
-            imageProcessor.openCameraImage(reader, previewWidth, previewHeight)
-            if (detectorPaused) {
-                imageProcessor.readyForNextImage()
-            } else {
-                processImage()
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Exception in ImageListener!")
-            return
-        }
-    }
-
-    @Synchronized
-    public override fun onDestroy() {
-        Timber.d("onDestroy $this")
-        super.onDestroy()
-        locationHandler.removeCallbacksAndMessages(null)
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int, permissions: Array<String>, grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
-        if (requestCode == PERMISSIONS_REQUEST && checkPermissions(permissions)) setFragment()
-    }
-
-    private fun setFragment() {
-        val cameraManager = getSystemService(CAMERA_SERVICE) as CameraManager
-        val cameraId = chooseCamera(cameraManager)
-        val camera2Fragment = CameraConnectionFragment.newInstance(
-            { size: Size?, rotation: Int ->
-                previewHeight = size!!.height
-                previewWidth = size.width
-                onPreviewSizeChosen(size, rotation)
-            },
-            this, desiredPreviewFrameSize,
-        )
-
-        camera2Fragment.setCamera(cameraId)
-        supportFragmentManager.beginTransaction().replace(R.id.container, camera2Fragment).commit()
-    }
-
-    @Suppress("DEPRECATION")
-    private val screenOrientation: Int
-        get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            when (display?.rotation) {
-                Surface.ROTATION_270 -> 270
-                Surface.ROTATION_180 -> 180
-                Surface.ROTATION_90 -> 90
-                else -> 0
-            }
-        } else {
-            when (windowManager.defaultDisplay.rotation) {
-                Surface.ROTATION_270 -> 270
-                Surface.ROTATION_180 -> 180
-                Surface.ROTATION_90 -> 90
-                else -> 0
-            }
-        }
-
-
     fun updateCounter(count: Int?) {
         binding.wasteCounter.text = count.toString()
         if (count != null) {
@@ -487,8 +528,7 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         }
     }
 
-    private fun computeOF() {
-        computingOF = true
+    private fun computeIMU() {
         // get IMU variables
         val velocity: FloatArray = imuEstimator.velocity
         val imuPosition: FloatArray = imuEstimator.position
@@ -496,7 +536,6 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
         val xVelocity = velocity[0] * 3.6f
         val yVelocity = velocity[1] * 3.6f
         val zVelocity = velocity[2] * 3.6f
-
 
         // Get the magnitude of the velocity vector
         val speed =
@@ -511,155 +550,71 @@ class TrackingActivity : AppCompatActivity(), OnImageAvailableListener, Location
                 fastSelfMotionTimestamp = 0
             }
         }
-
-
-        currFrameMat = imageProcessor.getMatFromRGB(
-            previewWidth,
-            previewHeight,
-            DOWNSAMPLING_FACTOR_FLOW
-        )
-
-        lifecycleScope.launch(threadOpticalFlow) {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                // Run OF
-                currFrameMat?.let {
-                    outputLinesFlow = opticalFlow.run(it, currROIs, DOWNSAMPLING_FACTOR_FLOW)
-                }
-
-                // Update trackers and regions of interests
-                mutex.withLock {
-                    if (fastSelfMotionTimestamp == 0L) {
-                        avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
-                            outputLinesFlow,
-                            FLOW_REFRESH_RATE_MILLIS
-                        )
-                        if (flowRegionUpdateNeeded) {
-                            flowRegionUpdateNeeded = false
-                            currROIs =
-                                trackerManager?.getCurrentRois(
-                                    1280,
-                                    720,
-                                    DOWNSAMPLING_FACTOR_FLOW,
-                                    60
-                                )
-                        }
-                    }
-                }
-
-                computingOF = false
-
-                runOnUiThread {
-                    bottomSheet.showIMUStats(
-                        applicationContext,
-                        arrayOf(
-                            imuPosition[0], imuPosition[1], imuPosition[2],
-                            speed, avgFlowSpeed?.x ?: 0.0F, avgFlowSpeed?.y ?: 0.0F
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    private fun onPreviewSizeChosen(size: Size?, rotation: Int?) {
-        trackerManager = TrackerManager()
-
-        size?.let {
-            previewWidth = it.width
-            previewHeight = it.height
-        }
-        if (rotation != null) {
-            sensorOrientation = rotation - screenOrientation
-        }
-        Timber.i("Camera orientation relative to screen canvas: %d", sensorOrientation)
-        Timber.i("Initializing at size %dx%d", previewWidth, previewHeight)
-        rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888)
-    }
-
-
-    private fun processImage() {
-        trackingOverlay?.postInvalidate()
-
-        // No mutex needed as this method is not reentrant.
-        if (computingDetection && computingOF) {
-            imageProcessor.readyForNextImage()
-            return
-        }
-        if (!computingOF) {
-            // will run its own thread
-            computeOF()
-        }
-        if (!computingDetection) {
-            // will run its own thread
-            detect()
-        }
-
-    }
-
-    private fun detect() {
-        computingDetection = true
-
-        imageProcessor.getRgbBytes()?.let {
-            rgbFrameBitmap?.setPixels(
-                it, 0, previewWidth, 0, 0, previewWidth, previewHeight
+        runOnUiThread {
+            bottomSheet.showIMUStats(
+                applicationContext,
+                arrayOf(
+                    imuPosition[0], imuPosition[1], imuPosition[2],
+                    speed, avgFlowSpeed?.x ?: 0.0F, avgFlowSpeed?.y ?: 0.0F
+                )
             )
         }
-        imageProcessor.readyForNextImage()
+    }
 
+    private fun detect(frame: Mat) {
+        computingDetection = true
+        Imgproc.resize(frame, frameResized, Size(resizedWidth, resizedHeight))
+        // Timber.i("input frame: ${frame.size()} frame after resize: ${frameResized.size()} rect: ${cropRect}")
+        val rgbaInnerWindow = frameResized.submat(cropRect)
+        Utils.matToBitmap(rgbaInnerWindow, croppedBitmap);
+        if (SAVE_PREVIEW_BITMAP) {
+            ImageUtils.saveBitmap(croppedBitmap!!, applicationContext)
+        }
         /*trackerManager?.let {
             it.updateTrackers()
         }*/
 
-        if (croppedBitmap != null && rgbFrameBitmap != null && frameToCropTransform != null) {
-            val canvas = Canvas(croppedBitmap!!)
-            canvas.drawBitmap(rgbFrameBitmap!!, frameToCropTransform!!, null)
-            // For examining the actual TF input.
-            if (SAVE_PREVIEW_BITMAP) {
-                ImageUtils.saveBitmap(croppedBitmap!!)
+        // run in background
+        backgroundScope.launch(threadDetector) {
+            val startTime = SystemClock.uptimeMillis()
+            val results: List<Detector.Recognition>? = croppedBitmap?.let {
+                detector?.recognizeImage(it)
             }
-        }
 
-        lifecycleScope.launch(threadDetector) {
-            lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                val startTime = SystemClock.uptimeMillis()
-                val results: List<Detector.Recognition>? = croppedBitmap?.let {
-                    detector?.recognizeImage(croppedBitmap)
+            lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
+            val mappedRecognitions =
+                ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
+            @Synchronized
+            latestDetections = mappedRecognitions
+            mutex.withLock {
+                if (fastSelfMotionTimestamp == 0L) {
+                    trackerManager?.processDetections(mappedRecognitions, location)
+                    trackerManager?.updateTrackers()
                 }
-                latestDetections = results
+            }
 
-                lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
-                val mappedRecognitions =
-                    ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
-                mutex.withLock {
-                    if (fastSelfMotionTimestamp == 0L) {
-                        trackerManager?.processDetections(mappedRecognitions, location)
-                        trackerManager?.updateTrackers()
-                    }
-                }
-                flowRegionUpdateNeeded = true
-
-                trackingOverlay?.postInvalidate()
-                computingDetection = false
-                runOnUiThread {
-                    bottomSheet.showInference(lastProcessingTimeMs.toString() + "ms")
-                }
+            trackingOverlay?.postInvalidate()
+            computingDetection = false
+            runOnUiThread {
+                bottomSheet.showInference(lastProcessingTimeMs.toString() + "ms")
             }
         }
     }
 
-    private val desiredPreviewFrameSize: Size
-        get() = Size(1280, 720)
-
     companion object {
+        private const val DEBUG_FRAME = false
+        private const val DEBUG_MODE = false
+
         private const val FLOW_REFRESH_RATE_MILLIS: Long = 50
         private const val DOWNSAMPLING_FACTOR_FLOW: Int = 2
+
         private const val MAX_SELF_VELOCITY = 6.0
         private const val VELOCITY_PAUSE_STICKINESS: Long = 500
 
         private const val CONFIDENCE_THRESHOLD = 0.3f
         //private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
         // private const val MODEL_STRING = "yolov8n_float16.tflite"
-
+    
         private const val LABEL_FILENAME = "file:///android_asset/labelmap_surfnet.txt"
         private const val MODEL_STRING = "surfnet_best_13102023_float16.tflite" // not scaled
         private const val INPUT_SIZE = 640

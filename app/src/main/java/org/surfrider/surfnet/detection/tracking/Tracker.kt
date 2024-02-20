@@ -57,14 +57,10 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         alreadyAssociated = true
         justUpdated = true
 
-        if(trackedObjects.size > NUM_CONSECUTIVE_DET && (status == TrackerStatus.RED || status == TrackerStatus.LOADING)) {
+        if(trackedObjects.size > NUM_CONSECUTIVE_DET && (status == TrackerStatus.RED)) {
             status = TrackerStatus.GREEN
             animation = true
             animationTimeStamp = newDet.timestamp
-        }
-
-        if(trackedObjects.size in NUM_CONSECUTIVE_LOADING_DET..NUM_CONSECUTIVE_DET && status == TrackerStatus.RED) {
-            status = TrackerStatus.LOADING
         }
     }
 
@@ -135,14 +131,13 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         }
     }
     enum class TrackerStatus {
-        GREEN, RED, INACTIVE, LOADING
+        GREEN, RED, INACTIVE
     }
 
     companion object {
         private const val MAX_TIMESTAMP = 2000
         private const val MAX_ANIMATION_TIMESTAMP = 1000
         private const val NUM_CONSECUTIVE_DET = 5
-        private const val NUM_CONSECUTIVE_LOADING_DET = 3
         private const val COVARIANCE_SMOOTHING_FACTOR = 0.2F
     }
 }
