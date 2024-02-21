@@ -7,7 +7,7 @@ android {
     compileSdk 34
     defaultConfig {
         applicationId "org.surfrider.surfnet.detection"
-        minSdk 21
+        minSdk 26
         targetSdk 34
         versionCode 1
         versionName "1.0"
@@ -63,9 +63,9 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.coordinatorlayout:coordinatorlayout:1.2.0'
     implementation 'com.google.android.material:material:1.11.0'
-    implementation 'org.tensorflow:tensorflow-lite:2.14.0'
-    implementation 'org.tensorflow:tensorflow-lite-gpu:2.14.0'
-    implementation 'org.tensorflow:tensorflow-lite-gpu-api:2.14.0'
+    implementation 'org.tensorflow:tensorflow-lite:2.15.0'
+    implementation 'org.tensorflow:tensorflow-lite-gpu:2.15.0'
+    implementation 'org.tensorflow:tensorflow-lite-gpu-api:2.15.0'
     implementation 'org.tensorflow:tensorflow-lite-gpu-delegate-plugin:0.4.4'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'com.google.code.gson:gson:2.8.9'

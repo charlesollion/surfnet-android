@@ -145,6 +145,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         binding = ActivityCameraBinding.inflate(layoutInflater)
         setContentView(binding.root)
         openCvCameraView = findViewById(R.id.camera_view) as CameraBridgeViewBase
+        openCvCameraView.setMaxFrameSize(MAX_WIDTH, MAX_HEIGHT)
         openCvCameraView.visibility = CameraBridgeViewBase.VISIBLE
         openCvCameraView.setCvCameraViewListener(this)
 
@@ -173,6 +174,17 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             override fun onLocationResult(locationResult: LocationResult) {
                 location = locationResult.lastLocation
             }
+        }
+
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
         }
         fusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, null)
         updateLocation()
@@ -564,7 +576,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         Imgproc.resize(frame, frameResized, Size(resizedWidth, resizedHeight))
         // Timber.i("input frame: ${frame.size()} frame after resize: ${frameResized.size()} rect: ${cropRect}")
         val rgbaInnerWindow = frameResized.submat(cropRect)
-        Utils.matToBitmap(rgbaInnerWindow, croppedBitmap);
+        Utils.matToBitmap(rgbaInnerWindow, croppedBitmap)
         if (SAVE_PREVIEW_BITMAP) {
             ImageUtils.saveBitmap(croppedBitmap!!, applicationContext)
         }
@@ -602,9 +614,11 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     companion object {
         private const val DEBUG_FRAME = false
         private const val DEBUG_MODE = true
+        private const val MAX_WIDTH = 1280
+        private const val MAX_HEIGHT = 720
 
         private const val FLOW_REFRESH_RATE_MILLIS: Long = 50
-        private const val DOWNSAMPLING_FACTOR_FLOW: Int = 2
+        private const val DOWNSAMPLING_FACTOR_FLOW: Int = 1
         private const val MAX_SELF_VELOCITY = 5.0
 
         private const val VELOCITY_PAUSE_STICKINESS: Long = 500
