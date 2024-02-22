@@ -6,6 +6,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.VectorDrawable
 import android.location.Location
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.values
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.R
@@ -20,6 +21,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.math.min
+import kotlin.math.sqrt
 
 class TrackerManager {
 
@@ -29,7 +31,6 @@ class TrackerManager {
 
     var displayDetection = true
 
-    private var bmpYellow: Bitmap? = null
     private var bmpGreen: Bitmap? = null
     private var bmpWhite: Bitmap? = null
 
@@ -109,19 +110,12 @@ class TrackerManager {
     fun draw(
             canvas: Canvas,
             context: Context?,
-            previewWidth: Int,
-            previewHeight: Int,
+            frameToCanvasTransform: Matrix,
             showOF: Boolean
     ) {
         // Build transform matrix from canvas and context
-        val frameToCanvasTransform = Matrix()
-        val scale = min(
-                canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
-        )
-        frameToCanvasTransform.postScale(scale, scale)
-        if (bmpYellow == null) {
-            bmpYellow = context?.let { getBitmap(it, R.drawable.yellow_dot) }
-        }
+        val scale = 1.0F
+
         if (bmpGreen == null) {
             bmpGreen = context?.let { getBitmap(it, R.drawable.check_icon) }
         }
@@ -134,17 +128,14 @@ class TrackerManager {
             //Only draw tracker if not inactive
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
                 var bmp: Bitmap? = null
-                if (displayDetection || !(tracker.status == Tracker.TrackerStatus.RED || tracker.status == Tracker.TrackerStatus.LOADING)) {
+                if (displayDetection || !(tracker.status == Tracker.TrackerStatus.RED)) {
                     bmp = if (tracker.status == Tracker.TrackerStatus.GREEN) {
                         if (!detectedWaste.contains(tracker)) {
                             detectedWaste.add(tracker)
                         }
                         bmpGreen
                     } else {
-                        if (tracker.status == Tracker.TrackerStatus.LOADING)
-                            bmpYellow
-                        else
-                            bmpWhite
+                        bmpWhite
                     }
 
                 }
@@ -159,11 +150,10 @@ class TrackerManager {
                     val bmpWidth = bmp.width.div(scale)
                     val bmpHeight = bmp.height.div(scale)
 
-                    val point =
-                            floatArrayOf(trackedPos.x - bmpWidth / 2, trackedPos.y - bmpHeight / 2)
+                    val point = floatArrayOf(trackedPos.x, trackedPos.y)
                     frameToCanvasTransform.mapPoints(point)
 
-                    canvas.drawBitmap(bmp, point[0], point[1], null)
+                    canvas.drawBitmap(bmp, point[0] - bmpWidth / 2, point[1] - bmpHeight / 2, null)
 
                     // Draw text with tracker number
                     val paint = Paint()
@@ -184,10 +174,9 @@ class TrackerManager {
                         val animationHeight = animation.height.div(scale)
 
                         val animationPoint = floatArrayOf(
-                                trackedPos.x - (animationWidth / 2) + 3,
-                                if (shouldShowBottomAnimation) trackedPos.y + bmpHeight / 2 else trackedPos.y - bmpHeight / 2 - (animationHeight)
+                                point[0] - (animationWidth / 2) + 3,
+                                if (shouldShowBottomAnimation) point[1] + bmpHeight / 2 else point[1] - bmpHeight / 2 - (animationHeight)
                         )
-                        frameToCanvasTransform.mapPoints(animationPoint)
                         canvas.drawBitmap(
                                 animation,
                                 animationPoint[0],
@@ -282,6 +271,7 @@ class TrackerManager {
 
         for (tracker in trackers) {
             val medianSpeed = calculateMedianFlowSpeedForTrack(tracker.position, listOfFlowLines, 6)
+
 
             // scale speed depending on optical flow refresh rate
             /*medianSpeed?.let {
@@ -425,8 +415,8 @@ class TrackerManager {
             return kotlin.math.sqrt((p1[0] - p2.x) * (p1[0] - p2.x) + (p1[1] - p2.y) * (p1[1] - p2.y))
         }
 
-        private const val SCREEN_DIAGONAL = 960.0F // sqrt(720x1280)
-        private const val ASSOCIATION_THRESHOLD = 60.0F / SCREEN_DIAGONAL
+        private const val SCREEN_DIAGONAL = 1440 // sqrt(1920*1080)
+        private const val ASSOCIATION_THRESHOLD = 0.1f // 10% of screen diagonal
 
         // Weights of different scores
         private const val W_DIST = 1.0

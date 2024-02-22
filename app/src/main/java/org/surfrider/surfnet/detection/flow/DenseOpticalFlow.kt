@@ -3,9 +3,9 @@ package org.surfrider.surfnet.detection.flow
 import org.opencv.core.*
 import org.opencv.imgproc.Imgproc
 import org.opencv.video.Video
+import timber.log.Timber
 
 class DenseOpticalFlow {
-    private var currGreyImage = Mat()
     private var prevGreyImage = Mat()
     private var prevPts = MatOfPoint2f()
     private var currPts = MatOfPoint2f()
@@ -16,12 +16,12 @@ class DenseOpticalFlow {
     private var err = MatOfFloat()
 
 
-    private fun updatePoints(greyImage: Mat, mask: Mat?, scalingFactor: Int) {
+    private fun updatePoints(greyImage: Mat, scalingFactor: Int) {
         val corners = MatOfPoint()
         var numberCorners = maxCorners
         if(!prevPts.empty())
             numberCorners -= prevPts.rows()
-        Imgproc.goodFeaturesToTrack(greyImage, corners, numberCorners, 0.1, minDistance / scalingFactor, mask ?: Mat())
+        Imgproc.goodFeaturesToTrack(greyImage, corners, numberCorners, 0.1, 5.0)
 
         val newCornersArray = corners.toArray()
 
@@ -45,28 +45,38 @@ class DenseOpticalFlow {
     }
 
 
-    fun run(newFrame: Mat, mask:Mat?, scalingFactor: Int): ArrayList<FloatArray> {
-        return pyrLK(newFrame, mask, scalingFactor)
+    fun run(newFrame: Mat, scalingFactor: Int): ArrayList<FloatArray> {
+        return pyrLK(newFrame, scalingFactor)
     }
 
-    private fun pyrLK(newFrame: Mat, mask: Mat?, scalingFactor: Int) : ArrayList<FloatArray> {
-        // convert the frame to Gray
-        Imgproc.cvtColor(newFrame, currGreyImage, Imgproc.COLOR_RGBA2GRAY)
-
+    private fun pyrLK(currGreyImage: Mat, scalingFactor: Int) : ArrayList<FloatArray> {
         // if this is the first loop, find good features
         if (prevGreyImage.empty()) {
             currGreyImage.copyTo(prevGreyImage)
-            updatePoints(currGreyImage, mask, scalingFactor)
+            updatePoints(currGreyImage, scalingFactor)
             return arrayListOf()
+        } else {
+            if(prevGreyImage.size() != currGreyImage.size()) {
+                Timber.i("Warning, change of size prev: ${prevGreyImage.size()} cur: ${currGreyImage.size()}, dropping current OF")
+                currGreyImage.copyTo(prevGreyImage)
+                updatePoints(currGreyImage, scalingFactor)
+                return arrayListOf()
+            }
         }
 
         // If the number of flow points is too low, find new good features
         if (flowPtsCount < maxCorners / 2) {
-            updatePoints(currGreyImage, mask, scalingFactor)
+            updatePoints(currGreyImage, scalingFactor)
         }
 
         // Run the KLT algorithm for Optical Flow
-        Video.calcOpticalFlowPyrLK(prevGreyImage, currGreyImage, prevPts, currPts, status, err)
+        try {
+            Video.calcOpticalFlowPyrLK(prevGreyImage, currGreyImage, prevPts, currPts, status, err)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Timber.e(e, "Error in optical flow")
+            return arrayListOf()
+        }
         flowPtsCount = 0
         val lines = createLines(scalingFactor)
 
