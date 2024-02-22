@@ -21,7 +21,10 @@ import android.os.Build
 import org.surfrider.surfnet.detection.env.Utils.loadModelFile
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import org.tensorflow.lite.Interpreter
+import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
+import org.tensorflow.lite.gpu.GpuDelegateFactory.Options.INFERENCE_PREFERENCE_FAST_SINGLE_ANSWER
+import org.tensorflow.lite.gpu.GpuDelegateFactory.Options.INFERENCE_PREFERENCE_SUSTAINED_SPEED
 import org.tensorflow.lite.nnapi.NnApiDelegate
 import timber.log.Timber
 import java.io.BufferedReader
@@ -385,29 +388,20 @@ class YoloDetector private constructor() : Detector {
             Timber.i("First class: " + d.labels.firstElement())
             br.close()
             try {
-                val options = Interpreter.Options()
-                options.numThreads = NUM_THREADS
-                if (isNNAPI) {
-                    d.nnapiDelegate = null
-                    // Initialize interpreter with NNAPI delegate for Android Pie or above
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        d.nnapiDelegate = NnApiDelegate()
-                        options.addDelegate(d.nnapiDelegate)
-                        options.numThreads = NUM_THREADS
-                        //                    options.setUseNNAPI(false);
-//                    options.setAllowFp16PrecisionForFp32(true);
-//                    options.setAllowBufferHandleOutput(true);
-                        options.useNNAPI = true
+                val compatList = CompatibilityList()
+                val options = Interpreter.Options().apply{
+                    if(compatList.isDelegateSupportedOnThisDevice){
+                        // if the device has a supported GPU, add the GPU delegate
+                        val delegateOptions = compatList.bestOptionsForThisDevice
+                        delegateOptions.inferencePreference = INFERENCE_PREFERENCE_SUSTAINED_SPEED
+                        delegateOptions.setQuantizedModelsAllowed(false)
+                        delegateOptions.isPrecisionLossAllowed = true
+                        this.addDelegate(GpuDelegate(delegateOptions))
+                    } else {
+                        // if the GPU is not supported, run on 4 threads
+                        Timber.i("## USING CPU ##")
+                        this.numThreads = 4
                     }
-                }
-                if (isGPU) {
-                    val gpu_options = GpuDelegate.Options()
-                    gpu_options.isPrecisionLossAllowed = true // It seems that the default is true
-                    gpu_options.setQuantizedModelsAllowed(false)
-                    gpu_options.inferencePreference =
-                        GpuDelegate.Options.INFERENCE_PREFERENCE_SUSTAINED_SPEED
-                    d.gpuDelegate = GpuDelegate(gpu_options)
-                    options.addDelegate(d.gpuDelegate)
                 }
                 d.tfliteModel = loadModelFile(assetManager, modelFilename)
                 d.tfLite = Interpreter(d.tfliteModel!!, options)
@@ -480,15 +474,7 @@ class YoloDetector private constructor() : Detector {
             return d
         }
 
-        private val XYSCALE = floatArrayOf(1.2f, 1.1f, 1.05f)
-        private const val NUM_BOXES_PER_BLOCK = 3
-
-        // Number of threads in the java app
         private const val NUM_THREADS = 1
-        private const val isNNAPI = false
-        private const val isGPU = false
         private var scalingFactor = 1.0f
-        protected const val BATCH_SIZE = 1
-        protected const val PIXEL_SIZE = 3
     }
 }

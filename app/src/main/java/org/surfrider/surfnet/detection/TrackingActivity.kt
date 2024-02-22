@@ -367,11 +367,11 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 IS_QUANTIZED,
                 IS_V8,
                 IS_SCALED,
-                INPUT_SIZE,
+                INPUT_SIZE
             )
 
-            detector?.useGpu()
-            detector?.setNumThreads(NUM_THREADS)
+            // detector?.useGpu()
+            // detector?.setNumThreads(NUM_THREADS)
             detectorPaused = false
         } catch (e: IOException) {
             e.printStackTrace()
@@ -624,16 +624,15 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         private const val VELOCITY_PAUSE_STICKINESS: Long = 500
 
         private const val CONFIDENCE_THRESHOLD = 0.3f
+
         //private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
         // private const val MODEL_STRING = "yolov8n_float16.tflite"
-    
         private const val LABEL_FILENAME = "file:///android_asset/labelmap_surfnet.txt"
         private const val MODEL_STRING = "surfnet_best_13102023_float16.tflite" // not scaled
         private const val INPUT_SIZE = 640
         private const val IS_V8 = true
         private const val IS_QUANTIZED = false
         private const val IS_SCALED = false // False only for newer Yolo
-        private const val NUM_THREADS = 1
 
         private const val MAINTAIN_ASPECT = true
         private const val SAVE_PREVIEW_BITMAP = false
