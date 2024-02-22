@@ -395,9 +395,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                     if (frameToCanvasTransform == null) {
                         frameToCanvasTransform = ImageUtils.getTransformationMatrix(previewWidth, previewHeight, canvas.width, canvas.height,0, false)
                     }
-                    trackerManager?.draw(
-                        it, context, frameToCanvasTransform!!, bottomSheet.showOF
-                    )
+                    trackerManager?.draw(it, context, frameToCanvasTransform!!, bottomSheet.showOF)
                     if (bottomSheet.showOF) {
                         drawOFLinesPRK(it, outputLinesFlow, frameToCanvasTransform!!)
                     }
