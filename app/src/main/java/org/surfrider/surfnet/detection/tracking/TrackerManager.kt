@@ -47,14 +47,14 @@ class TrackerManager {
     }
 
     @Synchronized
-    fun processDetections(results: MutableList<Recognition?>, location: Location?) {
+    fun processDetections(results: MutableList<Recognition?>, location: Location?, frameTimestamp: Long) {
         if (results.isEmpty()) {
             return
         }
         // Store all Recognition objects in a list of TrackedDetections
         val dets = LinkedList<Tracker.TrackedDetection>()
         for (result in results) {
-            result?.let {dets.addLast(Tracker.TrackedDetection(it))}
+            result?.let {dets.addLast(Tracker.TrackedDetection(it, frameTimestamp))}
         }
 
         // Create cost matrix
