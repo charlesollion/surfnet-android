@@ -116,12 +116,6 @@ class TrackerManager {
         // Build transform matrix from canvas and context
         val scale = 1.0F
 
-        val frameToCanvasTransform = Matrix()
-        /*val scale = min(
-                canvas.width / previewWidth.toFloat(), canvas.height / previewHeight.toFloat()
-        )*/
-        frameToCanvasTransform.postScale(scale, scale)
-
         if (bmpGreen == null) {
             bmpGreen = context?.let { getBitmap(it, R.drawable.check_icon) }
         }
@@ -156,11 +150,10 @@ class TrackerManager {
                     val bmpWidth = bmp.width.div(scale)
                     val bmpHeight = bmp.height.div(scale)
 
-                    val point =
-                            floatArrayOf(trackedPos.x - bmpWidth / 2, trackedPos.y - bmpHeight / 2)
+                    val point = floatArrayOf(trackedPos.x, trackedPos.y)
                     frameToCanvasTransform.mapPoints(point)
 
-                    canvas.drawBitmap(bmp, point[0], point[1], null)
+                    canvas.drawBitmap(bmp, point[0] - bmpWidth / 2, point[1] - bmpHeight / 2, null)
 
                     // Draw text with tracker number
                     val paint = Paint()
@@ -181,10 +174,9 @@ class TrackerManager {
                         val animationHeight = animation.height.div(scale)
 
                         val animationPoint = floatArrayOf(
-                                trackedPos.x - (animationWidth / 2) + 3,
-                                if (shouldShowBottomAnimation) trackedPos.y + bmpHeight / 2 else trackedPos.y - bmpHeight / 2 - (animationHeight)
+                                point[0] - (animationWidth / 2) + 3,
+                                if (shouldShowBottomAnimation) point[1] + bmpHeight / 2 else point[1] - bmpHeight / 2 - (animationHeight)
                         )
-                        frameToCanvasTransform.mapPoints(animationPoint)
                         canvas.drawBitmap(
                                 animation,
                                 animationPoint[0],
