@@ -127,7 +127,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
     private var trackerManager: TrackerManager? = null
-    private var latestDetections: List<Detector.Recognition>? = null
+    private var latestDetections: List<Detector.Recognition?>? = null
     private val mutex = Mutex()
     private val locationHandler = Handler(Looper.getMainLooper())
     private var lastTrackerManager: TrackerManager? = null
@@ -587,7 +587,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         // run in background
         backgroundScope.launch(threadDetector) {
             val startTime = SystemClock.uptimeMillis()
-            val results: List<Detector.Recognition>? = croppedBitmap?.let {
+            val results: ArrayList<Detector.Recognition?>? = croppedBitmap?.let {
                 detector?.recognizeImage(it)
             }
 

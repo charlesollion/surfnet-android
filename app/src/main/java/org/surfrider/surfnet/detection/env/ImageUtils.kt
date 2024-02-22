@@ -22,9 +22,6 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
 import android.media.Image
-import android.os.Environment
-import org.opencv.core.CvType
-import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.tflite.Detector
 import timber.log.Timber
 import java.io.File
@@ -33,7 +30,6 @@ import java.util.ArrayList
 import java.util.LinkedList
 import kotlin.math.abs
 import kotlin.math.max
-import kotlin.math.min
 
 /** Utility class for manipulating images.  */
 object ImageUtils {
@@ -261,14 +257,14 @@ object ImageUtils {
     }
 
 
-    fun drawDetections(canvas: Canvas, results: List<Detector.Recognition>?, frameToCanvasTransform: Matrix) {
+    fun drawDetections(canvas: Canvas, results: List<Detector.Recognition?>?, frameToCanvasTransform: Matrix) {
         val paint = Paint()
         paint.color = Color.RED
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2.0f
         if (results != null) {
             for (result in results) {
-                val location = result.location
+                val location = result?.location
                 if (location != null) {
                     frameToCanvasTransform.mapRect(location)
                     canvas.drawRect(location, paint)
@@ -293,11 +289,11 @@ object ImageUtils {
     }
 
 
-    fun mapDetectionsWithTransform(results: List<Detector.Recognition>?, cropToFrameTransform: Matrix?): MutableList<Detector.Recognition> {
-        val mappedRecognitions: MutableList<Detector.Recognition> = LinkedList()
+    fun mapDetectionsWithTransform(results: List<Detector.Recognition?>?, cropToFrameTransform: Matrix?): MutableList<Detector.Recognition?> {
+        val mappedRecognitions: MutableList<Detector.Recognition?> = LinkedList()
         if (results != null) {
             for (result in results) {
-                val location = result.location
+                val location = result?.location
                 if (location != null) {
                     cropToFrameTransform?.mapRect(location)
                     result.location = location

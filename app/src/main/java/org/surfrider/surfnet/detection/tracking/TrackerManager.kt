@@ -6,7 +6,6 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.VectorDrawable
 import android.location.Location
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.values
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.R
@@ -20,8 +19,6 @@ import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
-import kotlin.math.min
-import kotlin.math.sqrt
 
 class TrackerManager {
 
@@ -50,14 +47,14 @@ class TrackerManager {
     }
 
     @Synchronized
-    fun processDetections(results: List<Recognition>, location: Location?) {
+    fun processDetections(results: MutableList<Recognition?>, location: Location?) {
         if (results.isEmpty()) {
             return
         }
         // Store all Recognition objects in a list of TrackedDetections
         val dets = LinkedList<Tracker.TrackedDetection>()
         for (result in results) {
-            dets.addLast(Tracker.TrackedDetection(result))
+            result?.let {dets.addLast(Tracker.TrackedDetection(it))}
         }
 
         // Create cost matrix
