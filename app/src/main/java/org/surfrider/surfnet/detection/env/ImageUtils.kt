@@ -260,9 +260,9 @@ object ImageUtils {
     fun drawDetections(canvas: Canvas, results: List<Detector.Recognition?>?, frameToCanvasTransform: Matrix, isMovedDetections:Boolean) {
         val paint = Paint()
         if (isMovedDetections)
-            paint.color = Color.RED
-        else
             paint.color = Color.BLUE
+        else
+            paint.color = Color.RED
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2.0f
         if (results != null) {

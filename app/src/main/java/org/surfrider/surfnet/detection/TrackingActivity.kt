@@ -634,7 +634,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 val rect = RectF(it.location)
                 val center = PointF(rect.centerX(), rect.centerY())
                 val move = PointF(0.0F,0.0F)
-                // Timber.i("@@@@@@@@@@@@@Moving !!")
                 outputFlowLinesRollingArray.forEach { outputFlowLine: TimedOutputFlowLine ->
                     if (outputFlowLine.timestamp >= frameTimestamp) {
                         val localMove = calculateMedianFlowSpeedForTrack(center, outputFlowLine.data, 6)
@@ -642,8 +641,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                         move.y += localMove?.y?:0.0F
                     }
                 }
-                // Timber.i("@@@@@@@@@@@ ${move.x} ${move.y}")
-                val newLocation = RectF(move.x + it.location.left, move.y + it.location.top, move.x+ + it.location.right, move.y+ + it.location.bottom)
+                val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
+                                       it.location.right + move.x, it.location.bottom + move.y)
                 val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, it.detectedClass)
                 movedRecognitions.add(newDet)
             }
