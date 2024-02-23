@@ -267,10 +267,12 @@ object ImageUtils {
         paint.strokeWidth = 2.0f
         if (results != null) {
             for (result in results) {
-                val location = result?.location
-                if (location != null) {
-                    frameToCanvasTransform.mapRect(location)
-                    canvas.drawRect(location, paint)
+                result?.let {
+                    val newLocation = RectF(it.location)
+                    newLocation?.let { location ->
+                        frameToCanvasTransform.mapRect(location)
+                        canvas.drawRect(location, paint)
+                    }
                 }
             }
         }
@@ -296,11 +298,13 @@ object ImageUtils {
         val mappedRecognitions: MutableList<Detector.Recognition?> = LinkedList()
         if (results != null) {
             for (result in results) {
-                val location = result?.location
-                if (location != null) {
-                    cropToFrameTransform?.mapRect(location)
-                    result.location = location
-                    mappedRecognitions.add(result)
+                result?.let {
+                    val newLocation = RectF(it.location)
+                    newLocation?.let { location ->
+                        cropToFrameTransform?.mapRect(location)
+                        val newDet = Detector.Recognition(it.classId, it.confidence, location, it.detectedClass)
+                        mappedRecognitions.add(newDet)
+                    }
                 }
             }
         }
