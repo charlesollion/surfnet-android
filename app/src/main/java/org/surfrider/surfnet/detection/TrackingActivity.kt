@@ -21,8 +21,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.PointF
+import android.graphics.RectF
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -76,10 +78,12 @@ import org.surfrider.surfnet.detection.flow.IMU_estimator
 import org.surfrider.surfnet.detection.tflite.Detector
 import org.surfrider.surfnet.detection.tflite.YoloDetector
 import org.surfrider.surfnet.detection.tracking.TrackerManager
+import org.surfrider.surfnet.detection.tracking.TrackerManager.Companion.calculateMedianFlowSpeedForTrack
 import timber.log.Timber
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.collections.ArrayList
 import kotlin.math.max
 
 
@@ -93,6 +97,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private lateinit var chronoContainer: TableRow
     private lateinit var imageProcessor: ImageProcessor
     private lateinit var outputLinesFlow: ArrayList<FloatArray>
+
     private lateinit var imuEstimator: IMU_estimator
     private lateinit var opticalFlow: DenseOpticalFlow
     private lateinit var openCvCameraView: CameraBridgeViewBase
@@ -110,6 +115,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private var wasteCount = 0
     private var location: Location? = null
     private var fastSelfMotionTimestamp: Long = 0
+    private var outputFlowLinesRollingArray = LinkedList<TimedOutputFlowLine>()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val threadDetector = newSingleThreadContext("InferenceThread")
@@ -121,13 +127,15 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private var sensorOrientation: Int = 0
     private var detector: YoloDetector? = null
     private var lastProcessingTimeMs: Long = 0
+    private var latestDetectionsTimestamp: Long = 0
     private var croppedBitmap: Bitmap? = null
     private var computingDetection = false
     private var frameToCanvasTransform: Matrix? = null
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
     private var trackerManager: TrackerManager? = null
-    private var latestDetections: List<Detector.Recognition>? = null
+    private var latestDetections: List<Detector.Recognition?>? = null
+    private var latestMovedDetections: List<Detector.Recognition?>? = null
     private val mutex = Mutex()
     private val locationHandler = Handler(Looper.getMainLooper())
     private var lastTrackerManager: TrackerManager? = null
@@ -296,16 +304,21 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             val grayMat = it.gray()
             Imgproc.resize(grayMat, frameGray, frameGray.size())
             outputLinesFlow = opticalFlow.run(frameGray, DOWNSAMPLING_FACTOR_FLOW)
-            if (fastSelfMotionTimestamp == 0L) {
-                backgroundScope.launch(threadTracker) {
-                    mutex.withLock {
-                        avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
-                            outputLinesFlow,
-                            FLOW_REFRESH_RATE_MILLIS
-                        )
+            //if (fastSelfMotionTimestamp == 0L) {
+            backgroundScope.launch(threadTracker) {
+                mutex.withLock {
+                    avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
+                        outputLinesFlow,
+                        FLOW_REFRESH_RATE_MILLIS
+                    )
+
+                    outputFlowLinesRollingArray.add(TimedOutputFlowLine(outputLinesFlow, System.currentTimeMillis()))
+                    if (outputFlowLinesRollingArray.size > FLOW_ROLLING_ARRAY_MAX_SIZE) {
+                        outputFlowLinesRollingArray.removeFirst()
                     }
                 }
             }
+            //}
         }
 
         // detection (only if not already detecting)
@@ -367,11 +380,11 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 IS_QUANTIZED,
                 IS_V8,
                 IS_SCALED,
-                INPUT_SIZE,
+                INPUT_SIZE
             )
 
-            detector?.useGpu()
-            detector?.setNumThreads(NUM_THREADS)
+            // detector?.useGpu()
+            // detector?.setNumThreads(NUM_THREADS)
             detectorPaused = false
         } catch (e: IOException) {
             e.printStackTrace()
@@ -400,7 +413,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                         drawOFLinesPRK(it, outputLinesFlow, frameToCanvasTransform!!)
                     }
                     if (bottomSheet.showBoxes) {
-                        drawDetections(it, latestDetections, frameToCanvasTransform!!)
+                        drawDetections(it, latestDetections, frameToCanvasTransform!!, false)
+                        drawDetections(it, latestMovedDetections, frameToCanvasTransform!!, true)
                     }
                     if (DEBUG_FRAME) {
                         trackerManager?.drawDebug(it)
@@ -587,7 +601,9 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         // run in background
         backgroundScope.launch(threadDetector) {
             val startTime = SystemClock.uptimeMillis()
-            val results: List<Detector.Recognition>? = croppedBitmap?.let {
+            val frameTimestamp = System.currentTimeMillis()
+            latestDetectionsTimestamp = frameTimestamp
+            val results: ArrayList<Detector.Recognition?>? = croppedBitmap?.let {
                 detector?.recognizeImage(it)
             }
 
@@ -597,10 +613,11 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             @Synchronized
             latestDetections = mappedRecognitions
             mutex.withLock {
-                if (fastSelfMotionTimestamp == 0L) {
-                    trackerManager?.processDetections(mappedRecognitions, location)
-                    trackerManager?.updateTrackers()
-                }
+                //if (fastSelfMotionTimestamp == 0L) {
+                latestMovedDetections = moveDetectionsWithOF(mappedRecognitions, frameTimestamp)
+                trackerManager?.processDetections(mappedRecognitions, location, frameTimestamp)
+                trackerManager?.updateTrackers()
+                //}
             }
 
             trackingOverlay?.postInvalidate()
@@ -610,6 +627,30 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             }
         }
     }
+    private fun moveDetectionsWithOF(mappedRecognitions: List<Detector.Recognition?>, frameTimestamp:Long): MutableList<Detector.Recognition?> {
+        val movedRecognitions: MutableList<Detector.Recognition?> = LinkedList()
+        for (det in mappedRecognitions) {
+            det?.let {
+                val rect = RectF(it.location)
+                val center = PointF(rect.centerX(), rect.centerY())
+                val move = PointF(0.0F,0.0F)
+                outputFlowLinesRollingArray.forEach { outputFlowLine: TimedOutputFlowLine ->
+                    if (outputFlowLine.timestamp >= frameTimestamp) {
+                        val localMove = calculateMedianFlowSpeedForTrack(center, outputFlowLine.data, 6)
+                        move.x += localMove?.x?:0.0F
+                        move.y += localMove?.y?:0.0F
+                    }
+                }
+                val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
+                                       it.location.right + move.x, it.location.bottom + move.y)
+                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, it.detectedClass)
+                movedRecognitions.add(newDet)
+            }
+        }
+        return movedRecognitions
+    }
+
+    data class TimedOutputFlowLine(val data: ArrayList<FloatArray>, val timestamp: Long)
 
     companion object {
         private const val DEBUG_FRAME = false
@@ -618,22 +659,22 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         private const val MAX_HEIGHT = 720
 
         private const val FLOW_REFRESH_RATE_MILLIS: Long = 50
+        private const val FLOW_ROLLING_ARRAY_MAX_SIZE = 50
         private const val DOWNSAMPLING_FACTOR_FLOW: Int = 1
         private const val MAX_SELF_VELOCITY = 5.0
 
         private const val VELOCITY_PAUSE_STICKINESS: Long = 500
 
         private const val CONFIDENCE_THRESHOLD = 0.3f
+
         //private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
         // private const val MODEL_STRING = "yolov8n_float16.tflite"
-    
         private const val LABEL_FILENAME = "file:///android_asset/labelmap_surfnet.txt"
         private const val MODEL_STRING = "surfnet_best_13102023_float16.tflite" // not scaled
         private const val INPUT_SIZE = 640
         private const val IS_V8 = true
         private const val IS_QUANTIZED = false
         private const val IS_SCALED = false // False only for newer Yolo
-        private const val NUM_THREADS = 1
 
         private const val MAINTAIN_ASPECT = true
         private const val SAVE_PREVIEW_BITMAP = false

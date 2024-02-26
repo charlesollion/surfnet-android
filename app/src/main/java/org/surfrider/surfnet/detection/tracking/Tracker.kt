@@ -119,11 +119,11 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
         return status == TrackerStatus.GREEN
     }
 
-    class TrackedDetection(det: Detector.Recognition) {
+    class TrackedDetection(det: Detector.Recognition, timestamp:Long) {
         var rect: RectF = RectF(det.location)
         var detectionConfidence: Float = det.confidence
-        var timestamp: Long = System.currentTimeMillis()
-        var classId: String = det.title
+        var timestamp: Long = timestamp
+        var classId: String = det.classId
         var associatedId = -1
 
         fun getCenter(): PointF {
