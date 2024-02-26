@@ -400,6 +400,7 @@ class YoloDetector private constructor() : Detector {
                     } else {
                         // if the GPU is not supported, run on 4 threads
                         Timber.i("## USING CPU ##")
+                        this.useXNNPACK = true
                         this.numThreads = 4
                     }
                 }
