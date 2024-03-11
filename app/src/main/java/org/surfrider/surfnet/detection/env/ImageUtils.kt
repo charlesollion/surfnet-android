@@ -302,7 +302,7 @@ object ImageUtils {
                     val newLocation = RectF(it.location)
                     newLocation?.let { location ->
                         cropToFrameTransform?.mapRect(location)
-                        val newDet = Detector.Recognition(it.classId, it.confidence, location, it.detectedClass)
+                        val newDet = Detector.Recognition(it.classId, it.confidence, location, null, it.detectedClass)
                         mappedRecognitions.add(newDet)
                     }
                 }

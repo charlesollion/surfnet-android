@@ -16,6 +16,7 @@ package org.surfrider.surfnet.detection.tflite
 
 import android.graphics.Bitmap
 import android.graphics.RectF
+import org.opencv.core.Mat
 import java.util.Locale
 
 /**
@@ -41,6 +42,8 @@ interface Detector {
          * Optional location within the source image for the location of the recognized object.
          */
         var location: RectF,
+
+        var mask: Mat?,
 
         val detectedClass: Int
     ) {

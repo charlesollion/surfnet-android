@@ -18,6 +18,9 @@ import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.RectF
 import android.os.Build
+import org.opencv.core.Core
+import org.opencv.core.CvType
+import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.env.Utils.loadModelFile
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import org.tensorflow.lite.Interpreter
@@ -81,9 +84,13 @@ class YoloDetector private constructor() : Detector {
 
     //config yolo
     var inputSize = -1
+    var numMasks = 0
+    var resolutionMaskW = 0
+    var resolutionMaskH = 0
     private var output_box = 0
     private var isModelQuantized = false
     private var isV8 = false
+    private var modelType = ""
     private var confThreshold = 0f
 
     /** holds a gpu delegate  */
@@ -103,6 +110,7 @@ class YoloDetector private constructor() : Detector {
     private lateinit var intValues: IntArray
     private lateinit var imgData: ByteBuffer
     private lateinit var outData: ByteBuffer
+    private lateinit var outData2: ByteBuffer
     private var tfLite: Interpreter? = null
     private var inp_scale = 0f
     private var inp_zero_point = 0
@@ -113,7 +121,7 @@ class YoloDetector private constructor() : Detector {
     //non maximum suppression
     protected fun nms(list: ArrayList<Recognition>): ArrayList<Recognition?> {
         val nmsList = ArrayList<Recognition?>()
-        for (k in labels.indices) {
+        for (k in 0 until numClass) {
             //1.find max confidence per class
             val pq = PriorityQueue<Recognition?>(
                 50
@@ -145,6 +153,33 @@ class YoloDetector private constructor() : Detector {
         }
         return nmsList
     }
+
+    fun weightedSumOfMasks(masks: Array<FloatArray>, maskWeights: FloatArray, maskResolution: Int): Mat {
+        val numMasks = masks.size
+        val maskSize = maskResolution * maskResolution
+
+        // Create a matrix to store all masks as rows
+        val maskMatrix = Mat(numMasks, maskSize, CvType.CV_32F)
+
+        // Populate the mask matrix
+        for (i in masks.indices) {
+            maskMatrix.put(i, 0, masks[i])
+        }
+
+        // Create a matrix for mask weights
+        val weightMatrix = Mat(numMasks, 1, CvType.CV_32F)
+        for (i in maskWeights.indices) {
+            var value: Double = maskWeights[i].toDouble()
+            weightMatrix.put(i, 0, value)
+        }
+
+        // Calculate the weighted sum of masks
+        val weightedSum = Mat()
+        Core.gemm(maskMatrix, weightMatrix, 1.0, Mat(), 0.0, weightedSum)
+
+        return weightedSum
+    }
+
 
     protected var mNmsThresh = 0.6f
     protected fun box_iou(a: RectF, b: RectF): Float {
@@ -204,6 +239,10 @@ class YoloDetector private constructor() : Detector {
     }
 
     override fun recognizeImage(bitmap: Bitmap?): ArrayList<Recognition?>? {
+        if(modelType == "segmentation") {
+            Timber.d("overriding for segmentation")
+            return segmentImage(bitmap)
+        }
         convertBitmapToByteBuffer(bitmap)
         val outputMap: MutableMap<Int, Any?> =
             HashMap()
@@ -215,43 +254,43 @@ class YoloDetector private constructor() : Detector {
         val byteBuffer = outputMap[0] as ByteBuffer?
         byteBuffer!!.rewind()
         val detections = ArrayList<Recognition>()
-        val out =
-            Array(1) {
-                Array(output_box) { FloatArray(numClass + 5) }
-            }
-        if (!isV8) {
-            // Timber.tag("YoloDetector").d("out[0] detect start");
-            for (i in 0 until output_box) {
-                for (j in 0 until numClass + 5) {
-                    if (isModelQuantized) {
-                        out[0][i][j] =
-                            oup_scale * ((byteBuffer.get().toInt() and 0xFF) - oup_zero_point)
-                    } else {
-                        out[0][i][j] = byteBuffer.float
-                    }
-                }
-                // Denormalize xywh
-                for (j in 0..3) {
-                    out[0][i][j] *= inputSize.toFloat()
-                }
-            }
-        } else {
-            // switch the way we span through the bytebuffer
-            // Timber.tag("YoloDetector V8").d("out[0] detect start");
-            for (j in 0 until numClass + 4) {
+        val out = Array(1) { Array(output_box) { FloatArray(numClass + 5) }}
+        when (modelType) {
+            "v5" -> {
+                // Timber.tag("YoloDetector").d("out[0] detect start");
                 for (i in 0 until output_box) {
-                    if (isModelQuantized) {
-                        out[0][i][j] =
-                            oup_scale * ((byteBuffer.get().toInt() and 0xFF) - oup_zero_point)
-                    } else {
-                        out[0][i][j] = byteBuffer.float
+                    for (j in 0 until numClass + 5) {
+                        if (isModelQuantized) {
+                            out[0][i][j] =
+                                oup_scale * ((byteBuffer.get().toInt() and 0xFF) - oup_zero_point)
+                        } else {
+                            out[0][i][j] = byteBuffer.float
+                        }
+                    }
+                    // Denormalize xywh
+                    for (j in 0..3) {
+                        out[0][i][j] *= inputSize.toFloat()
                     }
                 }
             }
-            // not always needed to denormalize for yolov8
-            for (i in 0 until output_box) {
-                for (j in 0..3) {
-                    out[0][i][j] *= scalingFactor
+            "v8" -> {
+                // switch the way we span through the bytebuffer
+                // Timber.tag("YoloDetector V8").d("out[0] detect start");
+                for (j in 0 until numClass + 4) {
+                    for (i in 0 until output_box) {
+                        if (isModelQuantized) {
+                            out[0][i][j] =
+                                oup_scale * ((byteBuffer.get().toInt() and 0xFF) - oup_zero_point)
+                        } else {
+                            out[0][i][j] = byteBuffer.float
+                        }
+                    }
+                }
+                // not always needed to denormalize for yolov8
+                for (i in 0 until output_box) {
+                    for (j in 0..3) {
+                        out[0][i][j] *= scalingFactor
+                    }
                 }
             }
         }
@@ -263,15 +302,15 @@ class YoloDetector private constructor() : Detector {
             }
             var detectedClass = -1
             var maxClass = 0f
-            val classes = FloatArray(labels.size)
-            for (c in labels.indices) {
+            val classes = FloatArray(numClass)
+            for (c in 0 until numClass) {
                 if (!isV8) {
                     classes[c] = out[0][i][5 + c]
                 } else {
                     classes[c] = out[0][i][4 + c]
                 }
             }
-            for (c in labels.indices) {
+            for (c in 0 until numClass) {
                 if (classes[c] > maxClass) {
                     detectedClass = c
                     maxClass = classes[c]
@@ -292,7 +331,92 @@ class YoloDetector private constructor() : Detector {
                 )
                 detections.add(
                     Recognition(labels[detectedClass],
-                        confidenceInClass, rect, detectedClass
+                        confidenceInClass, rect, null, detectedClass
+                    )
+                )
+            }
+        }
+        // Timber.tag("YoloDetector").d("detect end");
+        return nms(detections)
+    }
+
+    fun segmentImage(bitmap: Bitmap?): ArrayList<Recognition?>? {
+        convertBitmapToByteBuffer(bitmap)
+        val outputMap: MutableMap<Int, Any?> =
+            HashMap()
+        outData!!.rewind()
+        outData2!!.rewind()
+        outputMap[0] = outData
+        outputMap[1] = outData2
+        // Timber.tag("YoloDetector").d("mObjThresh: %s", getObjThresh());
+        val inputArray = arrayOf<Any?>(imgData)
+        tfLite!!.runForMultipleInputsOutputs(inputArray, outputMap)
+
+        val byteBuffer = outputMap[0] as ByteBuffer?
+        val byteBuffer2 = outputMap[1] as ByteBuffer?
+        byteBuffer!!.rewind()
+        byteBuffer2!!.rewind()
+        val detections = ArrayList<Recognition>()
+        val out = Array(output_box) { FloatArray(4 + numClass + numMasks) }
+        val out2 = Array(numMasks) { Mat(resolutionMaskW, resolutionMaskW, CvType.CV_32F) }
+
+        // Get first output
+        for (j in 0 until 4 + numClass + numMasks) {
+            for (i in 0 until output_box) {
+                if (isModelQuantized) {
+                    out[i][j] =
+                        oup_scale * ((byteBuffer.get().toInt() and 0xFF) - oup_zero_point)
+                } else {
+                    out[i][j] = byteBuffer.float
+                }
+            }
+        }
+        // not always needed to denormalize for yolov8
+        for (i in 0 until output_box) {
+            for (j in 0..3) {
+                out[i][j] *= scalingFactor
+            }
+        }
+
+        // Get second output
+        for (i in 0 until numMasks) {
+            val floatBuffer = byteBuffer2.asFloatBuffer()
+            val floatArray = FloatArray(floatBuffer.remaining())
+            floatBuffer.get(floatArray)
+            out2[i].put(0,0, floatArray)
+        }
+
+
+        for (i in 0 until output_box) {
+
+            var detectedClass = -1
+            var maxClass = 0f
+            val classes = FloatArray(numClass)
+            for (c in 0 until numClass) {
+                classes[c] = out[i][4 + c]
+            }
+            for (c in 0 until numClass) {
+                if (classes[c] > maxClass) {
+                    detectedClass = c
+                    maxClass = classes[c]
+                }
+            }
+            val confidenceInClass = maxClass
+            if (confidenceInClass > confThreshold) {
+                val xPos = out[i][0]
+                val yPos = out[i][1]
+                val w = out[i][2]
+                val h = out[i][3]
+                // Timber.tag("YoloDetector").i(Float.toString(xPos) + ',' + yPos + ',' + w + ',' + h);
+                val rect = RectF(
+                    max(0f, xPos - w / 2),
+                    max(0f, yPos - h / 2),
+                    min((bitmap!!.width - 1).toFloat(), xPos + w / 2),
+                    min((bitmap.height - 1).toFloat(), yPos + h / 2)
+                )
+                detections.add(
+                    Recognition(labels[detectedClass],
+                        confidenceInClass, rect, null, detectedClass
                     )
                 )
             }
@@ -369,7 +493,7 @@ class YoloDetector private constructor() : Detector {
             labelFilename: String,
             confThreshold: Float,
             isQuantized: Boolean,
-            isV8: Boolean,
+            modelType: String,
             outputIsScaled: Boolean,
             inputSize: Int
         ): YoloDetector {
@@ -417,7 +541,18 @@ class YoloDetector private constructor() : Detector {
             } else {
                 scalingFactor = inputSize.toFloat()
             }
-            d.isV8 = isV8
+            when (modelType) {
+                "v8", "segmentation" -> {
+                    d.isV8 = true
+                }
+                "v5" -> {
+                    d.isV8 = false
+                }
+                else -> {
+                    throw RuntimeException("model type $modelType not recognized, possible types: [v5, v8, segmentation]")
+                }
+            }
+            d.modelType = modelType
             // Pre-allocate buffers.
             val numBytesPerChannel: Int
             numBytesPerChannel = if (isQuantized) {
@@ -430,7 +565,7 @@ class YoloDetector private constructor() : Detector {
                 ByteBuffer.allocateDirect(1 * d.inputSize * d.inputSize * 3 * numBytesPerChannel)
             d.imgData.order(ByteOrder.nativeOrder())
             d.intValues = IntArray(d.inputSize * d.inputSize)
-            if (!isV8) {
+            if (!d.isV8) {
                 // yolov5 case (20² + 40² + 80²)*3 = 25200
                 d.output_box = ((Math.pow(
                     (inputSize / 32).toDouble(),
@@ -439,7 +574,7 @@ class YoloDetector private constructor() : Detector {
                     (inputSize / 16).toDouble(),
                     2.0
                 ) + Math.pow((inputSize / 8).toDouble(), 2.0)) * 3).toInt()
-            } else {
+            } else{
                 // yolov8 case (20² + 40² + 80²) = 8400
                 d.output_box = (Math.pow(
                     (inputSize / 32).toDouble(),
@@ -449,6 +584,7 @@ class YoloDetector private constructor() : Detector {
                     2.0
                 ) + Math.pow((inputSize / 8).toDouble(), 2.0)).toInt()
             }
+
             if (d.isModelQuantized) {
                 val inpten = d.tfLite!!.getInputTensor(0)
                 d.inp_scale = inpten.quantizationParams().scale
@@ -458,18 +594,39 @@ class YoloDetector private constructor() : Detector {
                 d.oup_zero_point = oupten.quantizationParams().zeroPoint
             }
             val shape = d.tfLite!!.getOutputTensor(0).shape()
+
             // Timber.i("out shape ==== "+Arrays.toString(shape));
             var numClass = 0
-            if (!isV8) {
-                // yolov5 case: (1, num_anchors, num_class+5)
-                numClass = shape[shape.size - 1] - 5
-                d.outData =
-                    ByteBuffer.allocateDirect(d.output_box * (numClass + 5) * numBytesPerChannel)
-            } else {
-                // yolov8 case: (1, num_class+4, num_anchors)
-                numClass = shape[shape.size - 2] - 4
-                d.outData =
-                    ByteBuffer.allocateDirect(d.output_box * (numClass + 4) * numBytesPerChannel)
+            when (modelType) {
+                "v8" -> {
+                    numClass = shape[shape.size - 2] - 4
+                    d.outData =
+                        ByteBuffer.allocateDirect(d.output_box * (numClass + 4) * numBytesPerChannel)
+                }
+                "v5" -> {
+                    // yolov5 case: (1, num_anchors, num_class+5)
+                    numClass = shape[shape.size - 1] - 5
+                    d.outData =
+                        ByteBuffer.allocateDirect(d.output_box * (numClass + 5) * numBytesPerChannel)
+                }
+                "segmentation" -> {
+                    // segmentation case (1, num_class+ num_masks+4, num_anchors)
+                    val shape2 = d.tfLite!!.getOutputTensor(1).shape()
+                    d.resolutionMaskW = shape2[1]
+                    d.resolutionMaskH = shape2[2]
+                    d.numMasks = shape2[3]
+                    numClass = shape[1] - 4 - d.numMasks
+                    Timber.i("shape: ${d.numMasks} ${d.resolutionMaskW} $numClass")
+                    d.outData =
+                        ByteBuffer.allocateDirect(d.output_box * (4 + numClass + d.numMasks) * numBytesPerChannel)
+                    // second output
+                    d.outData2 =
+                        ByteBuffer.allocateDirect((d.resolutionMaskW * d.resolutionMaskH * d.numMasks)* numBytesPerChannel)
+
+                }
+                else -> {
+                    throw RuntimeException("model type $modelType not recognized, possible types: [v5, v8, segmentation]")
+                }
             }
             d.numClass = numClass
             d.outData.order(ByteOrder.nativeOrder())

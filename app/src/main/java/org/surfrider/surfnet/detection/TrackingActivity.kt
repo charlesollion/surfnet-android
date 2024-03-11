@@ -378,7 +378,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 LABEL_FILENAME,
                 CONFIDENCE_THRESHOLD,
                 IS_QUANTIZED,
-                IS_V8,
+                MODEL_TYPE,
                 IS_SCALED,
                 INPUT_SIZE
             )
@@ -643,7 +643,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 }
                 val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
                                        it.location.right + move.x, it.location.bottom + move.y)
-                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, it.detectedClass)
+                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, null, it.detectedClass)
                 movedRecognitions.add(newDet)
             }
         }
@@ -670,9 +670,9 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         //private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
         // private const val MODEL_STRING = "yolov8n_float16.tflite"
         private const val LABEL_FILENAME = "file:///android_asset/labelmap_surfnet.txt"
-        private const val MODEL_STRING = "surfnet_best_13102023_float16.tflite" // not scaled
+        private const val MODEL_STRING = "yolov8n-seg-surfnet_float16.tflite" // not scaled
         private const val INPUT_SIZE = 640
-        private const val IS_V8 = true
+        private const val MODEL_TYPE = "segmentation" // can also be v5 or v8
         private const val IS_QUANTIZED = false
         private const val IS_SCALED = false // False only for newer Yolo
 
