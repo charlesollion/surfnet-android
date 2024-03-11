@@ -35,13 +35,20 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme.ObjectDetection"
         tools:ignore="HardcodedDebugMode">
-
+        <activity
+            android:name=".TutorialActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"/>
         <activity
             android:name=".TrackingActivity"
-            android:label="@string/tfe_od_app_name"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"
             android:exported="true">
+        </activity>
+        <activity
+            android:name=".HomeActivity"
+            android:exported="true"
+            android:label="Surfnet Demo App">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

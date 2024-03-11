@@ -654,7 +654,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
     companion object {
         private const val DEBUG_FRAME = false
-        private const val DEBUG_MODE = true
+        private const val DEBUG_MODE = false
         private const val MAX_WIDTH = 1280
         private const val MAX_HEIGHT = 720
 
