@@ -393,7 +393,8 @@ class YoloDetector private constructor() : Detector {
                     if(compatList.isDelegateSupportedOnThisDevice){
                         // if the device has a supported GPU, add the GPU delegate
                         val delegateOptions = compatList.bestOptionsForThisDevice
-                        delegateOptions.inferencePreference = INFERENCE_PREFERENCE_SUSTAINED_SPEED
+                        // delegateOptions.inferencePreference = INFERENCE_PREFERENCE_SUSTAINED_SPEED
+                        delegateOptions.inferencePreference = INFERENCE_PREFERENCE_FAST_SINGLE_ANSWER
                         delegateOptions.setQuantizedModelsAllowed(false)
                         delegateOptions.isPrecisionLossAllowed = true
                         this.addDelegate(GpuDelegate(delegateOptions))
