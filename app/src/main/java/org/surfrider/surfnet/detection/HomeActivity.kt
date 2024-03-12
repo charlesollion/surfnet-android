@@ -1,8 +1,11 @@
 package org.surfrider.surfnet.detection
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.text.SpannableString
 import android.text.SpannableStringBuilder
@@ -11,6 +14,8 @@ import android.text.style.ClickableSpan
 import android.util.Patterns
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import org.surfrider.surfnet.detection.databinding.ActivityHomeBinding
 
 
@@ -64,6 +69,19 @@ class HomeActivity : AppCompatActivity() {
                 startActivity(intent)
             }
         }
+
+        setupPermissions()
+
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return
+        }
     }
 
     private fun validateEmail(): Boolean {
@@ -77,5 +95,30 @@ class HomeActivity : AppCompatActivity() {
         }
     }
 
+    private fun setupPermissions() {
+        val permissions = arrayOf(
+            Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION
+        )
+        if (!checkPermissions(permissions)) {
+            // TODO add dialog for permissions
+            //val locationPermissionDialog = LocationPermissionDialog()
+            //locationPermissionDialog.show(supportFragmentManager, "stop_record_dialog")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                requestPermissions(permissions, 1)
+            }
+        }
+    }
+    private fun checkPermissions(permissions: Array<String>): Boolean {
+        for (permission in permissions) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    permission
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return false
+            }
+        }
+        return true
+    }
 
 }

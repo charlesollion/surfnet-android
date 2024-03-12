@@ -98,7 +98,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private lateinit var imageProcessor: ImageProcessor
     private lateinit var outputLinesFlow: ArrayList<FloatArray>
 
-    private lateinit var imuEstimator: IMU_estimator
+
     private lateinit var opticalFlow: DenseOpticalFlow
     private lateinit var openCvCameraView: CameraBridgeViewBase
     private lateinit var frameRgba: Mat
@@ -122,7 +122,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private val threadTracker = newSingleThreadContext("TrackerThread")
 
     private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-
+    private var imuEstimator: IMU_estimator? = null
     private var trackingOverlay: OverlayView? = null
     private var sensorOrientation: Int = 0
     private var detector: YoloDetector? = null
@@ -167,8 +167,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         bottomSheet.showBoxes = DEBUG_MODE
         hideSystemUI()
 
-        setupPermissions()
-
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
 
@@ -184,7 +182,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             }
         }
 
-        if (ActivityCompat.checkSelfPermission(
+        /*if (ActivityCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
@@ -193,7 +191,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             return
-        }
+        }*/
         fusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, null)
         updateLocation()
         imageProcessor = ImageProcessor()
@@ -518,32 +516,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         getLocation()
     }
 
-    private fun setupPermissions() {
-        val permissions = arrayOf(
-            PERMISSION_CAMERA, PERMISSION_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION
-        )
-        if (!checkPermissions(permissions)) {
-            // TODO add dialog for permissions
-            //val locationPermissionDialog = LocationPermissionDialog()
-            //locationPermissionDialog.show(supportFragmentManager, "stop_record_dialog")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                requestPermissions(permissions, PERMISSIONS_REQUEST)
-            }
-        }
-    }
 
-    private fun checkPermissions(permissions: Array<String>): Boolean {
-        for (permission in permissions) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    permission
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                return false
-            }
-        }
-        return true
-    }
 
     fun updateCounter(count: Int?) {
         binding.wasteCounter.text = count.toString()
@@ -554,8 +527,12 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
     private fun computeIMU() {
         // get IMU variables
-        val velocity: FloatArray = imuEstimator.velocity
-        val imuPosition: FloatArray = imuEstimator.position
+        if (imuEstimator == null) {
+            Timber.d("Problem with initialization of imu")
+            return
+        }
+        val velocity: FloatArray = imuEstimator!!.velocity
+        val imuPosition: FloatArray = imuEstimator!!.position
         // Convert the velocity to kmh
         val xVelocity = velocity[0] * 3.6f
         val yVelocity = velocity[1] * 3.6f
