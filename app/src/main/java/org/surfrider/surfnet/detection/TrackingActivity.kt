@@ -182,16 +182,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             }
         }
 
-        /*if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }*/
         fusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, null)
         updateLocation()
         imageProcessor = ImageProcessor()
@@ -251,11 +241,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         Timber.i("CameraViewStarted ${width}x${height}")
         previewWidth = width
         previewHeight = height
-
-        /*if (openCvCameraView.rotation != null) {
-                    sensorOrientation = openCvCameraView.rotation - screenOrientation
-                }
-        Timber.i("Camera orientation relative to screen canvas: %d", sensorOrientation)*/
 
         // Get Android Graphics transform matrix
         frameToCropTransform = ImageUtils.getTransformationMatrix(
@@ -645,19 +630,18 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         private const val CONFIDENCE_THRESHOLD = 0.3f
 
         //private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
-        // private const val MODEL_STRING = "yolov8n_float16.tflite"
+        //private const val MODEL_STRING = "yolov8s_float16.tflite"
+        //private const val MODEL_TYPE = "v8"
         private const val LABEL_FILENAME = "file:///android_asset/labelmap_surfnet.txt"
-        private const val MODEL_STRING = "yolov8n-seg-surfnet_float16.tflite" // not scaled
-        private const val INPUT_SIZE = 640
+        private const val MODEL_STRING = "yolov8s-seg-surfnet_float16.tflite" // not scaled
+        //private const val MODEL_STRING = "yolov8n-seg-surfnet_float16.tflite" // not scaled
         private const val MODEL_TYPE = "segmentation" // can also be v5 or v8
+        private const val INPUT_SIZE = 640
         private const val IS_QUANTIZED = false
         private const val IS_SCALED = false // False only for newer Yolo
 
         private const val MAINTAIN_ASPECT = true
         private const val SAVE_PREVIEW_BITMAP = false
         private const val REQUEST_LOCATION_PERMISSION = 2
-        private const val PERMISSIONS_REQUEST = 1
-        private const val PERMISSION_CAMERA = Manifest.permission.CAMERA
-        private const val PERMISSION_LOCATION = Manifest.permission.ACCESS_FINE_LOCATION
     }
 }
