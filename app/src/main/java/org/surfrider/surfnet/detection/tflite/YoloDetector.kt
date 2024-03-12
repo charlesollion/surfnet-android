@@ -65,6 +65,7 @@ class YoloDetector private constructor() : Detector {
     private lateinit var imgData: ByteBuffer
     private lateinit var outData: ByteBuffer
     private lateinit var outData2: ByteBuffer
+    private lateinit var masks: Mat
     private var tfLite: Interpreter? = null
     private var inp_scale = 0f
     private var inp_zero_point = 0
@@ -109,11 +110,60 @@ class YoloDetector private constructor() : Detector {
         return null
     }
 
-    override fun recognizeImage(bitmap: Bitmap?): ArrayList<Recognition?>? {
-        if(modelType == "segmentation") {
-            Timber.d("overriding for segmentation")
-            return segmentImage(bitmap)
+    private fun processTFoutput(out: Array<FloatArray>, width:Int, height:Int): ArrayList<Recognition> {
+        val detections = ArrayList<Recognition>()
+        for (i in 0 until outputBox) {
+            var confidence = 1.0f
+            if (!isV8) {
+                // confidence only valid for yolov5
+                confidence = out[i][4]
+            }
+            var detectedClass = -1
+            var maxClass = 0f
+            val classes = FloatArray(numClass)
+            for (c in 0 until numClass) {
+                if (!isV8) {
+                    classes[c] = out[i][5 + c]
+                } else {
+                    classes[c] = out[i][4 + c]
+                }
+            }
+            for (c in 0 until numClass) {
+                if (classes[c] > maxClass) {
+                    detectedClass = c
+                    maxClass = classes[c]
+                }
+            }
+            val confidenceInClass = maxClass * confidence
+            if (confidenceInClass > confThreshold) {
+                val xPos = out[i][0]
+                val yPos = out[i][1]
+                val w = out[i][2]
+                val h = out[i][3]
+                val rect = RectF(
+                    max(0f, xPos - w / 2),
+                    max(0f, yPos - h / 2),
+                    kotlin.math.min((width - 1).toFloat(), xPos + w / 2),
+                    kotlin.math.min((height - 1).toFloat(), yPos + h / 2)
+                )
+                detections.add(
+                    Recognition(labels[detectedClass],
+                        confidenceInClass, rect, null, detectedClass
+                    )
+                )
+            }
         }
+        return detections
+    }
+
+    override fun recognizeImage(bitmap: Bitmap?): ArrayList<Recognition?>? {
+        return if (modelType == "segmentation") {
+            segmentImage(bitmap)
+        } else {
+            detectImage(bitmap)
+        }
+    }
+    private fun detectImage(bitmap: Bitmap?): ArrayList<Recognition?>? {
         convertBitmapToByteBuffer(bitmap)
         val outputMap: MutableMap<Int, Any?> =
             HashMap()
@@ -123,7 +173,7 @@ class YoloDetector private constructor() : Detector {
         tfLite!!.runForMultipleInputsOutputs(inputArray, outputMap)
         val byteBuffer = outputMap[0] as ByteBuffer?
         byteBuffer!!.rewind()
-        val detections = ArrayList<Recognition>()
+
         val out =   Array(outputBox) { FloatArray(numClass + 5) }
         when (modelType) {
             "v5" -> {
@@ -162,47 +212,7 @@ class YoloDetector private constructor() : Detector {
                 }
             }
         }
-        for (i in 0 until outputBox) {
-            var confidence = 1.0f
-            if (!isV8) {
-                // confidence only valid for yolov5
-                confidence = out[i][4]
-            }
-            var detectedClass = -1
-            var maxClass = 0f
-            val classes = FloatArray(numClass)
-            for (c in 0 until numClass) {
-                if (!isV8) {
-                    classes[c] = out[i][5 + c]
-                } else {
-                    classes[c] = out[i][4 + c]
-                }
-            }
-            for (c in 0 until numClass) {
-                if (classes[c] > maxClass) {
-                    detectedClass = c
-                    maxClass = classes[c]
-                }
-            }
-            val confidenceInClass = maxClass * confidence
-            if (confidenceInClass > confThreshold) {
-                val xPos = out[i][0]
-                val yPos = out[i][1]
-                val w = out[i][2]
-                val h = out[i][3]
-                val rect = RectF(
-                    max(0f, xPos - w / 2),
-                    max(0f, yPos - h / 2),
-                    kotlin.math.min((bitmap!!.width - 1).toFloat(), xPos + w / 2),
-                    kotlin.math.min((bitmap.height - 1).toFloat(), yPos + h / 2)
-                )
-                detections.add(
-                    Recognition(labels[detectedClass],
-                        confidenceInClass, rect, null, detectedClass
-                    )
-                )
-            }
-        }
+        val detections = processTFoutput(out, bitmap!!.width, bitmap.height)
         return DetectorUtils.nms(detections, numClass)
     }
 
@@ -221,9 +231,7 @@ class YoloDetector private constructor() : Detector {
         val byteBuffer2 = outputMap[1] as ByteBuffer?
         byteBuffer!!.rewind()
         byteBuffer2!!.rewind()
-        val detections = ArrayList<Recognition>()
         val out = Array(outputBox) { FloatArray(4 + numClass + numMasks) }
-        val out2 = Array(numMasks) { Mat(resolutionMaskW, resolutionMaskW, CvType.CV_32F) }
 
         // Get first output
         for (j in 0 until 4 + numClass + numMasks) {
@@ -246,50 +254,23 @@ class YoloDetector private constructor() : Detector {
         // Get second output
         for (i in 0 until numMasks) {
             val floatBuffer = byteBuffer2.asFloatBuffer()
-            val floatArray = FloatArray(floatBuffer.remaining())
+            val floatArray = FloatArray(resolutionMaskW * resolutionMaskH)
             floatBuffer.get(floatArray)
-            out2[i].put(0,0, floatArray)
+            masks.put(i,0, floatArray)
         }
-
-        for (i in 0 until outputBox) {
-            var detectedClass = -1
-            var maxClass = 0f
-            val classes = FloatArray(numClass)
-            for (c in 0 until numClass) {
-                classes[c] = out[i][4 + c]
-            }
-            for (c in 0 until numClass) {
-                if (classes[c] > maxClass) {
-                    detectedClass = c
-                    maxClass = classes[c]
-                }
-            }
-            val confidenceInClass = maxClass
-            if (confidenceInClass > confThreshold) {
-                val xPos = out[i][0]
-                val yPos = out[i][1]
-                val w = out[i][2]
-                val h = out[i][3]
-                val rect = RectF(
-                    max(0f, xPos - w / 2),
-                    max(0f, yPos - h / 2),
-                    kotlin.math.min((bitmap!!.width - 1).toFloat(), xPos + w / 2),
-                    kotlin.math.min((bitmap.height - 1).toFloat(), yPos + h / 2)
-                )
-                detections.add(
-                    Recognition(labels[detectedClass],
-                        confidenceInClass, rect, null, detectedClass
-                    )
-                )
-            }
-        }
+        val detections = processTFoutput(out, bitmap!!.width, bitmap.height)
         val indicesToKeep = DetectorUtils.nmsIndices(detections, numClass)
         val newDetections = indicesToKeep
             .filter { it in detections.indices }
-            .map { detections[it] as Recognition? }
+            .map { computeMask(detections[it], masks, out[it].sliceArray(4+numClass .. 4+numClass+numMasks-1)) }
             .toCollection(ArrayList())
 
         return newDetections
+    }
+
+    private fun computeMask(det: Recognition, masks: Mat, maskWeights: FloatArray): Recognition? {
+        det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskW, resolutionMaskH)
+        return det as Recognition?
     }
 
     companion object {
@@ -403,7 +384,7 @@ class YoloDetector private constructor() : Detector {
                     // second output
                     d.outData2 =
                         ByteBuffer.allocateDirect((d.resolutionMaskW * d.resolutionMaskH * d.numMasks)* numBytesPerChannel)
-
+                    d.masks = Mat(d.numMasks, d.resolutionMaskW * d.resolutionMaskH, CvType.CV_32F)
                 }
                 else -> {
                     throw RuntimeException("model type $modelType not recognized, possible types: [v5, v8, segmentation]")

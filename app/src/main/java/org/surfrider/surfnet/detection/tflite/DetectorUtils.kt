@@ -4,6 +4,7 @@ import android.graphics.RectF
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
+import timber.log.Timber
 import java.util.PriorityQueue
 
 object DetectorUtils {
@@ -109,30 +110,22 @@ object DetectorUtils {
         return right - left
     }
 
-    fun weightedSumOfMasks(masks: Array<FloatArray>, maskWeights: FloatArray, maskResolution: Int): Mat {
-        val numMasks = masks.size
-        val maskSize = maskResolution * maskResolution
-
-        // Create a matrix to store all masks as rows
-        val maskMatrix = Mat(numMasks, maskSize, CvType.CV_32F)
-
-        // Populate the mask matrix
-        for (i in masks.indices) {
-            maskMatrix.put(i, 0, masks[i])
-        }
+    fun weightedSumOfMasks(maskMatrix: Mat, maskWeights: FloatArray, maskResolutionW: Int, maskResolutionH: Int): Mat {
+        // Expects a maskMatrix of size (numMasks, maskResolution * maskResolution)
+        val numMasks = maskWeights.size
 
         // Create a matrix for mask weights
-        val weightMatrix = Mat(numMasks, 1, CvType.CV_32F)
+        val weightMatrix = Mat(1, numMasks, CvType.CV_32F)
         for (i in maskWeights.indices) {
             val value: Double = maskWeights[i].toDouble()
-            weightMatrix.put(i, 0, value)
+            weightMatrix.put(0, i, value)
         }
 
         // Calculate the weighted sum of masks
         val weightedSum = Mat()
-        Core.gemm(maskMatrix, weightMatrix, 1.0, Mat(), 0.0, weightedSum)
+        Core.gemm(weightMatrix, maskMatrix, 1.0, Mat(), 0.0, weightedSum)
 
-        return weightedSum
+        return weightedSum.reshape(maskResolutionH, maskResolutionW)
     }
 
     private const val mNmsThresh = 0.6f
