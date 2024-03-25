@@ -20,6 +20,7 @@ import android.graphics.RectF
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
+import org.opencv.core.Rect
 import org.surfrider.surfnet.detection.env.Utils.loadModelFile
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import org.tensorflow.lite.Interpreter
@@ -262,14 +263,17 @@ class YoloDetector private constructor() : Detector {
         val indicesToKeep = DetectorUtils.nmsIndices(detections, numClass)
         val newDetections = indicesToKeep
             .filter { it in detections.indices }
-            .map { computeMask(detections[it], masks, out[it].sliceArray(4+numClass .. 4+numClass+numMasks-1)) }
+            .map { computeMask(detections[it], masks, out[it]) }
             .toCollection(ArrayList())
 
         return newDetections
     }
 
-    private fun computeMask(det: Recognition, masks: Mat, maskWeights: FloatArray): Recognition? {
-        det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskW, resolutionMaskH)
+    private fun computeMask(det: Recognition, masks: Mat, tfOutput: FloatArray): Recognition? {
+        val bbox = tfOutput.sliceArray(0 .. 3)
+        val rect = Rect(bbox.map{it.toDouble()/MASK_SCALE_FACTOR}.toDoubleArray())
+        val maskWeights = tfOutput.sliceArray(4+numClass .. 4+numClass+numMasks-1)
+        det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskW, resolutionMaskH, rect)
         return det as Recognition?
     }
 
@@ -394,5 +398,6 @@ class YoloDetector private constructor() : Detector {
             d.outData.order(ByteOrder.nativeOrder())
             return d
         }
+        private const val MASK_SCALE_FACTOR = 4
     }
 }

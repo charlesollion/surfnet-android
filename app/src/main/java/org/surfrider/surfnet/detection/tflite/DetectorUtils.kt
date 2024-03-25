@@ -4,6 +4,9 @@ import android.graphics.RectF
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
+import org.opencv.core.Rect
+import org.opencv.core.Scalar
+import org.surfrider.surfnet.detection.env.MathUtils.sigmoid
 import timber.log.Timber
 import java.util.PriorityQueue
 
@@ -110,23 +113,46 @@ object DetectorUtils {
         return right - left
     }
 
-    fun weightedSumOfMasks(maskMatrix: Mat, maskWeights: FloatArray, maskResolutionW: Int, maskResolutionH: Int): Mat {
-        // Expects a maskMatrix of size (numMasks, maskResolution * maskResolution)
-        val numMasks = maskWeights.size
+    fun weightedSumOfMasks(maskMatrix: Mat, maskWeights: FloatArray, maskResolutionW: Int, maskResolutionH: Int, rect: Rect): Mat {
+        // Expects a maskMatrix of size (numMasks, maskResolutionW * maskResolutionH)
+
+        // Other version
+        val weightedSum = Mat(rect.width, rect.height, CvType.CV_32F)
+
+        for (x in 0 until maskMatrix.cols()) {
+            val i: Int = x % maskResolutionW
+            val j: Int = x / maskResolutionW
+            var value: Double = 0.0
+            if( i >= rect.x && j >= rect.y && i < rect.x+rect.width && j < rect.y+rect.height) {
+                for (k in maskWeights.indices) {
+                    value = maskMatrix.get(k, x)[0] * maskWeights[k]
+                }
+                weightedSum.put(i - rect.x, j - rect.height, sigmoid(value))
+            }
+        }
+        val finalOutput = Mat()
+        Core.compare(weightedSum, Scalar(MASK_THRESHOLD), finalOutput, Core.CMP_GT)
+        return finalOutput
 
         // Create a matrix for mask weights
+        /*
+        // old version (using opencv)
+        val numMasks = maskWeights.size
         val weightMatrix = Mat(1, numMasks, CvType.CV_32F)
         for (i in maskWeights.indices) {
-            val value: Double = maskWeights[i].toDouble()
+            val value: Double = sigmoid(maskWeights[i].toDouble())
             weightMatrix.put(0, i, value)
         }
 
         // Calculate the weighted sum of masks
         val weightedSum = Mat()
         Core.gemm(weightMatrix, maskMatrix, 1.0, Mat(), 0.0, weightedSum)
+        val fullMask = weightedSum.reshape(1, maskResolutionH)
 
-        return weightedSum.reshape(maskResolutionH, maskResolutionW)
+
+        return Mat(fullMask, rect)*/
     }
 
     private const val mNmsThresh = 0.6f
+    private const val MASK_THRESHOLD = 0.0
 }

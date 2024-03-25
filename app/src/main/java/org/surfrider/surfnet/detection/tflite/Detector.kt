@@ -45,7 +45,9 @@ interface Detector {
 
         var mask: Mat?,
 
-        val detectedClass: Int
+        val detectedClass: Int,
+
+        var bitmap: Bitmap?
     ) {
 
         override fun toString(): String {

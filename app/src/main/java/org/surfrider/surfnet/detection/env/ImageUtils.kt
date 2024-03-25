@@ -20,8 +20,14 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.media.Image
+import org.opencv.android.Utils.matToBitmap
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import org.opencv.core.Size
+import org.opencv.imgproc.Imgproc
 import org.surfrider.surfnet.detection.tflite.Detector
 import timber.log.Timber
 import java.io.File
@@ -272,6 +278,11 @@ object ImageUtils {
                     newLocation?.let { location ->
                         frameToCanvasTransform.mapRect(location)
                         canvas.drawRect(location, paint)
+                        // Draw mask
+                        it.bitmap?.let { bitmap ->
+                            Timber.i(" drawing mask")
+                            canvas.drawBitmap(bitmap, null, newLocation, paint)
+                        }
                     }
                 }
             }
@@ -294,20 +305,39 @@ object ImageUtils {
     }
 
 
-    fun mapDetectionsWithTransform(results: List<Detector.Recognition?>?, cropToFrameTransform: Matrix?): MutableList<Detector.Recognition?> {
-        val mappedRecognitions: MutableList<Detector.Recognition?> = LinkedList()
+    fun buildBitmapFromMask(mask: Mat?, location: RectF): Bitmap? {
+        mask?.let {
+            val outputBitmap = Bitmap.createBitmap(
+                location.width().toInt(),
+                location.height().toInt(),
+                Bitmap.Config.ARGB_8888
+            )
+            for (i in 0 until outputBitmap.width) {
+                for (j in 0 until outputBitmap.height) {
+                    val pixelValue = it.get(i / 4, j / 4)[0].toInt()
+                    outputBitmap.setPixel(i, j, Color.argb(255 * pixelValue, 0, 255, 255))
+                }
+            }
+            return outputBitmap
+        }
+        return null
+    }
+
+    fun mapDetectionsWithTransform(results: List<Detector.Recognition?>?, cropToFrameTransform: Matrix?) { //}: MutableList<Detector.Recognition?> {
+        // Performs inplace mapping of detections
         if (results != null) {
             for (result in results) {
                 result?.let {
+                    it.bitmap = it.mask?.let { mask ->
+                        buildBitmapFromMask(mask, it.location)
+                    }
                     val newLocation = RectF(it.location)
                     newLocation?.let { location ->
                         cropToFrameTransform?.mapRect(location)
-                        val newDet = Detector.Recognition(it.classId, it.confidence, location, null, it.detectedClass)
-                        mappedRecognitions.add(newDet)
                     }
+                    it.location = newLocation
                 }
             }
         }
-        return mappedRecognitions
     }
 }

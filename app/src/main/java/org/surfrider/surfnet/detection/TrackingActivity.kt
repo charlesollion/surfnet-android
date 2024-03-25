@@ -570,14 +570,14 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             }
 
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
-            val mappedRecognitions =
-                ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
+
+            ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
             @Synchronized
-            latestDetections = mappedRecognitions
+            latestDetections = results
             mutex.withLock {
                 //if (fastSelfMotionTimestamp == 0L) {
-                latestMovedDetections = moveDetectionsWithOF(mappedRecognitions, frameTimestamp)
-                trackerManager?.processDetections(mappedRecognitions, location, frameTimestamp)
+                latestMovedDetections = moveDetectionsWithOF(results!!, frameTimestamp)
+                trackerManager?.processDetections(results, location, frameTimestamp)
                 trackerManager?.updateTrackers()
                 //}
             }
