@@ -312,11 +312,13 @@ object ImageUtils {
                 location.height().toInt(),
                 Bitmap.Config.ARGB_8888
             )
-            Timber.i("mask shape: ${it.size()} -- outBitmap shape: ${outputBitmap.width}x${outputBitmap.height}")
-            for (i in 0 until outputBitmap.width) {
-                for (j in 0 until outputBitmap.height) {
-                    val pixelValue = it.get(i / 4, j / 4)[0].toInt()
-                    outputBitmap.setPixel(i, j, Color.argb(255 * pixelValue, 0, 255, 255))
+            Timber.i("mask shape: ${it.rows()}x${it.cols()} -- outBitmap shape: ${outputBitmap.width}x${outputBitmap.height}")
+            for (i in 0 until outputBitmap.width - 3)  {
+                for (j in 0 until outputBitmap.height - 3) {
+                    if(j/4 >= it.rows() || i/4 > it.cols())
+                        Timber.i("$i $j")
+                    val pixelValue = it.get(j / 4, i / 4)[0].toInt()
+                    outputBitmap.setPixel(i, j, Color.argb(pixelValue / 2, 200, 128, 0))
                 }
             }
             return outputBitmap

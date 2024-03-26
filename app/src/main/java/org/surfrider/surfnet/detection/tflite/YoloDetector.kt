@@ -17,6 +17,7 @@ package org.surfrider.surfnet.detection.tflite
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.RectF
+import androidx.core.graphics.toRect
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -253,11 +254,12 @@ class YoloDetector private constructor() : Detector {
         }
 
         // Get second output
+        val floatBuffer = byteBuffer2.asFloatBuffer()
         for (i in 0 until numMasks) {
-            val floatBuffer = byteBuffer2.asFloatBuffer()
             val floatArray = FloatArray(resolutionMaskW * resolutionMaskH)
             floatBuffer.get(floatArray)
-            masks.put(i,0, floatArray)
+            //Timber.i("mask $i: ${floatArray.max()}")
+            masks.put(i,0, floatArray.clone())
         }
         val detections = processTFoutput(out, bitmap!!.width, bitmap.height)
         val indicesToKeep = DetectorUtils.nmsIndices(detections, numClass)
@@ -270,8 +272,10 @@ class YoloDetector private constructor() : Detector {
     }
 
     private fun computeMask(det: Recognition, masks: Mat, tfOutput: FloatArray): Recognition? {
-        val bbox = tfOutput.sliceArray(0 .. 3)
-        val rect = Rect(bbox.map{it.toDouble()/MASK_SCALE_FACTOR}.toDoubleArray())
+        val rect = Rect(det.location.left.toInt() / MASK_SCALE_FACTOR,
+            det.location.top.toInt() / MASK_SCALE_FACTOR,
+            det.location.width().toInt() / MASK_SCALE_FACTOR,
+            det.location.height().toInt() / MASK_SCALE_FACTOR)
         val maskWeights = tfOutput.sliceArray(4+numClass .. 4+numClass+numMasks-1)
         det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskW, resolutionMaskH, rect)
         return det as Recognition?
@@ -396,6 +400,7 @@ class YoloDetector private constructor() : Detector {
             }
             d.numClass = numClass
             d.outData.order(ByteOrder.nativeOrder())
+            d.outData2.order(ByteOrder.nativeOrder())
             return d
         }
         private const val MASK_SCALE_FACTOR = 4
