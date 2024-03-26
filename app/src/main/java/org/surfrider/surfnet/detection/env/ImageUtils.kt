@@ -312,6 +312,7 @@ object ImageUtils {
                 location.height().toInt(),
                 Bitmap.Config.ARGB_8888
             )
+            Timber.i("mask shape: ${it.size()} -- outBitmap shape: ${outputBitmap.width}x${outputBitmap.height}")
             for (i in 0 until outputBitmap.width) {
                 for (j in 0 until outputBitmap.height) {
                     val pixelValue = it.get(i / 4, j / 4)[0].toInt()

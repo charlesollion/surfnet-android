@@ -605,7 +605,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 }
                 val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
                                        it.location.right + move.x, it.location.bottom + move.y)
-                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, null, it.detectedClass)
+                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, null, it.detectedClass, null)
                 movedRecognitions.add(newDet)
             }
         }

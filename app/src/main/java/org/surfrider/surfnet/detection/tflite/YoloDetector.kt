@@ -149,7 +149,7 @@ class YoloDetector private constructor() : Detector {
                 )
                 detections.add(
                     Recognition(labels[detectedClass],
-                        confidenceInClass, rect, null, detectedClass
+                        confidenceInClass, rect, null, detectedClass, null
                     )
                 )
             }
