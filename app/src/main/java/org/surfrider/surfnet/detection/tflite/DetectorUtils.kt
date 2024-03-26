@@ -7,7 +7,6 @@ import org.opencv.core.Mat
 import org.opencv.core.Rect
 import org.opencv.core.Scalar
 import org.surfrider.surfnet.detection.env.MathUtils.sigmoid
-import timber.log.Timber
 import java.util.PriorityQueue
 
 object DetectorUtils {
@@ -113,31 +112,9 @@ object DetectorUtils {
         return right - left
     }
 
-    fun weightedSumOfMasks(maskMatrix: Mat, maskWeights: FloatArray, maskResolutionW: Int, maskResolutionH: Int, rect: Rect): Mat {
+    fun weightedSumOfMasks(maskMatrix: Mat, maskWeights: FloatArray, maskResolutionH: Int, rect: Rect): Mat {
         // Expects a maskMatrix of size (numMasks, maskResolutionW * maskResolutionH)
 
-        // Other version
-        /*val weightedSum = Mat(rect.width, rect.height, CvType.CV_32F)
-
-        for (x in 0 until maskMatrix.cols()) {
-            val j: Int = x % maskResolutionW
-            val i: Int = x / maskResolutionW
-            var value: Double = 0.0
-            if( i >= rect.x && j >= rect.y && i < rect.x+rect.width && j < rect.y+rect.height) {
-                for (k in maskWeights.indices) {
-                    value += maskMatrix.get(k, x)[0] * maskWeights[k]
-                    //Timber.i("$i $j $k ${maskWeights[k]} ${maskMatrix.get(k, x)[0]} $value")
-                }
-                weightedSum.put(i - rect.x, j - rect.y, sigmoid(value))
-            }
-        }
-        val finalOutput = Mat()
-        Core.compare(weightedSum, Scalar(MASK_THRESHOLD), finalOutput, Core.CMP_GT)
-        return finalOutput*/
-
-        // Create a matrix for mask weights
-
-        // old version (using opencv)
         val numMasks = maskWeights.size
         val weightMatrix = Mat(1, numMasks, CvType.CV_32F)
         for (i in maskWeights.indices) {
@@ -151,11 +128,10 @@ object DetectorUtils {
         val fullMask = weightedSum.reshape(1, maskResolutionH)
 
         val finalOutput = Mat()
-        Core.compare(Mat(fullMask, rect), Scalar(0.0), finalOutput, Core.CMP_GT)
-        Timber.i("out shape: ${finalOutput.size()}, rect WxH: ${rect.width}x${rect.height}")
+        Core.compare(Mat(fullMask, rect), Scalar(MASK_THRESHOLD), finalOutput, Core.CMP_GT)
         return finalOutput
     }
 
     private const val mNmsThresh = 0.6f
-    private const val MASK_THRESHOLD = 0.5
+    private const val MASK_THRESHOLD = 0.0
 }

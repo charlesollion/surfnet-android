@@ -280,8 +280,7 @@ object ImageUtils {
                         canvas.drawRect(location, paint)
                         // Draw mask
                         it.bitmap?.let { bitmap ->
-                            Timber.i(" drawing mask")
-                            canvas.drawBitmap(bitmap, null, newLocation, paint)
+                            canvas.drawBitmap(bitmap, null, newLocation, null)
                         }
                     }
                 }
@@ -294,30 +293,25 @@ object ImageUtils {
         paint.color = Color.WHITE
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 4.0f
-        // Timber.i("output line flow size: ${outputLinesFlow.size}")
         for(line in outputLinesFlow) {
             val points = line.clone()
             frameToCanvasTransform.mapPoints(points)
-            //Timber.i(" flow - i, j, dx, dy, $i, $j, $dx, $dy")
             canvas.drawCircle(points[0], points[1], 10.0f, paint)
             canvas.drawLine(points[0], points[1], points[2], points[3], paint)
         }
     }
 
 
-    fun buildBitmapFromMask(mask: Mat?, location: RectF): Bitmap? {
+    private fun buildBitmapFromMask(mask: Mat?, location: RectF): Bitmap? {
         mask?.let {
             val outputBitmap = Bitmap.createBitmap(
                 location.width().toInt(),
                 location.height().toInt(),
                 Bitmap.Config.ARGB_8888
             )
-            Timber.i("mask shape: ${it.rows()}x${it.cols()} -- outBitmap shape: ${outputBitmap.width}x${outputBitmap.height}")
             for (i in 0 until outputBitmap.width - 3)  {
                 for (j in 0 until outputBitmap.height - 3) {
-                    if(j/4 >= it.rows() || i/4 > it.cols())
-                        Timber.i("$i $j")
-                    val pixelValue = it.get(j / 4, i / 4)[0].toInt()
+                    val pixelValue = 255 - it.get(j / 4, i / 4)[0].toInt()
                     outputBitmap.setPixel(i, j, Color.argb(pixelValue / 2, 200, 128, 0))
                 }
             }

@@ -17,8 +17,6 @@ package org.surfrider.surfnet.detection.tflite
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.RectF
-import androidx.core.graphics.toRect
-import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.Rect
@@ -253,13 +251,14 @@ class YoloDetector private constructor() : Detector {
             }
         }
 
-        // Get second output
+        // Get second output, careful as it shape is HWC
         val floatBuffer = byteBuffer2.asFloatBuffer()
-        for (i in 0 until numMasks) {
-            val floatArray = FloatArray(resolutionMaskW * resolutionMaskH)
-            floatBuffer.get(floatArray)
-            //Timber.i("mask $i: ${floatArray.max()}")
-            masks.put(i,0, floatArray.clone())
+        for (i in 0 until resolutionMaskW) {
+            for (j in 0 until resolutionMaskH) {
+                val floatArray = FloatArray(numMasks)
+                floatBuffer.get(floatArray)
+                masks.put(0, i * resolutionMaskW + j, floatArray.clone())
+            }
         }
         val detections = processTFoutput(out, bitmap!!.width, bitmap.height)
         val indicesToKeep = DetectorUtils.nmsIndices(detections, numClass)
@@ -276,8 +275,8 @@ class YoloDetector private constructor() : Detector {
             det.location.top.toInt() / MASK_SCALE_FACTOR,
             det.location.width().toInt() / MASK_SCALE_FACTOR,
             det.location.height().toInt() / MASK_SCALE_FACTOR)
-        val maskWeights = tfOutput.sliceArray(4+numClass .. 4+numClass+numMasks-1)
-        det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskW, resolutionMaskH, rect)
+        val maskWeights = tfOutput.sliceArray(4+numClass..<4+numClass+numMasks)
+        det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskH, rect)
         return det as Recognition?
     }
 
