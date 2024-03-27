@@ -5,9 +5,6 @@ import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.Rect
-import org.opencv.core.Scalar
-import org.surfrider.surfnet.detection.env.MathUtils.sigmoid
-import timber.log.Timber
 import java.util.PriorityQueue
 
 object DetectorUtils {
@@ -119,23 +116,11 @@ object DetectorUtils {
         val numMasks = maskWeights.size
         val weightMatrix = Mat(1, numMasks, CvType.CV_32F)
         weightMatrix.put(0, 0, maskWeights)
-        /*for (i in maskWeights.indices) {
-            var value: Double = maskWeights[i].toDouble()
-            //var value = 0.0
-            if (i>1) {
-                value = 0.0
-            }
-            weightMatrix.put(0, i, value)
-        }*/
-
 
         // Calculate the weighted sum of masks
         val weightedSum = Mat(1, maskResolutionH * maskResolutionH, CvType.CV_32F)
         Core.gemm(weightMatrix, maskMatrix, 1.0, Mat(), 0.0, weightedSum)
         val fullMask = weightedSum.reshape(1, maskResolutionH)
-
-        // val finalOutput = Mat()
-        // Core.compare(Mat(fullMask, rect), Scalar(MASK_THRESHOLD), finalOutput, Core.CMP_GE)
 
         return Mat(fullMask, rect)
     }

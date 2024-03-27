@@ -16,6 +16,7 @@ package org.surfrider.surfnet.detection.env
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Bitmap.createScaledBitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
@@ -321,7 +322,23 @@ object ImageUtils {
                     outputBitmap.setPixel(i, j, Color.argb(pixelValue, 200, 128, 0))
                 }
             }
-            return outputBitmap
+            //return outputBitmap
+
+            /* NEW VERSION
+            val outputBitmap = Bitmap.createBitmap(
+                location.width().toInt() / 4,
+                location.height().toInt() / 4,
+                Bitmap.Config.ARGB_8888
+            )
+            for (i in 0 until outputBitmap.width)  {
+                for (j in 0 until outputBitmap.height) {
+                    var pixelValue = 0
+                    if (sigmoid(it.get(j, i)[0]) > 0.5)
+                        pixelValue = 128
+                    outputBitmap.setPixel(i, j, Color.argb(pixelValue, 200, 128, 0))
+                }
+            }
+            return Bitmap.createScaledBitmap(outputBitmap, location.width().toInt(), location.height().toInt(), true)*/
         }
         return null
     }

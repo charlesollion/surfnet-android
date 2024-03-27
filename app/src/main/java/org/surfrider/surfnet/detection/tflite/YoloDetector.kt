@@ -251,29 +251,16 @@ class YoloDetector private constructor() : Detector {
             }
         }
 
-
-
         // Get second output, careful as it shape is HWC
         masks = Mat(resolutionMaskH* resolutionMaskW, numMasks, CvType.CV_32F, byteBuffer2).t()
-        /*val floatBuffer = byteBuffer2.asFloatBuffer()
-        for (i in 0 until resolutionMaskW) {
-            for (j in 0 until resolutionMaskH) {
-                val floatArray = FloatArray(numMasks)
-                floatBuffer.get(floatArray)
-                masks.put(0, i * resolutionMaskW + j, floatArray.clone())
-            }
-        }*/
+
         val detections = processTFoutput(out, bitmap!!.width, bitmap.height)
         val indicesToKeep = DetectorUtils.nmsIndices(detections, numClass)
         val newDetections = indicesToKeep
             .map { computeMask(detections[it], out[it].sliceArray(4+numClass..<4+numClass+numMasks)) }
 
             .toCollection(ArrayList())
-        indicesToKeep.map {idx ->
-            val sums = (0 until numMasks).map{num:Int -> out[idx].sliceArray(4+numClass..<4+numClass+num).sum()}
-            val formattedString = sums.joinToString(prefix = "[", postfix = "]") { "%.3f".format(it) }
-            Timber.i("array of floats for idx $idx: $formattedString")
-        }
+
         return newDetections
     }
 
