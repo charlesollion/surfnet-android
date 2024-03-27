@@ -28,6 +28,7 @@ import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
+import org.surfrider.surfnet.detection.env.MathUtils.sigmoid
 import org.surfrider.surfnet.detection.tflite.Detector
 import timber.log.Timber
 import java.io.File
@@ -42,6 +43,7 @@ object ImageUtils {
     // This value is 2 ^ 18 - 1, and is used to clamp the RGB values before their ranges
     // are normalized to eight bits.
     private const val kMaxChannelValue = 262143
+    private var alreadySavedThisSession = false
 
     /**
      * Saves a Bitmap object to disk for analysis.
@@ -50,12 +52,14 @@ object ImageUtils {
      */
     @JvmStatic
     fun saveBitmap(bitmap: Bitmap, context:Context) {
-        val filename = "preview.png"
+        if(alreadySavedThisSession)
+            return
+        val filename = "input_preview.png"
         val root =
             File(context.getExternalFilesDir(null), "tensorflow")
         Timber.i("Saving %dx%d bitmap to %s.", bitmap.width, bitmap.height, root)
-        if (!root.mkdirs()) {
-            Timber.i("Make dir failed")
+        if (root.mkdirs()) {
+            Timber.i("created folder $root")
         }
         val file = File(root, filename)
         if (!file.exists()) {
@@ -311,8 +315,10 @@ object ImageUtils {
             )
             for (i in 0 until outputBitmap.width - 3)  {
                 for (j in 0 until outputBitmap.height - 3) {
-                    val pixelValue = 255 - it.get(j / 4, i / 4)[0].toInt()
-                    outputBitmap.setPixel(i, j, Color.argb(pixelValue / 2, 200, 128, 0))
+                    var pixelValue = 0
+                    if (sigmoid(it.get(j / 4, i / 4)[0]) > 0.5)
+                        pixelValue = 128
+                    outputBitmap.setPixel(i, j, Color.argb(pixelValue, 200, 128, 0))
                 }
             }
             return outputBitmap

@@ -251,31 +251,39 @@ class YoloDetector private constructor() : Detector {
             }
         }
 
+
+
         // Get second output, careful as it shape is HWC
-        val floatBuffer = byteBuffer2.asFloatBuffer()
+        masks = Mat(resolutionMaskH* resolutionMaskW, numMasks, CvType.CV_32F, byteBuffer2).t()
+        /*val floatBuffer = byteBuffer2.asFloatBuffer()
         for (i in 0 until resolutionMaskW) {
             for (j in 0 until resolutionMaskH) {
                 val floatArray = FloatArray(numMasks)
                 floatBuffer.get(floatArray)
                 masks.put(0, i * resolutionMaskW + j, floatArray.clone())
             }
-        }
+        }*/
         val detections = processTFoutput(out, bitmap!!.width, bitmap.height)
         val indicesToKeep = DetectorUtils.nmsIndices(detections, numClass)
         val newDetections = indicesToKeep
-            .filter { it in detections.indices }
-            .map { computeMask(detections[it], masks, out[it]) }
-            .toCollection(ArrayList())
+            .map { computeMask(detections[it], out[it].sliceArray(4+numClass..<4+numClass+numMasks)) }
 
+            .toCollection(ArrayList())
+        indicesToKeep.map {idx ->
+            val sums = (0 until numMasks).map{num:Int -> out[idx].sliceArray(4+numClass..<4+numClass+num).sum()}
+            val formattedString = sums.joinToString(prefix = "[", postfix = "]") { "%.3f".format(it) }
+            Timber.i("array of floats for idx $idx: $formattedString")
+        }
         return newDetections
     }
 
-    private fun computeMask(det: Recognition, masks: Mat, tfOutput: FloatArray): Recognition? {
+    private fun computeMask(det: Recognition, maskWeights: FloatArray): Recognition? {
+        // Performs inplace update of Mask
         val rect = Rect(det.location.left.toInt() / MASK_SCALE_FACTOR,
             det.location.top.toInt() / MASK_SCALE_FACTOR,
             det.location.width().toInt() / MASK_SCALE_FACTOR,
             det.location.height().toInt() / MASK_SCALE_FACTOR)
-        val maskWeights = tfOutput.sliceArray(4+numClass..<4+numClass+numMasks)
+
         det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskH, rect)
         return det as Recognition?
     }
@@ -388,10 +396,10 @@ class YoloDetector private constructor() : Detector {
                     numClass = shape[1] - 4 - d.numMasks
                     d.outData =
                         ByteBuffer.allocateDirect(d.outputBox * (4 + numClass + d.numMasks) * numBytesPerChannel)
-                    // second output
+                    // second output: masks (1, H, W, num_masks)
                     d.outData2 =
                         ByteBuffer.allocateDirect((d.resolutionMaskW * d.resolutionMaskH * d.numMasks)* numBytesPerChannel)
-                    d.masks = Mat(d.numMasks, d.resolutionMaskW * d.resolutionMaskH, CvType.CV_32F)
+                    // d.masks = Mat(d.numMasks, d.resolutionMaskW * d.resolutionMaskH, CvType.CV_32F)
                 }
                 else -> {
                     throw RuntimeException("model type $modelType not recognized, possible types: [v5, v8, segmentation]")

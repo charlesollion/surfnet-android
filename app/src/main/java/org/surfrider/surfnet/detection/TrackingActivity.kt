@@ -576,8 +576,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             latestDetections = results
             mutex.withLock {
                 //if (fastSelfMotionTimestamp == 0L) {
-                latestMovedDetections = moveDetectionsWithOF(results!!, frameTimestamp)
-                trackerManager?.processDetections(results, location, frameTimestamp)
+                //latestMovedDetections = moveDetectionsWithOF(results!!, frameTimestamp)
+                trackerManager?.processDetections(results!!, location, frameTimestamp)
                 trackerManager?.updateTrackers()
                 //}
             }
@@ -641,7 +641,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         private const val IS_SCALED = false // False only for newer Yolo
 
         private const val MAINTAIN_ASPECT = true
-        private const val SAVE_PREVIEW_BITMAP = false
+        private const val SAVE_PREVIEW_BITMAP = true
         private const val REQUEST_LOCATION_PERMISSION = 2
     }
 }
