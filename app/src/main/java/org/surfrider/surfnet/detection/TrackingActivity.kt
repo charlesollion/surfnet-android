@@ -363,7 +363,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 IS_QUANTIZED,
                 MODEL_TYPE,
                 IS_SCALED,
-                INPUT_SIZE
+                INPUT_SIZE,
+                applicationContext
             )
 
             // detector?.useGpu()
@@ -556,6 +557,9 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         if (SAVE_PREVIEW_BITMAP) {
             ImageUtils.saveBitmap(croppedBitmap!!, applicationContext)
         }
+        if (LOAD_PREVIEW_BITMAP) {
+            croppedBitmap = ImageUtils.loadBitmap(applicationContext)
+        }
         /*trackerManager?.let {
             it.updateTrackers()
         }*/
@@ -605,7 +609,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 }
                 val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
                                        it.location.right + move.x, it.location.bottom + move.y)
-                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, null, it.detectedClass, null)
+                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, it.maskIdx, null, it.detectedClass, null)
                 movedRecognitions.add(newDet)
             }
         }
@@ -641,7 +645,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         private const val IS_SCALED = false // False only for newer Yolo
 
         private const val MAINTAIN_ASPECT = true
-        private const val SAVE_PREVIEW_BITMAP = true
+        private const val SAVE_PREVIEW_BITMAP = false
+        private const val LOAD_PREVIEW_BITMAP = true
         private const val REQUEST_LOCATION_PERMISSION = 2
     }
 }

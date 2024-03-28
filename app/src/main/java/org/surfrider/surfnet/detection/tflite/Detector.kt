@@ -43,6 +43,8 @@ interface Detector {
          */
         var location: RectF,
 
+        var maskIdx: Int,
+
         var mask: Mat?,
 
         val detectedClass: Int,

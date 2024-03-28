@@ -17,6 +17,7 @@ package org.surfrider.surfnet.detection.env
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Bitmap.createScaledBitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
@@ -63,7 +64,7 @@ object ImageUtils {
             Timber.i("created folder $root")
         }
         val file = File(root, filename)
-        if (!file.exists()) {
+        if (file.exists()) {
             file.delete()
         }
         try {
@@ -75,6 +76,24 @@ object ImageUtils {
             Timber.e(e, "Exception!")
         }
     }
+    fun loadBitmap(context: Context): Bitmap? {
+        val filename = "input_preview.png"
+        val root = File(context.getExternalFilesDir(null), "tensorflow")
+        val file = File(root, filename)
+
+        if (!file.exists()) {
+            Timber.e("File does not exist: $file")
+            return null
+        }
+
+        return try {
+            BitmapFactory.decodeFile(file.absolutePath)
+        } catch (e: Exception) {
+            Timber.e(e, "Exception while loading bitmap!")
+            null
+        }
+    }
+
 
     public fun rgbIntToByteArray(rgbInts: IntArray): ByteArray {
         val outputBytes = ByteArray(rgbInts.size * 3)
@@ -322,7 +341,7 @@ object ImageUtils {
                     outputBitmap.setPixel(i, j, Color.argb(pixelValue, 200, 128, 0))
                 }
             }
-            //return outputBitmap
+            return outputBitmap
 
             /* NEW VERSION
             val outputBitmap = Bitmap.createBitmap(

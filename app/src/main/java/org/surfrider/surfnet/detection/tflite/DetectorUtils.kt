@@ -1,10 +1,14 @@
 package org.surfrider.surfnet.detection.tflite
 
+import android.content.Context
 import android.graphics.RectF
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.Rect
+import timber.log.Timber
+import java.io.File
+import java.io.PrintWriter
 import java.util.PriorityQueue
 
 object DetectorUtils {
@@ -109,17 +113,47 @@ object DetectorUtils {
         val right = if (r1 < r2) r1 else r2
         return right - left
     }
+    fun saveMatAsText(mat: Mat, filename: String, context: Context) {
+        Timber.i("saving $filename, context: $context")
+        // Ensure that the Mat is continuous
+        val continuousMat = Mat()
+        mat.copyTo(continuousMat)
 
-    fun weightedSumOfMasks(maskMatrix: Mat, maskWeights: FloatArray, maskResolutionH: Int, rect: Rect): Mat {
+        // Open a PrintWriter to write to the file
+        val root =
+            File(context.getExternalFilesDir(null), "tensorflow")
+        val file = File(root, filename)
+        if (file.exists()) {
+            Timber.i("text file already exists: $file")
+            return
+        }
+        val writer = PrintWriter(file)
+
+        // Write each element of the Mat to the file
+        for (i in 0 until continuousMat.rows()) {
+            for (j in 0 until continuousMat.cols()) {
+                val value = continuousMat.get(i, j)[0]
+                writer.print("$value ")
+            }
+            writer.println()
+        }
+
+        // Close the PrintWriter
+        writer.close()
+    }
+
+    fun weightedSumOfMasks(maskMatrix: Mat, maskWeights: FloatArray, maskResolutionH: Int, rect: Rect, context:Context): Mat {
         // Expects a maskMatrix of size (numMasks, maskResolutionW * maskResolutionH)
 
         val numMasks = maskWeights.size
         val weightMatrix = Mat(1, numMasks, CvType.CV_32F)
         weightMatrix.put(0, 0, maskWeights)
-
+        saveMatAsText(weightMatrix, "weightMatrix.txt", context)
+        saveMatAsText(maskMatrix, "maskMatrix.txt", context)
         // Calculate the weighted sum of masks
         val weightedSum = Mat(1, maskResolutionH * maskResolutionH, CvType.CV_32F)
         Core.gemm(weightMatrix, maskMatrix, 1.0, Mat(), 0.0, weightedSum)
+        saveMatAsText(weightedSum, "weightedSum.txt", context)
         val fullMask = weightedSum.reshape(1, maskResolutionH)
 
         return Mat(fullMask, rect)

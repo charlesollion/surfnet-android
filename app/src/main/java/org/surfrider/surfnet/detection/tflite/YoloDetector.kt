@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 package org.surfrider.surfnet.detection.tflite
 
+import android.content.Context
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.RectF
@@ -72,6 +73,7 @@ class YoloDetector private constructor() : Detector {
     private var oup_scale = 0f
     private var oup_zero_point = 0
     private var numClass = 0
+    private lateinit var context: Context
 
 
     /**
@@ -148,7 +150,7 @@ class YoloDetector private constructor() : Detector {
                 )
                 detections.add(
                     Recognition(labels[detectedClass],
-                        confidenceInClass, rect, null, detectedClass, null
+                        confidenceInClass, rect, i,null, detectedClass, null
                     )
                 )
             }
@@ -232,7 +234,8 @@ class YoloDetector private constructor() : Detector {
         byteBuffer!!.rewind()
         byteBuffer2!!.rewind()
         val out = Array(outputBox) { FloatArray(4 + numClass + numMasks) }
-
+        val fullout2 = Mat(outputBox, 4+numClass+numMasks, CvType.CV_32F, byteBuffer)
+        DetectorUtils.saveMatAsText(fullout2, "fullout2.txt", context)
         // Get first output
         for (j in 0 until 4 + numClass + numMasks) {
             for (i in 0 until outputBox) {
@@ -256,8 +259,13 @@ class YoloDetector private constructor() : Detector {
 
         val detections = processTFoutput(out, bitmap!!.width, bitmap.height)
         val indicesToKeep = DetectorUtils.nmsIndices(detections, numClass)
+        val weightMatrix2 = Mat(1, numMasks, CvType.CV_32F)
+        val z = out[indicesToKeep[0]].clone()
+        weightMatrix2.put(0, 0, z)
+        //DetectorUtils.saveMatAsText(weightMatrix2, "fullout1.txt", context)
+
         val newDetections = indicesToKeep
-            .map { computeMask(detections[it], out[it].sliceArray(4+numClass..<4+numClass+numMasks)) }
+            .map { computeMask(detections[it], out[detections[it].maskIdx].sliceArray(4+numClass..<4+numClass+numMasks)) }
 
             .toCollection(ArrayList())
 
@@ -271,7 +279,7 @@ class YoloDetector private constructor() : Detector {
             det.location.width().toInt() / MASK_SCALE_FACTOR,
             det.location.height().toInt() / MASK_SCALE_FACTOR)
 
-        det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskH, rect)
+        det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskH, rect, context)
         return det as Recognition?
     }
 
@@ -285,9 +293,11 @@ class YoloDetector private constructor() : Detector {
             isQuantized: Boolean,
             modelType: String,
             outputIsScaled: Boolean,
-            inputSize: Int
+            inputSize: Int,
+            ctx: Context
         ): YoloDetector {
             val d = YoloDetector()
+            d.context = ctx
             val actualFilename = labelFilename.split("file:///android_asset/".toRegex())
                 .dropLastWhile { it.isEmpty() }
                 .toTypedArray()[1]
