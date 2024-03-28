@@ -646,7 +646,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         private const val MAINTAIN_ASPECT = true
         private const val SAVE_PREVIEW_BITMAP = false
-        private const val LOAD_PREVIEW_BITMAP = true
+        private const val LOAD_PREVIEW_BITMAP = false
         private const val REQUEST_LOCATION_PERMISSION = 2
     }
 }

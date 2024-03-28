@@ -142,18 +142,15 @@ object DetectorUtils {
         writer.close()
     }
 
-    fun weightedSumOfMasks(maskMatrix: Mat, maskWeights: FloatArray, maskResolutionH: Int, rect: Rect, context:Context): Mat {
+    fun weightedSumOfMasks(maskMatrix: Mat, maskWeights: FloatArray, maskResolutionH: Int, rect: Rect): Mat {
         // Expects a maskMatrix of size (numMasks, maskResolutionW * maskResolutionH)
 
         val numMasks = maskWeights.size
         val weightMatrix = Mat(1, numMasks, CvType.CV_32F)
         weightMatrix.put(0, 0, maskWeights)
-        saveMatAsText(weightMatrix, "weightMatrix.txt", context)
-        saveMatAsText(maskMatrix, "maskMatrix.txt", context)
         // Calculate the weighted sum of masks
         val weightedSum = Mat(1, maskResolutionH * maskResolutionH, CvType.CV_32F)
         Core.gemm(weightMatrix, maskMatrix, 1.0, Mat(), 0.0, weightedSum)
-        saveMatAsText(weightedSum, "weightedSum.txt", context)
         val fullMask = weightedSum.reshape(1, maskResolutionH)
 
         return Mat(fullMask, rect)

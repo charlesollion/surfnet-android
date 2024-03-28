@@ -234,8 +234,7 @@ class YoloDetector private constructor() : Detector {
         byteBuffer!!.rewind()
         byteBuffer2!!.rewind()
         val out = Array(outputBox) { FloatArray(4 + numClass + numMasks) }
-        val fullout2 = Mat(outputBox, 4+numClass+numMasks, CvType.CV_32F, byteBuffer)
-        DetectorUtils.saveMatAsText(fullout2, "fullout2.txt", context)
+
         // Get first output
         for (j in 0 until 4 + numClass + numMasks) {
             for (i in 0 until outputBox) {
@@ -259,10 +258,6 @@ class YoloDetector private constructor() : Detector {
 
         val detections = processTFoutput(out, bitmap!!.width, bitmap.height)
         val indicesToKeep = DetectorUtils.nmsIndices(detections, numClass)
-        val weightMatrix2 = Mat(1, numMasks, CvType.CV_32F)
-        val z = out[indicesToKeep[0]].clone()
-        weightMatrix2.put(0, 0, z)
-        //DetectorUtils.saveMatAsText(weightMatrix2, "fullout1.txt", context)
 
         val newDetections = indicesToKeep
             .map { computeMask(detections[it], out[detections[it].maskIdx].sliceArray(4+numClass..<4+numClass+numMasks)) }
@@ -279,7 +274,7 @@ class YoloDetector private constructor() : Detector {
             det.location.width().toInt() / MASK_SCALE_FACTOR,
             det.location.height().toInt() / MASK_SCALE_FACTOR)
 
-        det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskH, rect, context)
+        det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskH, rect)
         return det as Recognition?
     }
 
