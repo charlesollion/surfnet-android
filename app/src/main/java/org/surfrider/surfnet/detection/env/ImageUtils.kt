@@ -331,22 +331,6 @@ object ImageUtils {
     private fun buildBitmapFromMask(mask: Mat?, location: RectF): Bitmap? {
         mask?.let {
             val outputBitmap = Bitmap.createBitmap(
-                location.width().toInt(),
-                location.height().toInt(),
-                Bitmap.Config.ARGB_8888
-            )
-            for (i in 0 until outputBitmap.width - 3)  {
-                for (j in 0 until outputBitmap.height - 3) {
-                    var pixelValue = 0
-                    if (sigmoid(it.get(j / 4, i / 4)[0]) > 0.5)
-                        pixelValue = 128
-                    outputBitmap.setPixel(i, j, Color.argb(pixelValue, 200, 128, 0))
-                }
-            }
-            return outputBitmap
-
-            /* NEW VERSION
-            val outputBitmap = Bitmap.createBitmap(
                 location.width().toInt() / 4,
                 location.height().toInt() / 4,
                 Bitmap.Config.ARGB_8888
@@ -359,7 +343,7 @@ object ImageUtils {
                     outputBitmap.setPixel(i, j, Color.argb(pixelValue, 200, 128, 0))
                 }
             }
-            return Bitmap.createScaledBitmap(outputBitmap, location.width().toInt(), location.height().toInt(), true)*/
+            return createScaledBitmap(outputBitmap, location.width().toInt(), location.height().toInt(), true)
         }
         return null
     }
