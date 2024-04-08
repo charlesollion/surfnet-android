@@ -23,7 +23,7 @@ import java.util.Locale
  * Generic interface for interacting with different recognition engines.
  */
 interface Detector {
-    fun recognizeImage(bitmap: Bitmap?): List<Recognition?>?
+    fun recognizeImage(frame: Mat): List<Recognition?>?
     fun setNumThreads(numThreads: Int)
 
     /**

@@ -565,12 +565,13 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         Imgproc.resize(frame, frameResized, Size(resizedWidth, resizedHeight))
         // Timber.i("input frame: ${frame.size()} frame after resize: ${frameResized.size()} rect: ${cropRect}")
         val rgbaInnerWindow = frameResized.submat(cropRect)
-        Utils.matToBitmap(rgbaInnerWindow, croppedBitmap)
         if (SAVE_PREVIEW_BITMAP) {
+            Utils.matToBitmap(rgbaInnerWindow, croppedBitmap)
             ImageUtils.saveBitmap(croppedBitmap!!, applicationContext)
         }
         if (LOAD_PREVIEW_BITMAP) {
             croppedBitmap = ImageUtils.loadBitmap(applicationContext)
+            // todo: get RGBA from crop
         }
         /*trackerManager?.let {
             it.updateTrackers()
@@ -581,9 +582,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             val startTime = SystemClock.uptimeMillis()
             val frameTimestamp = System.currentTimeMillis()
             latestDetectionsTimestamp = frameTimestamp
-            val results: ArrayList<Detector.Recognition?>? = croppedBitmap?.let {
-                detector?.recognizeImage(it)
-            }
+            val results: ArrayList<Detector.Recognition?>? = detector?.recognizeImage(rgbaInnerWindow)
 
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
             var startTime2 = SystemClock.uptimeMillis()
@@ -672,7 +671,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
         //private const val MODEL_STRING = "yolov8s_float16.tflite"
-        //private const val MODEL_TYPE = "v8"
+        //private const val MODEL_TYPE = "detection"
         //private const val LABEL_FILENAME = "file:///android_asset/labelmap_surfnet.txt"
         private const val MODEL_STRING = "yolov8s-seg_float16.tflite" // not scaled
         //private const val MODEL_STRING = "yolov8n-seg-surfnet_float16.tflite" // not scaled

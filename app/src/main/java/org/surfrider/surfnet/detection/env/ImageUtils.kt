@@ -330,9 +330,15 @@ object ImageUtils {
 
     private fun buildBitmapFromMask(mask: Mat?, location: RectF): Bitmap? {
         mask?.let {
+            val w = location.width().toInt()
+            val h = location.height().toInt()
+            if (w < 4 || h < 4) {
+                Timber.i("Warning too small region ${w}x$h")
+                return null
+            }
             val outputBitmap = Bitmap.createBitmap(
-                location.width().toInt() / 4,
-                location.height().toInt() / 4,
+                w / 4,
+                h / 4,
                 Bitmap.Config.ARGB_8888
             )
             for (i in 0 until outputBitmap.width)  {
@@ -343,7 +349,7 @@ object ImageUtils {
                     outputBitmap.setPixel(i, j, Color.argb(pixelValue, 200, 128, 0))
                 }
             }
-            return createScaledBitmap(outputBitmap, location.width().toInt(), location.height().toInt(), true)
+            return createScaledBitmap(outputBitmap, w, h, true)
         }
         return null
     }
