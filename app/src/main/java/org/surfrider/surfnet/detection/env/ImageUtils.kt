@@ -303,8 +303,10 @@ object ImageUtils {
                         frameToCanvasTransform.mapRect(location)
                         canvas.drawRect(location, paint)
                         // Draw mask
-                        it.bitmap?.let { bitmap ->
-                            canvas.drawBitmap(bitmap, null, newLocation, null)
+                        if(isMovedDetections) {
+                            it.bitmap?.let { bitmap ->
+                                canvas.drawBitmap(bitmap, null, newLocation, null)
+                            }
                         }
                     }
                 }

@@ -295,6 +295,11 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                         FLOW_REFRESH_RATE_MILLIS
                     )
 
+                    // Move current location of detections
+                    latestMovedDetections?.let { dets ->
+                        inPlaceMoveDetectionsWithOF(dets)
+                    }
+
                     outputFlowLinesRollingArray.add(TimedOutputFlowLine(outputLinesFlow, System.currentTimeMillis()))
                     if (outputFlowLinesRollingArray.size > FLOW_ROLLING_ARRAY_MAX_SIZE) {
                         outputFlowLinesRollingArray.removeFirst()
@@ -388,18 +393,27 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
         trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
+                val startTime = SystemClock.uptimeMillis()
                 canvas?.let {
                     if (frameToCanvasTransform == null) {
                         frameToCanvasTransform = ImageUtils.getTransformationMatrix(previewWidth, previewHeight, canvas.width, canvas.height,0, false)
                     }
+
                     trackerManager?.draw(it, context, frameToCanvasTransform!!, bottomSheet.showOF)
+                    val trackerDrawTS = SystemClock.uptimeMillis()
                     if (bottomSheet.showOF) {
                         drawOFLinesPRK(it, outputLinesFlow, frameToCanvasTransform!!)
                     }
+                    val OFLinesTS = SystemClock.uptimeMillis()
+                    var detectionTS = 0L
+                    var masksTS = 0L
                     if (bottomSheet.showBoxes) {
                         drawDetections(it, latestDetections, frameToCanvasTransform!!, false)
+                        detectionTS = SystemClock.uptimeMillis()
                         drawDetections(it, latestMovedDetections, frameToCanvasTransform!!, true)
+                        masksTS = SystemClock.uptimeMillis()
                     }
+                    Timber.i("draw tracker: ${trackerDrawTS - startTime}, OFlines: ${OFLinesTS - trackerDrawTS}, dets: ${detectionTS - OFLinesTS} masks: ${masksTS - detectionTS}")
                     if (DEBUG_FRAME) {
                         trackerManager?.drawDebug(it)
                         cropToFrameTransform?.let {matrix ->
@@ -502,8 +516,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         getLocation()
     }
 
-
-
     fun updateCounter(count: Int?) {
         binding.wasteCounter.text = count.toString()
         if (count != null) {
@@ -574,17 +586,25 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             }
 
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
-
+            var startTime2 = SystemClock.uptimeMillis()
             ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
+            val buildBitmapTime = SystemClock.uptimeMillis() - startTime2
+
+            var latestMovedDetectionsTS = 0L
+            var trackerManagerTS = 0L
+            startTime2 = SystemClock.uptimeMillis()
             @Synchronized
             latestDetections = results
             mutex.withLock {
                 //if (fastSelfMotionTimestamp == 0L) {
-                //latestMovedDetections = moveDetectionsWithOF(results!!, frameTimestamp)
+                latestMovedDetections = moveDetectionsWithOF(results!!, frameTimestamp)
+                latestMovedDetectionsTS = SystemClock.uptimeMillis()
                 trackerManager?.processDetections(results!!, location, frameTimestamp)
                 trackerManager?.updateTrackers()
+                trackerManagerTS = SystemClock.uptimeMillis()
                 //}
             }
+            Timber.i("det Total: $lastProcessingTimeMs, buildBitmapTime: ${buildBitmapTime}, OF move: ${latestMovedDetectionsTS - startTime2}, TM: ${trackerManagerTS - latestMovedDetectionsTS}")
 
             trackingOverlay?.postInvalidate()
             computingDetection = false
@@ -594,6 +614,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         }
     }
     private fun moveDetectionsWithOF(mappedRecognitions: List<Detector.Recognition?>, frameTimestamp:Long): MutableList<Detector.Recognition?> {
+        // Move detections with cumulative values of optical flows since frameTimestamps
+        // returns a new detection list
         val movedRecognitions: MutableList<Detector.Recognition?> = LinkedList()
         for (det in mappedRecognitions) {
             det?.let {
@@ -609,11 +631,26 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 }
                 val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
                                        it.location.right + move.x, it.location.bottom + move.y)
-                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, it.maskIdx, null, it.detectedClass, null)
+                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, it.maskIdx, it.mask, it.detectedClass, it.bitmap)
                 movedRecognitions.add(newDet)
             }
         }
         return movedRecognitions
+    }
+    private fun inPlaceMoveDetectionsWithOF(mappedRecognitions: List<Detector.Recognition?>) {
+        // Moves detections inplace with current optical flow value
+        for (det in mappedRecognitions) {
+            det?.let {
+                val rect = RectF(it.location)
+                val center = PointF(rect.centerX(), rect.centerY())
+                val move = calculateMedianFlowSpeedForTrack(center, outputLinesFlow, 6)
+                move?.let{ move ->
+                    val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
+                        it.location.right + move.x, it.location.bottom + move.y)
+                    det.location = newLocation
+                }
+            }
+        }
     }
 
     data class TimedOutputFlowLine(val data: ArrayList<FloatArray>, val timestamp: Long)

@@ -18,6 +18,7 @@ import android.content.Context
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.RectF
+import android.os.SystemClock
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.Rect
@@ -172,7 +173,9 @@ class YoloDetector private constructor() : Detector {
         outData.rewind()
         outputMap[0] = outData
         val inputArray = arrayOf<Any?>(imgData)
+
         tfLite!!.runForMultipleInputsOutputs(inputArray, outputMap)
+
         val byteBuffer = outputMap[0] as ByteBuffer?
         byteBuffer!!.rewind()
 
@@ -219,6 +222,7 @@ class YoloDetector private constructor() : Detector {
     }
 
     private fun segmentImage(bitmap: Bitmap?): ArrayList<Recognition?>? {
+        val preprocessTime = SystemClock.uptimeMillis()
         convertBitmapToByteBuffer(bitmap)
         val outputMap: MutableMap<Int, Any?> =
             HashMap()
@@ -227,7 +231,9 @@ class YoloDetector private constructor() : Detector {
         outputMap[0] = outData
         outputMap[1] = outData2
         val inputArray = arrayOf<Any?>(imgData)
+        val startTime = SystemClock.uptimeMillis()
         tfLite!!.runForMultipleInputsOutputs(inputArray, outputMap)
+        val tfTime = SystemClock.uptimeMillis()
 
         val byteBuffer = outputMap[0] as ByteBuffer?
         val byteBuffer2 = outputMap[1] as ByteBuffer?
@@ -257,13 +263,19 @@ class YoloDetector private constructor() : Detector {
         masks = Mat(resolutionMaskH* resolutionMaskW, numMasks, CvType.CV_32F, byteBuffer2).t()
 
         val detections = processTFoutput(out, bitmap!!.width, bitmap.height)
+        val processOutputTime = SystemClock.uptimeMillis()
         val indicesToKeep = DetectorUtils.nmsIndices(detections, numClass)
-
+        val nmsTime = SystemClock.uptimeMillis()
         val newDetections = indicesToKeep
             .map { computeMask(detections[it], out[detections[it].maskIdx].sliceArray(4+numClass..<4+numClass+numMasks)) }
 
             .toCollection(ArrayList())
-
+        val postprocessTime = SystemClock.uptimeMillis()
+        Timber.i("pre: ${startTime - preprocessTime}" +
+        " tf: ${tfTime - startTime}" +
+        " outProcess: ${processOutputTime - tfTime}" +
+        " nms: ${nmsTime - processOutputTime}" +
+        " mask: ${postprocessTime - nmsTime}")
         return newDetections
     }
 
