@@ -413,7 +413,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                         drawDetections(it, latestMovedDetections, frameToCanvasTransform!!, true)
                         masksTS = SystemClock.uptimeMillis()
                     }
-                    Timber.i("draw tracker: ${trackerDrawTS - startTime}, OFlines: ${OFLinesTS - trackerDrawTS}, dets: ${detectionTS - OFLinesTS} masks: ${masksTS - detectionTS}")
+                    //Timber.i("draw tracker: ${trackerDrawTS - startTime}, OFlines: ${OFLinesTS - trackerDrawTS}, dets: ${detectionTS - OFLinesTS} masks: ${masksTS - detectionTS}")
                     if (DEBUG_FRAME) {
                         trackerManager?.drawDebug(it)
                         cropToFrameTransform?.let {matrix ->
