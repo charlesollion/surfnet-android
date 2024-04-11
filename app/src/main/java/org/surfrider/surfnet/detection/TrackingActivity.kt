@@ -98,7 +98,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private lateinit var imageProcessor: ImageProcessor
     private lateinit var outputLinesFlow: ArrayList<FloatArray>
 
-
     private lateinit var opticalFlow: DenseOpticalFlow
     private lateinit var openCvCameraView: CameraBridgeViewBase
     private lateinit var frameRgba: Mat
@@ -163,7 +162,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         chronoContainer = binding.chronoContainer
         binding.wasteCounter.text = "0"
         bottomSheet = BottomSheet(binding)
-        bottomSheet.showOF = DEBUG_MODE
+        bottomSheet.showOF = false
         bottomSheet.showBoxes = DEBUG_MODE
         hideSystemUI()
 
@@ -367,13 +366,10 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 CONFIDENCE_THRESHOLD,
                 IS_QUANTIZED,
                 MODEL_TYPE,
-                IS_SCALED,
                 INPUT_SIZE,
                 applicationContext
             )
 
-            // detector?.useGpu()
-            // detector?.setNumThreads(NUM_THREADS)
             detectorPaused = false
         } catch (e: IOException) {
             e.printStackTrace()
@@ -388,7 +384,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         trackerManager = lastTrackerManager ?: TrackerManager()
 
         bottomSheet.displayDetection(trackerManager!!)
-        detectorPaused = false
 
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
         trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
@@ -408,12 +403,16 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                     var detectionTS = 0L
                     var masksTS = 0L
                     if (bottomSheet.showBoxes) {
-                        drawDetections(it, latestDetections, frameToCanvasTransform!!, false)
+                        //drawDetections(it, latestDetections, frameToCanvasTransform!!, false)
                         detectionTS = SystemClock.uptimeMillis()
-                        drawDetections(it, latestMovedDetections, frameToCanvasTransform!!, true)
+                        drawDetections(it, latestMovedDetections, frameToCanvasTransform!!,
+                            isMovedDetections = true,
+                            drawOnlyMasks = MODEL_TYPE == "segmentation"
+                        )
                         masksTS = SystemClock.uptimeMillis()
                     }
-                    //Timber.i("draw tracker: ${trackerDrawTS - startTime}, OFlines: ${OFLinesTS - trackerDrawTS}, dets: ${detectionTS - OFLinesTS} masks: ${masksTS - detectionTS}")
+                    if(DEBUG_PROFILING)
+                        Timber.i("draw tracker: ${trackerDrawTS - startTime}, OFlines: ${OFLinesTS - trackerDrawTS}, dets: ${detectionTS - OFLinesTS} masks: ${masksTS - detectionTS}")
                     if (DEBUG_FRAME) {
                         trackerManager?.drawDebug(it)
                         cropToFrameTransform?.let {matrix ->
@@ -563,7 +562,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private fun detect(frame: Mat) {
         computingDetection = true
         Imgproc.resize(frame, frameResized, Size(resizedWidth, resizedHeight))
-        // Timber.i("input frame: ${frame.size()} frame after resize: ${frameResized.size()} rect: ${cropRect}")
+
         val rgbaInnerWindow = frameResized.submat(cropRect)
         if (SAVE_PREVIEW_BITMAP) {
             Utils.matToBitmap(rgbaInnerWindow, croppedBitmap)
@@ -603,7 +602,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 trackerManagerTS = SystemClock.uptimeMillis()
                 //}
             }
-            Timber.i("det Total: $lastProcessingTimeMs, buildBitmapTime: ${buildBitmapTime}, OF move: ${latestMovedDetectionsTS - startTime2}, TM: ${trackerManagerTS - latestMovedDetectionsTS}")
+            if(DEBUG_PROFILING)
+                Timber.i("det Total: $lastProcessingTimeMs, buildBitmapTime: ${buildBitmapTime}, OF move: ${latestMovedDetectionsTS - startTime2}, TM: ${trackerManagerTS - latestMovedDetectionsTS}")
 
             trackingOverlay?.postInvalidate()
             computingDetection = false
@@ -657,6 +657,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     companion object {
         private const val DEBUG_FRAME = false
         private const val DEBUG_MODE = true
+        private const val DEBUG_PROFILING = true
         private const val MAX_WIDTH = 1280
         private const val MAX_HEIGHT = 720
 
@@ -669,16 +670,15 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         private const val CONFIDENCE_THRESHOLD = 0.3f
 
-        private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
-        private const val MODEL_STRING = "yolov8n-seg_float16.tflite"
+        //private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
+        //private const val MODEL_STRING = "yolov8n-seg_float16.tflite"
         //private const val MODEL_TYPE = "detection"
-        //private const val LABEL_FILENAME = "file:///android_asset/labelmap_surfnet.txt"
+        private const val LABEL_FILENAME = "file:///android_asset/labelmap_surfnet.txt"
         //private const val MODEL_STRING = "yolov8s-seg_float16.tflite" // not scaled
-        //private const val MODEL_STRING = "yolov8n-seg-surfnet_float16.tflite" // not scaled
+        private const val MODEL_STRING = "yolov8n-seg-surfnet_float16.tflite" // not scaled
         private const val MODEL_TYPE = "segmentation" // can also be v5 or v8
         private const val INPUT_SIZE = 640
         private const val IS_QUANTIZED = false
-        private const val IS_SCALED = false // False only for newer Yolo
 
         private const val MAINTAIN_ASPECT = true
         private const val SAVE_PREVIEW_BITMAP = false

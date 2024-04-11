@@ -287,7 +287,7 @@ object ImageUtils {
     }
 
 
-    fun drawDetections(canvas: Canvas, results: List<Detector.Recognition?>?, frameToCanvasTransform: Matrix, isMovedDetections:Boolean) {
+    fun drawDetections(canvas: Canvas, results: List<Detector.Recognition?>?, frameToCanvasTransform: Matrix, isMovedDetections:Boolean, drawOnlyMasks:Boolean) {
         val paint = Paint()
         if (isMovedDetections)
             paint.color = Color.BLUE
@@ -301,11 +301,12 @@ object ImageUtils {
                     val newLocation = RectF(it.location)
                     newLocation?.let { location ->
                         frameToCanvasTransform.mapRect(location)
-                        canvas.drawRect(location, paint)
+                        if(!drawOnlyMasks)
+                            canvas.drawRect(location, paint)
                         // Draw mask
                         if(isMovedDetections) {
                             it.bitmap?.let { bitmap ->
-                                canvas.drawBitmap(bitmap, null, newLocation, null)
+                                canvas.drawBitmap(bitmap, null, location, null)
                             }
                         }
                     }
@@ -333,7 +334,7 @@ object ImageUtils {
             val w = location.width().toInt()
             val h = location.height().toInt()
             if (w < 4 || h < 4) {
-                Timber.i("Warning too small region ${w}x$h")
+                Timber.i("Warning too mask small region ${w}x$h")
                 return null
             }
             val outputBitmap = Bitmap.createBitmap(

@@ -92,6 +92,7 @@ class YoloDetector private constructor() : Detector {
     }
 
     private fun processTFoutput(out: Mat, width:Int, height:Int): ArrayList<Recognition> {
+        // Assumes a matrix of shape (output_box, 4 + numClass) or (output_box, 4 + numClass + numMask)
         val detections = ArrayList<Recognition>()
         val classes = FloatArray(numClass)
         val boxes = FloatArray(4)
@@ -167,7 +168,8 @@ class YoloDetector private constructor() : Detector {
         val allocateTime = SystemClock.uptimeMillis()
         val detections = processTFoutput(predsCV, frame.rows(), frame.cols())
         val processOutputTime = SystemClock.uptimeMillis()
-        Timber.i("pre: ${startTime - preprocessTime}" +
+        if(DEBUG_PROFILING)
+            Timber.i("pre: ${startTime - preprocessTime}" +
                 " tf: ${tfTime - startTime}" +
                 " allocate: ${allocateTime - tfTime}" +
                 " outProcess: ${processOutputTime - allocateTime}")
@@ -221,13 +223,14 @@ class YoloDetector private constructor() : Detector {
 
             .toCollection(ArrayList())
         val postprocessTime = SystemClock.uptimeMillis()
-        Timber.i("pre: ${startTime - preprocessTime}" +
-        " tf: ${tfTime - startTime}" +
-                " allocate: ${allocateTime - tfTime}" +
-                " allocate mask: ${allocateMaskTime - allocateTime}" +
-        " outProcess: ${processOutputTime - allocateMaskTime}" +
-        " nms: ${nmsTime - processOutputTime}" +
-        " mask: ${postprocessTime - nmsTime}")
+        if(DEBUG_PROFILING)
+            Timber.i("pre: ${startTime - preprocessTime}" +
+                    " tf: ${tfTime - startTime}" +
+                    " allocate: ${allocateTime - tfTime}" +
+                    " allocate mask: ${allocateMaskTime - allocateTime}" +
+                    " outProcess: ${processOutputTime - allocateMaskTime}" +
+                    " nms: ${nmsTime - processOutputTime}" +
+                    " mask: ${postprocessTime - nmsTime}")
         return newDetections
     }
 
@@ -251,7 +254,6 @@ class YoloDetector private constructor() : Detector {
             confThreshold: Float,
             isQuantized: Boolean,
             modelType: String,
-            outputIsScaled: Boolean,
             inputSize: Int,
             ctx: Context
         ): YoloDetector {
@@ -295,7 +297,7 @@ class YoloDetector private constructor() : Detector {
             }
             d.confThreshold = confThreshold
             d.isModelQuantized = isQuantized
-            d.scalingFactor = if (outputIsScaled) 1.0f else inputSize.toFloat()
+            d.scalingFactor = inputSize.toFloat()
             d.modelType = modelType
 
             // Pre-allocate buffers.
@@ -356,5 +358,6 @@ class YoloDetector private constructor() : Detector {
             return d
         }
         private const val MASK_SCALE_FACTOR = 4
+        private const val DEBUG_PROFILING = true
     }
 }
