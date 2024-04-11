@@ -98,7 +98,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private lateinit var imageProcessor: ImageProcessor
     private lateinit var outputLinesFlow: ArrayList<FloatArray>
 
-
     private lateinit var opticalFlow: DenseOpticalFlow
     private lateinit var openCvCameraView: CameraBridgeViewBase
     private lateinit var frameRgba: Mat
@@ -163,7 +162,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         chronoContainer = binding.chronoContainer
         binding.wasteCounter.text = "0"
         bottomSheet = BottomSheet(binding)
-        bottomSheet.showOF = DEBUG_MODE
+        bottomSheet.showOF = false
         bottomSheet.showBoxes = DEBUG_MODE
         hideSystemUI()
 
@@ -182,16 +181,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             }
         }
 
-        /*if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }*/
         fusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, null)
         updateLocation()
         imageProcessor = ImageProcessor()
@@ -252,11 +241,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         previewWidth = width
         previewHeight = height
 
-        /*if (openCvCameraView.rotation != null) {
-                    sensorOrientation = openCvCameraView.rotation - screenOrientation
-                }
-        Timber.i("Camera orientation relative to screen canvas: %d", sensorOrientation)*/
-
         // Get Android Graphics transform matrix
         frameToCropTransform = ImageUtils.getTransformationMatrix(
             previewWidth, previewHeight, INPUT_SIZE, INPUT_SIZE, sensorOrientation, MAINTAIN_ASPECT
@@ -309,6 +293,11 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                         outputLinesFlow,
                         FLOW_REFRESH_RATE_MILLIS
                     )
+
+                    // Move current location of detections
+                    latestMovedDetections?.let { dets ->
+                        inPlaceMoveDetectionsWithOF(dets)
+                    }
 
                     outputFlowLinesRollingArray.add(TimedOutputFlowLine(outputLinesFlow, System.currentTimeMillis()))
                     if (outputFlowLinesRollingArray.size > FLOW_ROLLING_ARRAY_MAX_SIZE) {
@@ -376,13 +365,11 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 LABEL_FILENAME,
                 CONFIDENCE_THRESHOLD,
                 IS_QUANTIZED,
-                IS_V8,
-                IS_SCALED,
-                INPUT_SIZE
+                MODEL_TYPE,
+                INPUT_SIZE,
+                applicationContext
             )
 
-            // detector?.useGpu()
-            // detector?.setNumThreads(NUM_THREADS)
             detectorPaused = false
         } catch (e: IOException) {
             e.printStackTrace()
@@ -397,23 +384,35 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         trackerManager = lastTrackerManager ?: TrackerManager()
 
         bottomSheet.displayDetection(trackerManager!!)
-        detectorPaused = false
 
         trackingOverlay = findViewById<View>(R.id.tracking_overlay) as OverlayView
         trackingOverlay?.addCallback(object : OverlayView.DrawCallback {
             override fun drawCallback(canvas: Canvas?) {
+                val startTime = SystemClock.uptimeMillis()
                 canvas?.let {
                     if (frameToCanvasTransform == null) {
                         frameToCanvasTransform = ImageUtils.getTransformationMatrix(previewWidth, previewHeight, canvas.width, canvas.height,0, false)
                     }
+
                     trackerManager?.draw(it, context, frameToCanvasTransform!!, bottomSheet.showOF)
+                    val trackerDrawTS = SystemClock.uptimeMillis()
                     if (bottomSheet.showOF) {
                         drawOFLinesPRK(it, outputLinesFlow, frameToCanvasTransform!!)
                     }
+                    val OFLinesTS = SystemClock.uptimeMillis()
+                    var detectionTS = 0L
+                    var masksTS = 0L
                     if (bottomSheet.showBoxes) {
-                        drawDetections(it, latestDetections, frameToCanvasTransform!!, false)
-                        drawDetections(it, latestMovedDetections, frameToCanvasTransform!!, true)
+                        //drawDetections(it, latestDetections, frameToCanvasTransform!!, false)
+                        detectionTS = SystemClock.uptimeMillis()
+                        drawDetections(it, latestMovedDetections, frameToCanvasTransform!!,
+                            isMovedDetections = true,
+                            drawOnlyMasks = MODEL_TYPE == "segmentation"
+                        )
+                        masksTS = SystemClock.uptimeMillis()
                     }
+                    if(DEBUG_PROFILING)
+                        Timber.i("draw tracker: ${trackerDrawTS - startTime}, OFlines: ${OFLinesTS - trackerDrawTS}, dets: ${detectionTS - OFLinesTS} masks: ${masksTS - detectionTS}")
                     if (DEBUG_FRAME) {
                         trackerManager?.drawDebug(it)
                         cropToFrameTransform?.let {matrix ->
@@ -516,8 +515,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         getLocation()
     }
 
-
-
     fun updateCounter(count: Int?) {
         binding.wasteCounter.text = count.toString()
         if (count != null) {
@@ -565,11 +562,15 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private fun detect(frame: Mat) {
         computingDetection = true
         Imgproc.resize(frame, frameResized, Size(resizedWidth, resizedHeight))
-        // Timber.i("input frame: ${frame.size()} frame after resize: ${frameResized.size()} rect: ${cropRect}")
+
         val rgbaInnerWindow = frameResized.submat(cropRect)
-        Utils.matToBitmap(rgbaInnerWindow, croppedBitmap)
         if (SAVE_PREVIEW_BITMAP) {
+            Utils.matToBitmap(rgbaInnerWindow, croppedBitmap)
             ImageUtils.saveBitmap(croppedBitmap!!, applicationContext)
+        }
+        if (LOAD_PREVIEW_BITMAP) {
+            croppedBitmap = ImageUtils.loadBitmap(applicationContext)
+            // todo: get RGBA from crop
         }
         /*trackerManager?.let {
             it.updateTrackers()
@@ -580,22 +581,29 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             val startTime = SystemClock.uptimeMillis()
             val frameTimestamp = System.currentTimeMillis()
             latestDetectionsTimestamp = frameTimestamp
-            val results: ArrayList<Detector.Recognition?>? = croppedBitmap?.let {
-                detector?.recognizeImage(it)
-            }
+            val results: ArrayList<Detector.Recognition?>? = detector?.recognizeImage(rgbaInnerWindow)
 
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
-            val mappedRecognitions =
-                ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
+            var startTime2 = SystemClock.uptimeMillis()
+            ImageUtils.mapDetectionsWithTransform(results, cropToFrameTransform)
+            val buildBitmapTime = SystemClock.uptimeMillis() - startTime2
+
+            var latestMovedDetectionsTS = 0L
+            var trackerManagerTS = 0L
+            startTime2 = SystemClock.uptimeMillis()
             @Synchronized
-            latestDetections = mappedRecognitions
+            latestDetections = results
             mutex.withLock {
                 //if (fastSelfMotionTimestamp == 0L) {
-                latestMovedDetections = moveDetectionsWithOF(mappedRecognitions, frameTimestamp)
-                trackerManager?.processDetections(mappedRecognitions, location, frameTimestamp)
+                latestMovedDetections = moveDetectionsWithOF(results!!, frameTimestamp)
+                latestMovedDetectionsTS = SystemClock.uptimeMillis()
+                trackerManager?.processDetections(results!!, location, frameTimestamp)
                 trackerManager?.updateTrackers()
+                trackerManagerTS = SystemClock.uptimeMillis()
                 //}
             }
+            if(DEBUG_PROFILING)
+                Timber.i("det Total: $lastProcessingTimeMs, buildBitmapTime: ${buildBitmapTime}, OF move: ${latestMovedDetectionsTS - startTime2}, TM: ${trackerManagerTS - latestMovedDetectionsTS}")
 
             trackingOverlay?.postInvalidate()
             computingDetection = false
@@ -605,6 +613,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         }
     }
     private fun moveDetectionsWithOF(mappedRecognitions: List<Detector.Recognition?>, frameTimestamp:Long): MutableList<Detector.Recognition?> {
+        // Move detections with cumulative values of optical flows since frameTimestamps
+        // returns a new detection list
         val movedRecognitions: MutableList<Detector.Recognition?> = LinkedList()
         for (det in mappedRecognitions) {
             det?.let {
@@ -620,11 +630,26 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 }
                 val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
                                        it.location.right + move.x, it.location.bottom + move.y)
-                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, it.detectedClass)
+                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, it.maskIdx, it.mask, it.detectedClass, it.bitmap)
                 movedRecognitions.add(newDet)
             }
         }
         return movedRecognitions
+    }
+    private fun inPlaceMoveDetectionsWithOF(mappedRecognitions: List<Detector.Recognition?>) {
+        // Moves detections inplace with current optical flow value
+        for (det in mappedRecognitions) {
+            det?.let {
+                val rect = RectF(it.location)
+                val center = PointF(rect.centerX(), rect.centerY())
+                val move = calculateMedianFlowSpeedForTrack(center, outputLinesFlow, 6)
+                move?.let{ move ->
+                    val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
+                        it.location.right + move.x, it.location.bottom + move.y)
+                    det.location = newLocation
+                }
+            }
+        }
     }
 
     data class TimedOutputFlowLine(val data: ArrayList<FloatArray>, val timestamp: Long)
@@ -632,6 +657,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     companion object {
         private const val DEBUG_FRAME = false
         private const val DEBUG_MODE = false
+        private const val DEBUG_PROFILING = false
+
         private const val MAX_WIDTH = 1280
         private const val MAX_HEIGHT = 720
 
@@ -645,19 +672,18 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         private const val CONFIDENCE_THRESHOLD = 0.3f
 
         //private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
-        // private const val MODEL_STRING = "yolov8n_float16.tflite"
+        //private const val MODEL_STRING = "yolov8n-seg_float16.tflite"
+        //private const val MODEL_TYPE = "detection"
         private const val LABEL_FILENAME = "file:///android_asset/labelmap_surfnet.txt"
-        private const val MODEL_STRING = "surfnet_best_13102023_float16.tflite" // not scaled
+        //private const val MODEL_STRING = "yolov8s-seg_float16.tflite" // not scaled
+        private const val MODEL_STRING = "yolov8n-seg-surfnet_float16.tflite" // not scaled
+        private const val MODEL_TYPE = "segmentation" // can also be v5 or v8
         private const val INPUT_SIZE = 640
-        private const val IS_V8 = true
         private const val IS_QUANTIZED = false
-        private const val IS_SCALED = false // False only for newer Yolo
 
         private const val MAINTAIN_ASPECT = true
         private const val SAVE_PREVIEW_BITMAP = false
+        private const val LOAD_PREVIEW_BITMAP = false
         private const val REQUEST_LOCATION_PERMISSION = 2
-        private const val PERMISSIONS_REQUEST = 1
-        private const val PERMISSION_CAMERA = Manifest.permission.CAMERA
-        private const val PERMISSION_LOCATION = Manifest.permission.ACCESS_FINE_LOCATION
     }
 }

@@ -16,12 +16,21 @@ package org.surfrider.surfnet.detection.env
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Bitmap.createScaledBitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.media.Image
+import org.opencv.android.Utils.matToBitmap
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import org.opencv.core.Size
+import org.opencv.imgproc.Imgproc
+import org.surfrider.surfnet.detection.env.MathUtils.sigmoid
 import org.surfrider.surfnet.detection.tflite.Detector
 import timber.log.Timber
 import java.io.File
@@ -36,6 +45,7 @@ object ImageUtils {
     // This value is 2 ^ 18 - 1, and is used to clamp the RGB values before their ranges
     // are normalized to eight bits.
     private const val kMaxChannelValue = 262143
+    private var alreadySavedThisSession = false
 
     /**
      * Saves a Bitmap object to disk for analysis.
@@ -44,15 +54,17 @@ object ImageUtils {
      */
     @JvmStatic
     fun saveBitmap(bitmap: Bitmap, context:Context) {
-        val filename = "preview.png"
+        if(alreadySavedThisSession)
+            return
+        val filename = "input_preview.png"
         val root =
             File(context.getExternalFilesDir(null), "tensorflow")
         Timber.i("Saving %dx%d bitmap to %s.", bitmap.width, bitmap.height, root)
-        if (!root.mkdirs()) {
-            Timber.i("Make dir failed")
+        if (root.mkdirs()) {
+            Timber.i("created folder $root")
         }
         val file = File(root, filename)
-        if (!file.exists()) {
+        if (file.exists()) {
             file.delete()
         }
         try {
@@ -64,6 +76,24 @@ object ImageUtils {
             Timber.e(e, "Exception!")
         }
     }
+    fun loadBitmap(context: Context): Bitmap? {
+        val filename = "input_preview.png"
+        val root = File(context.getExternalFilesDir(null), "tensorflow")
+        val file = File(root, filename)
+
+        if (!file.exists()) {
+            Timber.e("File does not exist: $file")
+            return null
+        }
+
+        return try {
+            BitmapFactory.decodeFile(file.absolutePath)
+        } catch (e: Exception) {
+            Timber.e(e, "Exception while loading bitmap!")
+            null
+        }
+    }
+
 
     public fun rgbIntToByteArray(rgbInts: IntArray): ByteArray {
         val outputBytes = ByteArray(rgbInts.size * 3)
@@ -257,7 +287,7 @@ object ImageUtils {
     }
 
 
-    fun drawDetections(canvas: Canvas, results: List<Detector.Recognition?>?, frameToCanvasTransform: Matrix, isMovedDetections:Boolean) {
+    fun drawDetections(canvas: Canvas, results: List<Detector.Recognition?>?, frameToCanvasTransform: Matrix, isMovedDetections:Boolean, drawOnlyMasks:Boolean) {
         val paint = Paint()
         if (isMovedDetections)
             paint.color = Color.BLUE
@@ -271,7 +301,14 @@ object ImageUtils {
                     val newLocation = RectF(it.location)
                     newLocation?.let { location ->
                         frameToCanvasTransform.mapRect(location)
-                        canvas.drawRect(location, paint)
+                        if(!drawOnlyMasks)
+                            canvas.drawRect(location, paint)
+                        // Draw mask
+                        if(isMovedDetections) {
+                            it.bitmap?.let { bitmap ->
+                                canvas.drawBitmap(bitmap, null, location, null)
+                            }
+                        }
                     }
                 }
             }
@@ -283,31 +320,56 @@ object ImageUtils {
         paint.color = Color.WHITE
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 4.0f
-        // Timber.i("output line flow size: ${outputLinesFlow.size}")
         for(line in outputLinesFlow) {
             val points = line.clone()
             frameToCanvasTransform.mapPoints(points)
-            //Timber.i(" flow - i, j, dx, dy, $i, $j, $dx, $dy")
             canvas.drawCircle(points[0], points[1], 10.0f, paint)
             canvas.drawLine(points[0], points[1], points[2], points[3], paint)
         }
     }
 
 
-    fun mapDetectionsWithTransform(results: List<Detector.Recognition?>?, cropToFrameTransform: Matrix?): MutableList<Detector.Recognition?> {
-        val mappedRecognitions: MutableList<Detector.Recognition?> = LinkedList()
+    private fun buildBitmapFromMask(mask: Mat?, location: RectF): Bitmap? {
+        mask?.let {
+            val w = location.width().toInt()
+            val h = location.height().toInt()
+            if (w < 4 || h < 4) {
+                Timber.i("Warning too mask small region ${w}x$h")
+                return null
+            }
+            val outputBitmap = Bitmap.createBitmap(
+                w / 4,
+                h / 4,
+                Bitmap.Config.ARGB_8888
+            )
+            for (i in 0 until outputBitmap.width)  {
+                for (j in 0 until outputBitmap.height) {
+                    var pixelValue = 0
+                    if (sigmoid(it.get(j, i)[0]) > 0.5)
+                        pixelValue = 128
+                    outputBitmap.setPixel(i, j, Color.argb(pixelValue, 200, 128, 0))
+                }
+            }
+            return createScaledBitmap(outputBitmap, w, h, true)
+        }
+        return null
+    }
+
+    fun mapDetectionsWithTransform(results: List<Detector.Recognition?>?, cropToFrameTransform: Matrix?) { //}: MutableList<Detector.Recognition?> {
+        // Performs inplace mapping of detections
         if (results != null) {
             for (result in results) {
                 result?.let {
+                    it.bitmap = it.mask?.let { mask ->
+                        buildBitmapFromMask(mask, it.location)
+                    }
                     val newLocation = RectF(it.location)
                     newLocation?.let { location ->
                         cropToFrameTransform?.mapRect(location)
-                        val newDet = Detector.Recognition(it.classId, it.confidence, location, it.detectedClass)
-                        mappedRecognitions.add(newDet)
                     }
+                    it.location = newLocation
                 }
             }
         }
-        return mappedRecognitions
     }
 }

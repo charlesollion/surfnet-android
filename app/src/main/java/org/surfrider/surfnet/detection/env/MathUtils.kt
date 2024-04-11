@@ -2,6 +2,7 @@ package org.surfrider.surfnet.detection.env
 
 import android.graphics.PointF
 import android.graphics.RectF
+import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -91,6 +92,10 @@ object MathUtils {
 
         // Calculate the Mahalanobis distance by summing the squared components
         return sqrt(mahalanobisDistanceX + mahalanobisDistanceY)
+    }
+
+    fun sigmoid(x: Double): Double {
+        return 1.0 / (1.0 + exp(-x))
     }
 
 }

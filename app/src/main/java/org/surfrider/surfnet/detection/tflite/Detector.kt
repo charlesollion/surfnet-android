@@ -16,13 +16,14 @@ package org.surfrider.surfnet.detection.tflite
 
 import android.graphics.Bitmap
 import android.graphics.RectF
+import org.opencv.core.Mat
 import java.util.Locale
 
 /**
  * Generic interface for interacting with different recognition engines.
  */
 interface Detector {
-    fun recognizeImage(bitmap: Bitmap?): List<Recognition?>?
+    fun recognizeImage(frame: Mat): List<Recognition?>?
     fun setNumThreads(numThreads: Int)
 
     /**
@@ -42,7 +43,13 @@ interface Detector {
          */
         var location: RectF,
 
-        val detectedClass: Int
+        var maskIdx: Int,
+
+        var mask: Mat?,
+
+        val detectedClass: Int,
+
+        var bitmap: Bitmap?
     ) {
 
         override fun toString(): String {

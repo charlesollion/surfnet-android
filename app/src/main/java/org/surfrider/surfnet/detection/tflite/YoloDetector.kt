@@ -14,10 +14,15 @@ limitations under the License.
 ==============================================================================*/
 package org.surfrider.surfnet.detection.tflite
 
+import android.content.Context
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.RectF
-import android.os.Build
+import android.os.SystemClock
+import org.opencv.core.CvType
+import org.opencv.core.Mat
+import org.opencv.core.Rect
+import org.opencv.imgproc.Imgproc
 import org.surfrider.surfnet.detection.env.Utils.loadModelFile
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import org.tensorflow.lite.Interpreter
@@ -25,55 +30,20 @@ import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
 import org.tensorflow.lite.gpu.GpuDelegateFactory.Options.INFERENCE_PREFERENCE_FAST_SINGLE_ANSWER
 import org.tensorflow.lite.gpu.GpuDelegateFactory.Options.INFERENCE_PREFERENCE_SUSTAINED_SPEED
-import org.tensorflow.lite.nnapi.NnApiDelegate
 import timber.log.Timber
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
-import java.lang.Math.min
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.FloatBuffer
 import java.nio.MappedByteBuffer
-import java.util.PriorityQueue
 import java.util.Vector
 import kotlin.math.max
+import kotlin.math.pow
 
-/**
- * Wrapper for frozen detection models trained using the Tensorflow Object Detection API:
- * - https://github.com/tensorflow/models/tree/master/research/object_detection
- * where you can find the training code.
- *
- *
- * To use pretrained models in the API or convert to TF Lite models, please see docs for details:
- * - https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md
- * - https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/running_on_mobile_tensorflowlite.md#running-our-model-on-android
- */
 class YoloDetector private constructor() : Detector {
-    override fun setNumThreads(num_threads: Int) {}
-    private fun recreateInterpreter() {
-        if (tfLite != null) {
-            tfLite!!.close()
-            tfLite = Interpreter(tfliteModel!!, tfliteOptions)
-        }
-    }
-
-    fun useGpu() {
-        if (gpuDelegate == null) {
-            gpuDelegate = GpuDelegate()
-            tfliteOptions.addDelegate(gpuDelegate)
-            recreateInterpreter()
-        }
-    }
-
-    fun useCPU() {
-        recreateInterpreter()
-    }
-
-    fun useNNAPI() {
-        nnapiDelegate = NnApiDelegate()
-        tfliteOptions.addDelegate(nnapiDelegate)
-        recreateInterpreter()
-    }
+    override fun setNumThreads(numThreads: Int) {}
 
     // Float model
     private val IMAGE_MEAN = 0f
@@ -81,287 +51,201 @@ class YoloDetector private constructor() : Detector {
 
     //config yolo
     var inputSize = -1
-    private var output_box = 0
+    var numMasks = 0
+    var resolutionMaskW = 0
+    var resolutionMaskH = 0
+    private var outputBox = 0
     private var isModelQuantized = false
-    private var isV8 = false
+    private var modelType = ""
     private var confThreshold = 0f
-
-    /** holds a gpu delegate  */
-    var gpuDelegate: GpuDelegate? = null
-
-    /** holds an nnapi delegate  */
-    var nnapiDelegate: NnApiDelegate? = null
+    private var scalingFactor = 1.0f
 
     /** The loaded TensorFlow Lite model.  */
     private var tfliteModel: MappedByteBuffer? = null
 
-    /** Options for configuring the Interpreter.  */
-    private val tfliteOptions = Interpreter.Options()
-
     // Config values.
     private val labels = Vector<String>()
     private lateinit var intValues: IntArray
+    private lateinit var imgFloatArray: FloatArray
     private lateinit var imgData: ByteBuffer
     private lateinit var outData: ByteBuffer
+    private lateinit var outData2: ByteBuffer
+    private lateinit var masks: Mat
+    private lateinit var predsCV: Mat
+    private lateinit var preds: Array<FloatArray>
     private var tfLite: Interpreter? = null
     private var inp_scale = 0f
     private var inp_zero_point = 0
     private var oup_scale = 0f
     private var oup_zero_point = 0
     private var numClass = 0
+    private lateinit var context: Context
 
-    //non maximum suppression
-    protected fun nms(list: ArrayList<Recognition>): ArrayList<Recognition?> {
-        val nmsList = ArrayList<Recognition?>()
-        for (k in labels.indices) {
-            //1.find max confidence per class
-            val pq = PriorityQueue<Recognition?>(
-                50
-            ) { lhs, rhs -> // Intentionally reversed to put high confidence at the head of the queue.
-                java.lang.Float.compare(rhs.confidence!!, lhs.confidence!!)
-            }
-            for (i in list.indices) {
-                if (list[i].detectedClass == k) {
-                    pq.add(list[i])
-                }
-            }
-
-            //2.do non maximum suppression
-            while (pq.size > 0) {
-                //insert detection with max confidence
-                val a = arrayOfNulls<Recognition>(pq.size)
-                val detections = pq.toArray(a)
-                val max = detections[0]
-                nmsList.add(max)
-                pq.clear()
-                for (j in 1 until detections.size) {
-                    val detection = detections[j]
-                    val b = detection!!.location
-                    if (box_iou(max!!.location, b) < mNmsThresh) {
-                        pq.add(detection)
-                    }
-                }
-            }
-        }
-        return nmsList
+    private fun convertMatToByteBuffer(mat: Mat) {
+        imgData.rewind()
+        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGBA2RGB)
+        val floatMat = Mat()
+        mat.convertTo(floatMat, CvType.CV_32FC3, 1.0 / IMAGE_STD, 1.0 * IMAGE_MEAN)
+        val newMat = floatMat.reshape(1, 1)
+        newMat.get(0, 0, imgFloatArray)
+        imgData.asFloatBuffer().put(imgFloatArray)
     }
 
-    protected var mNmsThresh = 0.6f
-    protected fun box_iou(a: RectF, b: RectF): Float {
-        return box_intersection(a, b) / box_union(a, b)
-    }
-
-    protected fun box_intersection(a: RectF, b: RectF): Float {
-        val w = overlap(
-            (a.left + a.right) / 2, a.right - a.left,
-            (b.left + b.right) / 2, b.right - b.left
-        )
-        val h = overlap(
-            (a.top + a.bottom) / 2, a.bottom - a.top,
-            (b.top + b.bottom) / 2, b.bottom - b.top
-        )
-        return if (w < 0 || h < 0) 0.0F else w * h
-    }
-
-    protected fun box_union(a: RectF, b: RectF): Float {
-        val i = box_intersection(a, b)
-        return (a.right - a.left) * (a.bottom - a.top) + (b.right - b.left) * (b.bottom - b.top) - i
-    }
-
-    protected fun overlap(x1: Float, w1: Float, x2: Float, w2: Float): Float {
-        val l1 = x1 - w1 / 2
-        val l2 = x2 - w2 / 2
-        val left = if (l1 > l2) l1 else l2
-        val r1 = x1 + w1 / 2
-        val r2 = x2 + w2 / 2
-        val right = if (r1 < r2) r1 else r2
-        return right - left
-    }
-
-    /**
-     * Writes Image data into a `ByteBuffer`.
-     */
-    protected fun convertBitmapToByteBuffer(bitmap: Bitmap?): ByteBuffer? {
-        bitmap!!.getPixels(intValues, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-        val pixel = 0
-        imgData!!.rewind()
-        for (i in 0 until inputSize) {
-            for (j in 0 until inputSize) {
-                val pixelValue = intValues[i * inputSize + j]
-                if (isModelQuantized) {
-                    // Quantized model
-                    imgData!!.put((((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point).toInt().toByte())
-                    imgData!!.put((((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point).toInt().toByte())
-                    imgData!!.put((((pixelValue and 0xFF) - IMAGE_MEAN) / IMAGE_STD / inp_scale + inp_zero_point).toInt().toByte())
-                } else { // Float model
-                    imgData!!.putFloat(((pixelValue shr 16 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
-                    imgData!!.putFloat(((pixelValue shr 8 and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
-                    imgData!!.putFloat(((pixelValue and 0xFF) - IMAGE_MEAN) / IMAGE_STD)
-                }
-            }
-        }
-        return imgData
-    }
-
-    override fun recognizeImage(bitmap: Bitmap?): ArrayList<Recognition?>? {
-        convertBitmapToByteBuffer(bitmap)
-        val outputMap: MutableMap<Int, Any?> =
-            HashMap()
-        outData!!.rewind()
-        outputMap[0] = outData
-        // Timber.tag("YoloDetector").d("mObjThresh: %s", getObjThresh());
-        val inputArray = arrayOf<Any?>(imgData)
-        tfLite!!.runForMultipleInputsOutputs(inputArray, outputMap)
-        val byteBuffer = outputMap[0] as ByteBuffer?
-        byteBuffer!!.rewind()
+    private fun processTFoutput(out: Mat, width:Int, height:Int): ArrayList<Recognition> {
+        // Assumes a matrix of shape (output_box, 4 + numClass) or (output_box, 4 + numClass + numMask)
         val detections = ArrayList<Recognition>()
-        val out =
-            Array(1) {
-                Array(output_box) { FloatArray(numClass + 5) }
-            }
-        if (!isV8) {
-            // Timber.tag("YoloDetector").d("out[0] detect start");
-            for (i in 0 until output_box) {
-                for (j in 0 until numClass + 5) {
-                    if (isModelQuantized) {
-                        out[0][i][j] =
-                            oup_scale * ((byteBuffer.get().toInt() and 0xFF) - oup_zero_point)
-                    } else {
-                        out[0][i][j] = byteBuffer.float
-                    }
-                }
-                // Denormalize xywh
-                for (j in 0..3) {
-                    out[0][i][j] *= inputSize.toFloat()
-                }
-            }
-        } else {
-            // switch the way we span through the bytebuffer
-            // Timber.tag("YoloDetector V8").d("out[0] detect start");
-            for (j in 0 until numClass + 4) {
-                for (i in 0 until output_box) {
-                    if (isModelQuantized) {
-                        out[0][i][j] =
-                            oup_scale * ((byteBuffer.get().toInt() and 0xFF) - oup_zero_point)
-                    } else {
-                        out[0][i][j] = byteBuffer.float
-                    }
-                }
-            }
-            // not always needed to denormalize for yolov8
-            for (i in 0 until output_box) {
-                for (j in 0..3) {
-                    out[0][i][j] *= scalingFactor
-                }
-            }
-        }
-        for (i in 0 until output_box) {
-            var confidence = 1.0f
-            if (!isV8) {
-                // confidence only valid for yolov5
-                confidence = out[0][i][4]
-            }
+        val classes = FloatArray(numClass)
+        val boxes = FloatArray(4)
+        for (i in 0 until outputBox) {
+            out.get(i, 4, classes)
             var detectedClass = -1
-            var maxClass = 0f
-            val classes = FloatArray(labels.size)
-            for (c in labels.indices) {
-                if (!isV8) {
-                    classes[c] = out[0][i][5 + c]
-                } else {
-                    classes[c] = out[0][i][4 + c]
-                }
-            }
-            for (c in labels.indices) {
+            var maxClass = 0.0f
+            for (c in 0 until numClass) {
                 if (classes[c] > maxClass) {
                     detectedClass = c
                     maxClass = classes[c]
+                    if (maxClass > 0.5) {
+                        break
+                    }
                 }
             }
-            val confidenceInClass = maxClass * confidence
+            val confidenceInClass = maxClass
             if (confidenceInClass > confThreshold) {
-                val xPos = out[0][i][0]
-                val yPos = out[0][i][1]
-                val w = out[0][i][2]
-                val h = out[0][i][3]
-                // Timber.tag("YoloDetector").i(Float.toString(xPos) + ',' + yPos + ',' + w + ',' + h);
+                out.get(i, 0, boxes)
+                val xPos = boxes[0] * scalingFactor
+                val yPos = boxes[1] * scalingFactor
+                val w = boxes[2] * scalingFactor
+                val h = boxes[3] * scalingFactor
                 val rect = RectF(
-                    max(0f, xPos - w / 2),
-                    max(0f, yPos - h / 2),
-                    min((bitmap!!.width - 1).toFloat(), xPos + w / 2),
-                    min((bitmap.height - 1).toFloat(), yPos + h / 2)
+                    max(0.0f, xPos - w / 2),
+                    max(0.0f, yPos - h / 2),
+                    kotlin.math.min(width - 1.0f, xPos + w / 2),
+                    kotlin.math.min(height - 1.0f, yPos + h / 2)
                 )
                 detections.add(
                     Recognition(labels[detectedClass],
-                        confidenceInClass, rect, detectedClass
+                        confidenceInClass, rect, i,null, detectedClass, null
                     )
                 )
             }
         }
-        // Timber.tag("YoloDetector").d("detect end");
-        return nms(detections)
+        return detections
     }
 
-    fun checkInvalidateBox(
-        x: Float,
-        y: Float,
-        width: Float,
-        height: Float,
-        oriW: Float,
-        oriH: Float,
-        intputSize: Int
-    ): Boolean {
-        // (1) (x, y, w, h) --> (xmin, ymin, xmax, ymax)
-        val halfHeight = height / 2.0f
-        val halfWidth = width / 2.0f
-        val pred_coor = floatArrayOf(x - halfWidth, y - halfHeight, x + halfWidth, y + halfHeight)
+    override fun recognizeImage(frame: Mat): ArrayList<Recognition?>? {
+        return if (modelType == "segmentation") {
+            segmentImage(frame)
+        } else {
+            detectImage(frame)
+        }
+    }
+    private fun detectImage(frame: Mat): ArrayList<Recognition?>? {
+        val preprocessTime = SystemClock.uptimeMillis()
+        convertMatToByteBuffer(frame)
+        val outputMap: MutableMap<Int, Any?> =
+            HashMap()
+        outData.rewind()
+        outputMap[0] = outData
+        val inputArray = arrayOf<Any?>(imgData)
+        val startTime = SystemClock.uptimeMillis()
+        tfLite!!.runForMultipleInputsOutputs(inputArray, outputMap)
+        val tfTime = SystemClock.uptimeMillis()
 
-        // (2) (xmin, ymin, xmax, ymax) -> (xmin_org, ymin_org, xmax_org, ymax_org)
-        val resize_ratioW = 1.0f * intputSize / oriW
-        val resize_ratioH = 1.0f * intputSize / oriH
-        val resize_ratio = if (resize_ratioW > resize_ratioH) resize_ratioH else resize_ratioW //min
-        val dw = (intputSize - resize_ratio * oriW) / 2
-        val dh = (intputSize - resize_ratio * oriH) / 2
-        pred_coor[0] = 1.0f * (pred_coor[0] - dw) / resize_ratio
-        pred_coor[2] = 1.0f * (pred_coor[2] - dw) / resize_ratio
-        pred_coor[1] = 1.0f * (pred_coor[1] - dh) / resize_ratio
-        pred_coor[3] = 1.0f * (pred_coor[3] - dh) / resize_ratio
+        val byteBuffer = outputMap[0] as ByteBuffer?
+        byteBuffer!!.rewind()
 
-        // (3) clip some boxes those are out of range
-        pred_coor[0] = if (pred_coor[0] > 0) pred_coor[0] else 0.0f
-        pred_coor[1] = if (pred_coor[1] > 0) pred_coor[1] else 0.0f
-        pred_coor[2] = if (pred_coor[2] < oriW - 1) pred_coor[2] else oriW - 1
-        pred_coor[3] = if (pred_coor[3] < oriH - 1) pred_coor[3] else oriH - 1
-        if (pred_coor[0] > pred_coor[2] || pred_coor[1] > pred_coor[3]) {
-            pred_coor[0] = 0f
-            pred_coor[1] = 0f
-            pred_coor[2] = 0f
-            pred_coor[3] = 0f
+        // switch the way we span through the bytebuffer
+        if(isModelQuantized) {
+            for (j in 0 until 4 + numClass) {
+                for (i in 0 until outputBox) {
+                    preds[i][j] =
+                        oup_scale * ((byteBuffer.get().toInt() and 0xFF) - oup_zero_point)
+                }
+            }
+        } else {
+            predsCV = Mat(4+numClass, outputBox, CvType.CV_32F, byteBuffer).t()
+        }
+        val allocateTime = SystemClock.uptimeMillis()
+        val detections = processTFoutput(predsCV, frame.rows(), frame.cols())
+        val processOutputTime = SystemClock.uptimeMillis()
+        if(DEBUG_PROFILING)
+            Timber.i("pre: ${startTime - preprocessTime}" +
+                " tf: ${tfTime - startTime}" +
+                " allocate: ${allocateTime - tfTime}" +
+                " outProcess: ${processOutputTime - allocateTime}")
+        return DetectorUtils.nms(detections, numClass)
+    }
+
+    private fun segmentImage(frame: Mat): ArrayList<Recognition?>? {
+        val preprocessTime = SystemClock.uptimeMillis()
+        convertMatToByteBuffer(frame)
+        val outputMap: MutableMap<Int, Any?> =
+            HashMap()
+        outData.rewind()
+        outData2.rewind()
+        outputMap[0] = outData
+        outputMap[1] = outData2
+        val inputArray = arrayOf<Any?>(imgData)
+        val startTime = SystemClock.uptimeMillis()
+        tfLite!!.runForMultipleInputsOutputs(inputArray, outputMap)
+        val tfTime = SystemClock.uptimeMillis()
+
+        val byteBuffer = outputMap[0] as ByteBuffer?
+        val byteBuffer2 = outputMap[1] as ByteBuffer?
+        byteBuffer!!.rewind()
+        byteBuffer2!!.rewind()
+
+
+        // Get first output
+        if(isModelQuantized) {
+            for (j in 0 until 4 + numClass + numMasks) {
+                for (i in 0 until outputBox) {
+                    preds[i][j] =
+                        oup_scale * ((byteBuffer.get().toInt() and 0xFF) - oup_zero_point)
+                }
+            }
+        } else {
+            predsCV = Mat(4+numClass+numMasks, outputBox, CvType.CV_32F, byteBuffer).t()
         }
 
-        // (4) discard some invalid boxes
-        val temp1 = pred_coor[2] - pred_coor[0]
-        val temp2 = pred_coor[3] - pred_coor[1]
-        val temp = temp1 * temp2
-        if (temp < 0) {
-            Timber.tag("checkInvalidateBox").e("temp < 0")
-            return false
-        }
-        if (Math.sqrt(temp.toDouble()) > Float.MAX_VALUE) {
-            Timber.tag("checkInvalidateBox").e("temp max")
-            return false
-        }
-        return true
+        // Get second output, careful as it shape is HWC
+        val allocateTime = SystemClock.uptimeMillis()
+        masks = Mat(resolutionMaskH* resolutionMaskW, numMasks, CvType.CV_32F, byteBuffer2).t()
+        val allocateMaskTime = SystemClock.uptimeMillis()
+        val detections = processTFoutput(predsCV, frame.rows(), frame.cols())
+        val processOutputTime = SystemClock.uptimeMillis()
+        val indicesToKeep = DetectorUtils.nmsIndices(detections, numClass)
+        val nmsTime = SystemClock.uptimeMillis()
+
+        val newDetections = indicesToKeep
+            .map { computeMask(detections[it], predsCV.submat(detections[it].maskIdx, detections[it].maskIdx + 1, 4+numClass, 4+numClass+numMasks))}
+//        preds[detections[it].maskIdx].sliceArray(4+numClass..<4+numClass+numMasks)) }
+
+            .toCollection(ArrayList())
+        val postprocessTime = SystemClock.uptimeMillis()
+        if(DEBUG_PROFILING)
+            Timber.i("pre: ${startTime - preprocessTime}" +
+                    " tf: ${tfTime - startTime}" +
+                    " allocate: ${allocateTime - tfTime}" +
+                    " allocate mask: ${allocateMaskTime - allocateTime}" +
+                    " outProcess: ${processOutputTime - allocateMaskTime}" +
+                    " nms: ${nmsTime - processOutputTime}" +
+                    " mask: ${postprocessTime - nmsTime}")
+        return newDetections
+    }
+
+    private fun computeMask(det: Recognition, maskWeights: Mat): Recognition? {
+        // Performs inplace update of Mask
+        val rect = Rect(det.location.left.toInt() / MASK_SCALE_FACTOR,
+            det.location.top.toInt() / MASK_SCALE_FACTOR,
+            det.location.width().toInt() / MASK_SCALE_FACTOR,
+            det.location.height().toInt() / MASK_SCALE_FACTOR)
+
+        det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskH, rect)
+        return det as Recognition?
     }
 
     companion object {
-        /**
-         * Initializes a native TensorFlow session for classifying images.
-         *
-         * @param assetManager  The asset manager to be used to load assets.
-         * @param modelFilename The filepath of the model GraphDef protocol buffer.
-         * @param labelFilename The filepath of label file for classes.
-         * @param isQuantized   Boolean representing model is quantized or not
-         */
         @Throws(IOException::class)
         fun create(
             assetManager: AssetManager,
@@ -369,11 +253,12 @@ class YoloDetector private constructor() : Detector {
             labelFilename: String,
             confThreshold: Float,
             isQuantized: Boolean,
-            isV8: Boolean,
-            outputIsScaled: Boolean,
-            inputSize: Int
+            modelType: String,
+            inputSize: Int,
+            ctx: Context
         ): YoloDetector {
             val d = YoloDetector()
+            d.context = ctx
             val actualFilename = labelFilename.split("file:///android_asset/".toRegex())
                 .dropLastWhile { it.isEmpty() }
                 .toTypedArray()[1]
@@ -390,17 +275,17 @@ class YoloDetector private constructor() : Detector {
             try {
                 val compatList = CompatibilityList()
                 val options = Interpreter.Options().apply{
-                    if(compatList.isDelegateSupportedOnThisDevice){
+                    if(compatList.isDelegateSupportedOnThisDevice) {
                         // if the device has a supported GPU, add the GPU delegate
                         val delegateOptions = compatList.bestOptionsForThisDevice
-                        // delegateOptions.inferencePreference = INFERENCE_PREFERENCE_SUSTAINED_SPEED
+                        //delegateOptions.inferencePreference = INFERENCE_PREFERENCE_SUSTAINED_SPEED
                         delegateOptions.inferencePreference = INFERENCE_PREFERENCE_FAST_SINGLE_ANSWER
                         delegateOptions.setQuantizedModelsAllowed(false)
                         delegateOptions.isPrecisionLossAllowed = true
                         this.addDelegate(GpuDelegate(delegateOptions))
                     } else {
                         // if the GPU is not supported, run on 4 threads
-                        Timber.i("## USING CPU ##")
+                        Timber.i("## WARNING USING CPU ##")
                         this.useXNNPACK = true
                         this.numThreads = 4
                     }
@@ -412,43 +297,23 @@ class YoloDetector private constructor() : Detector {
             }
             d.confThreshold = confThreshold
             d.isModelQuantized = isQuantized
-            if (outputIsScaled) {
-                scalingFactor = 1.0f
-            } else {
-                scalingFactor = inputSize.toFloat()
-            }
-            d.isV8 = isV8
+            d.scalingFactor = inputSize.toFloat()
+            d.modelType = modelType
+
             // Pre-allocate buffers.
-            val numBytesPerChannel: Int
-            numBytesPerChannel = if (isQuantized) {
-                1 // Quantized
-            } else {
-                4 // Floating point
-            }
+            val numBytesPerChannel = if (isQuantized) 1 else 4
             d.inputSize = inputSize
             d.imgData =
                 ByteBuffer.allocateDirect(1 * d.inputSize * d.inputSize * 3 * numBytesPerChannel)
+            d.imgFloatArray = FloatArray(d.inputSize * d.inputSize * 3)
             d.imgData.order(ByteOrder.nativeOrder())
             d.intValues = IntArray(d.inputSize * d.inputSize)
-            if (!isV8) {
-                // yolov5 case (20² + 40² + 80²)*3 = 25200
-                d.output_box = ((Math.pow(
-                    (inputSize / 32).toDouble(),
-                    2.0
-                ) + Math.pow(
-                    (inputSize / 16).toDouble(),
-                    2.0
-                ) + Math.pow((inputSize / 8).toDouble(), 2.0)) * 3).toInt()
-            } else {
-                // yolov8 case (20² + 40² + 80²) = 8400
-                d.output_box = (Math.pow(
-                    (inputSize / 32).toDouble(),
-                    2.0
-                ) + Math.pow(
-                    (inputSize / 16).toDouble(),
-                    2.0
-                ) + Math.pow((inputSize / 8).toDouble(), 2.0)).toInt()
-            }
+
+            // yolov8 case (20² + 40² + 80²) = 8400
+            d.outputBox = ((inputSize / 32).toDouble().pow(2.0) + (inputSize / 16).toDouble()
+                .pow(2.0) + (inputSize / 8).toDouble().pow(2.0)).toInt()
+
+
             if (d.isModelQuantized) {
                 val inpten = d.tfLite!!.getInputTensor(0)
                 d.inp_scale = inpten.quantizationParams().scale
@@ -458,25 +323,41 @@ class YoloDetector private constructor() : Detector {
                 d.oup_zero_point = oupten.quantizationParams().zeroPoint
             }
             val shape = d.tfLite!!.getOutputTensor(0).shape()
-            // Timber.i("out shape ==== "+Arrays.toString(shape));
-            var numClass = 0
-            if (!isV8) {
-                // yolov5 case: (1, num_anchors, num_class+5)
-                numClass = shape[shape.size - 1] - 5
-                d.outData =
-                    ByteBuffer.allocateDirect(d.output_box * (numClass + 5) * numBytesPerChannel)
-            } else {
-                // yolov8 case: (1, num_class+4, num_anchors)
-                numClass = shape[shape.size - 2] - 4
-                d.outData =
-                    ByteBuffer.allocateDirect(d.output_box * (numClass + 4) * numBytesPerChannel)
+
+            val numClass: Int
+            when (modelType) {
+                "detection" -> {
+                    numClass = shape[shape.size - 2] - 4
+                    d.outData =
+                        ByteBuffer.allocateDirect(d.outputBox * (numClass + 4) * numBytesPerChannel)
+                    d.preds = Array(d.outputBox) { FloatArray(shape[shape.size - 2]) }
+                }
+                "segmentation" -> {
+                    // segmentation case (1, num_class+ num_masks+4, num_anchors)
+                    val shape2 = d.tfLite!!.getOutputTensor(1).shape()
+                    d.resolutionMaskW = shape2[1]
+                    d.resolutionMaskH = shape2[2]
+                    d.numMasks = shape2[3]
+                    numClass = shape[1] - 4 - d.numMasks
+                    d.outData =
+                        ByteBuffer.allocateDirect(d.outputBox * (4 + numClass + d.numMasks) * numBytesPerChannel)
+                    // second output: masks (1, H, W, num_masks)
+                    d.outData2 =
+                        ByteBuffer.allocateDirect((d.resolutionMaskW * d.resolutionMaskH * d.numMasks)* numBytesPerChannel)
+                    // d.masks = Mat(d.numMasks, d.resolutionMaskW * d.resolutionMaskH, CvType.CV_32F)
+                    d.outData2.order(ByteOrder.nativeOrder())
+                    d.preds = Array(d.outputBox) { FloatArray(shape[1]) }
+                }
+                else -> {
+                    throw RuntimeException("model type $modelType not recognized, possible types: [detection, segmentation]")
+                }
             }
             d.numClass = numClass
             d.outData.order(ByteOrder.nativeOrder())
+
             return d
         }
-
-        private const val NUM_THREADS = 1
-        private var scalingFactor = 1.0f
+        private const val MASK_SCALE_FACTOR = 4
+        private const val DEBUG_PROFILING = true
     }
 }
