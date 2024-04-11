@@ -29,6 +29,7 @@ import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
 import org.tensorflow.lite.gpu.GpuDelegateFactory.Options.INFERENCE_PREFERENCE_FAST_SINGLE_ANSWER
+import org.tensorflow.lite.gpu.GpuDelegateFactory.Options.INFERENCE_PREFERENCE_SUSTAINED_SPEED
 import timber.log.Timber
 import java.io.BufferedReader
 import java.io.IOException
@@ -65,6 +66,7 @@ class YoloDetector private constructor() : Detector {
     // Config values.
     private val labels = Vector<String>()
     private lateinit var intValues: IntArray
+    private lateinit var imgFloatArray: FloatArray
     private lateinit var imgData: ByteBuffer
     private lateinit var outData: ByteBuffer
     private lateinit var outData2: ByteBuffer
@@ -81,13 +83,12 @@ class YoloDetector private constructor() : Detector {
 
     private fun convertMatToByteBuffer(mat: Mat) {
         imgData.rewind()
-        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGBA2RGB);
+        Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGBA2RGB)
         val floatMat = Mat()
         mat.convertTo(floatMat, CvType.CV_32FC3, 1.0 / IMAGE_STD, 1.0 * IMAGE_MEAN)
         val newMat = floatMat.reshape(1, 1)
-        val floatArray = FloatArray(3 * 640 * 640)
-        newMat.get(0, 0, floatArray)
-        imgData.asFloatBuffer().put(floatArray)
+        newMat.get(0, 0, imgFloatArray)
+        imgData.asFloatBuffer().put(imgFloatArray)
     }
 
     private fun processTFoutput(out: Mat, width:Int, height:Int): ArrayList<Recognition> {
@@ -138,14 +139,16 @@ class YoloDetector private constructor() : Detector {
         }
     }
     private fun detectImage(frame: Mat): ArrayList<Recognition?>? {
+        val preprocessTime = SystemClock.uptimeMillis()
         convertMatToByteBuffer(frame)
         val outputMap: MutableMap<Int, Any?> =
             HashMap()
         outData.rewind()
         outputMap[0] = outData
         val inputArray = arrayOf<Any?>(imgData)
-
+        val startTime = SystemClock.uptimeMillis()
         tfLite!!.runForMultipleInputsOutputs(inputArray, outputMap)
+        val tfTime = SystemClock.uptimeMillis()
 
         val byteBuffer = outputMap[0] as ByteBuffer?
         byteBuffer!!.rewind()
@@ -161,8 +164,13 @@ class YoloDetector private constructor() : Detector {
         } else {
             predsCV = Mat(4+numClass, outputBox, CvType.CV_32F, byteBuffer).t()
         }
-
+        val allocateTime = SystemClock.uptimeMillis()
         val detections = processTFoutput(predsCV, frame.rows(), frame.cols())
+        val processOutputTime = SystemClock.uptimeMillis()
+        Timber.i("pre: ${startTime - preprocessTime}" +
+                " tf: ${tfTime - startTime}" +
+                " allocate: ${allocateTime - tfTime}" +
+                " outProcess: ${processOutputTime - allocateTime}")
         return DetectorUtils.nms(detections, numClass)
     }
 
@@ -265,17 +273,17 @@ class YoloDetector private constructor() : Detector {
             try {
                 val compatList = CompatibilityList()
                 val options = Interpreter.Options().apply{
-                    if(compatList.isDelegateSupportedOnThisDevice){
+                    if(compatList.isDelegateSupportedOnThisDevice) {
                         // if the device has a supported GPU, add the GPU delegate
                         val delegateOptions = compatList.bestOptionsForThisDevice
-                        // delegateOptions.inferencePreference = INFERENCE_PREFERENCE_SUSTAINED_SPEED
+                        //delegateOptions.inferencePreference = INFERENCE_PREFERENCE_SUSTAINED_SPEED
                         delegateOptions.inferencePreference = INFERENCE_PREFERENCE_FAST_SINGLE_ANSWER
                         delegateOptions.setQuantizedModelsAllowed(false)
                         delegateOptions.isPrecisionLossAllowed = true
                         this.addDelegate(GpuDelegate(delegateOptions))
                     } else {
                         // if the GPU is not supported, run on 4 threads
-                        Timber.i("## USING CPU ##")
+                        Timber.i("## WARNING USING CPU ##")
                         this.useXNNPACK = true
                         this.numThreads = 4
                     }
@@ -295,6 +303,7 @@ class YoloDetector private constructor() : Detector {
             d.inputSize = inputSize
             d.imgData =
                 ByteBuffer.allocateDirect(1 * d.inputSize * d.inputSize * 3 * numBytesPerChannel)
+            d.imgFloatArray = FloatArray(d.inputSize * d.inputSize * 3)
             d.imgData.order(ByteOrder.nativeOrder())
             d.intValues = IntArray(d.inputSize * d.inputSize)
 
@@ -334,6 +343,7 @@ class YoloDetector private constructor() : Detector {
                     d.outData2 =
                         ByteBuffer.allocateDirect((d.resolutionMaskW * d.resolutionMaskH * d.numMasks)* numBytesPerChannel)
                     // d.masks = Mat(d.numMasks, d.resolutionMaskW * d.resolutionMaskH, CvType.CV_32F)
+                    d.outData2.order(ByteOrder.nativeOrder())
                     d.preds = Array(d.outputBox) { FloatArray(shape[1]) }
                 }
                 else -> {
@@ -342,7 +352,7 @@ class YoloDetector private constructor() : Detector {
             }
             d.numClass = numClass
             d.outData.order(ByteOrder.nativeOrder())
-            d.outData2.order(ByteOrder.nativeOrder())
+
             return d
         }
         private const val MASK_SCALE_FACTOR = 4

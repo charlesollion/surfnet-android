@@ -670,10 +670,10 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         private const val CONFIDENCE_THRESHOLD = 0.3f
 
         private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
-        //private const val MODEL_STRING = "yolov8s_float16.tflite"
+        private const val MODEL_STRING = "yolov8n-seg_float16.tflite"
         //private const val MODEL_TYPE = "detection"
         //private const val LABEL_FILENAME = "file:///android_asset/labelmap_surfnet.txt"
-        private const val MODEL_STRING = "yolov8s-seg_float16.tflite" // not scaled
+        //private const val MODEL_STRING = "yolov8s-seg_float16.tflite" // not scaled
         //private const val MODEL_STRING = "yolov8n-seg-surfnet_float16.tflite" // not scaled
         private const val MODEL_TYPE = "segmentation" // can also be v5 or v8
         private const val INPUT_SIZE = 640
