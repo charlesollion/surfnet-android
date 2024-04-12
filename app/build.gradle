@@ -6,7 +6,7 @@ android {
     namespace 'org.surfrider.surfnet.detection'
     compileSdk 34
     defaultConfig {
-        applicationId "org.surfrider.surfnet.detection"
+        applicationId "org.surfrider.surfnet.segmentation.demo"
         minSdk 21
         targetSdk 34
         versionCode 1

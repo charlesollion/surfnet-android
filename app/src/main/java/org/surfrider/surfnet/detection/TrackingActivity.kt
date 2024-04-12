@@ -668,7 +668,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         private const val VELOCITY_PAUSE_STICKINESS: Long = 500
 
-        private const val CONFIDENCE_THRESHOLD = 0.3f
+        private const val CONFIDENCE_THRESHOLD = 0.35f
 
         private const val LABEL_FILENAME = "file:///android_asset/coco.txt"
         private const val MODEL_STRING = "yolov8n-seg_float16.tflite"

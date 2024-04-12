@@ -24,13 +24,13 @@
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
 
     <application
-        android:name=".Surfrider"
+        android:name=".Segmentation"
         android:allowBackup="false"
         android:debuggable="true"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
         android:installLocation="internalOnly"
-        android:label="@string/tfe_od_app_name"
+        android:label="Segmentation demo"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme.ObjectDetection"
@@ -38,7 +38,6 @@
 
         <activity
             android:name=".TrackingActivity"
-            android:label="@string/tfe_od_app_name"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"
             android:exported="true">
