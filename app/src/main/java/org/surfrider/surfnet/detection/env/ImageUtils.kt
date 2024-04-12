@@ -329,7 +329,7 @@ object ImageUtils {
     }
 
 
-    private fun buildBitmapFromMask(mask: Mat?, location: RectF): Bitmap? {
+    private fun buildBitmapFromMask(mask: Mat?, location: RectF, rgb: IntArray): Bitmap? {
         mask?.let {
             val w = location.width().toInt()
             val h = location.height().toInt()
@@ -344,15 +344,28 @@ object ImageUtils {
             )
             for (i in 0 until outputBitmap.width)  {
                 for (j in 0 until outputBitmap.height) {
+
                     var pixelValue = 0
                     if (sigmoid(it.get(j, i)[0]) > 0.5)
                         pixelValue = 128
-                    outputBitmap.setPixel(i, j, Color.argb(pixelValue, 200, 128, 0))
+                    outputBitmap.setPixel(i, j, Color.argb(pixelValue, rgb[0], rgb[1], rgb[2]))
                 }
             }
             return createScaledBitmap(outputBitmap, w, h, true)
         }
         return null
+    }
+
+    fun getRGB(i: Int): IntArray {
+        when(i%6) {
+            0 -> return intArrayOf(200, 128, 0)
+            1 -> return intArrayOf(128, 200, 0)
+            2 -> return intArrayOf(0, 128, 200)
+            3 -> return intArrayOf(0, 200, 128)
+            4 -> return intArrayOf(128, 0, 200)
+            5 -> return intArrayOf(200, 0, 128)
+        }
+        return intArrayOf(200, 128, 0)
     }
 
     fun mapDetectionsWithTransform(results: List<Detector.Recognition?>?, cropToFrameTransform: Matrix?) { //}: MutableList<Detector.Recognition?> {
@@ -361,7 +374,7 @@ object ImageUtils {
             for (result in results) {
                 result?.let {
                     it.bitmap = it.mask?.let { mask ->
-                        buildBitmapFromMask(mask, it.location)
+                        buildBitmapFromMask(mask, it.location, getRGB(it.detectedClass))
                     }
                     val newLocation = RectF(it.location)
                     newLocation?.let { location ->
