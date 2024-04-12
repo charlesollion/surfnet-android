@@ -1,11 +1,17 @@
 package org.surfrider.surfnet.detection.flow
 
+import android.graphics.PointF
+import android.graphics.RectF
 import org.opencv.core.*
 import org.opencv.imgproc.Imgproc
 import org.opencv.video.Video
+import org.surfrider.surfnet.detection.TrackingActivity
+import org.surfrider.surfnet.detection.tflite.Detector
+import org.surfrider.surfnet.detection.tracking.TrackerManager
 import timber.log.Timber
+import java.util.LinkedList
 
-class OpticalFlow {
+public class OpticalFlow {
     private var prevGreyImage = Mat()
     private var prevPts = MatOfPoint2f()
     private var currPts = MatOfPoint2f()
@@ -15,6 +21,8 @@ class OpticalFlow {
     private var status = MatOfByte()
     private var err = MatOfFloat()
 
+    var outputLinesFlow: ArrayList<FloatArray> = arrayListOf()
+    private var outputFlowLinesRollingArray = LinkedList<TrackingActivity.TimedOutputFlowLine>()
 
     private fun updatePoints(greyImage: Mat, scalingFactor: Int) {
         val corners = MatOfPoint()
@@ -45,8 +53,18 @@ class OpticalFlow {
     }
 
 
-    fun run(newFrame: Mat, scalingFactor: Int): ArrayList<FloatArray> {
-        return pyrLK(newFrame, scalingFactor)
+    fun run(newFrame: Mat, scalingFactor: Int) {
+        outputLinesFlow = pyrLK(newFrame, scalingFactor)
+
+        outputFlowLinesRollingArray.add(
+            TrackingActivity.TimedOutputFlowLine(
+                outputLinesFlow,
+                System.currentTimeMillis()
+            )
+        )
+        if (outputFlowLinesRollingArray.size > FLOW_ROLLING_ARRAY_MAX_SIZE) {
+            outputFlowLinesRollingArray.removeFirst()
+        }
     }
 
     private fun pyrLK(currGreyImage: Mat, scalingFactor: Int) : ArrayList<FloatArray> {
@@ -108,4 +126,54 @@ class OpticalFlow {
         }
         return listLines
     }
+
+    fun moveDetectionsWithOF(mappedRecognitions: List<Detector.Recognition?>, frameTimestamp:Long): MutableList<Detector.Recognition?> {
+        // Move detections with cumulative values of optical flows since frameTimestamps
+        // returns a new detection list
+        val movedRecognitions: MutableList<Detector.Recognition?> = LinkedList()
+        for (det in mappedRecognitions) {
+            det?.let {
+                val rect = RectF(it.location)
+                val center = PointF(rect.centerX(), rect.centerY())
+                val move = PointF(0.0F,0.0F)
+                outputFlowLinesRollingArray.forEach { outputFlowLine: TrackingActivity.TimedOutputFlowLine ->
+                    if (outputFlowLine.timestamp >= frameTimestamp) {
+                        val localMove = TrackerManager.calculateMedianFlowSpeedForTrack(
+                            center,
+                            outputFlowLine.data,
+                            6
+                        )
+                        move.x += localMove?.x?:0.0F
+                        move.y += localMove?.y?:0.0F
+                    }
+                }
+                val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
+                    it.location.right + move.x, it.location.bottom + move.y)
+                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, it.maskIdx, it.mask, it.detectedClass, it.bitmap)
+                movedRecognitions.add(newDet)
+            }
+        }
+        return movedRecognitions
+    }
+    fun inPlaceMoveDetectionsWithOF(mappedRecognitions: List<Detector.Recognition?>) {
+        // Moves detections inplace with current optical flow value
+        for (det in mappedRecognitions) {
+            det?.let {
+                val rect = RectF(it.location)
+                val center = PointF(rect.centerX(), rect.centerY())
+                val move =
+                    TrackerManager.calculateMedianFlowSpeedForTrack(center, outputLinesFlow, 6)
+                move?.let{ move ->
+                    val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
+                        it.location.right + move.x, it.location.bottom + move.y)
+                    det.location = newLocation
+                }
+            }
+        }
+    }
+
+    companion object {
+        private const val FLOW_ROLLING_ARRAY_MAX_SIZE = 50
+    }
+
 }

@@ -23,7 +23,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.PointF
-import android.graphics.RectF
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -75,7 +74,6 @@ import org.surfrider.surfnet.detection.flow.IMU_estimator
 import org.surfrider.surfnet.detection.tflite.Detector
 import org.surfrider.surfnet.detection.tflite.YoloDetector
 import org.surfrider.surfnet.detection.tracking.TrackerManager
-import org.surfrider.surfnet.detection.tracking.TrackerManager.Companion.calculateMedianFlowSpeedForTrack
 import timber.log.Timber
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -92,7 +90,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var bottomSheet: BottomSheet
     private lateinit var chronoContainer: TableRow
-    private lateinit var outputLinesFlow: ArrayList<FloatArray>
 
     private lateinit var opticalFlow: OpticalFlow
     private lateinit var openCvCameraView: CameraBridgeViewBase
@@ -110,7 +107,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private var wasteCount = 0
     private var location: Location? = null
     private var fastSelfMotionTimestamp: Long = 0
-    private var outputFlowLinesRollingArray = LinkedList<TimedOutputFlowLine>()
+
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val threadDetector = newSingleThreadContext("InferenceThread")
@@ -191,7 +188,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         // init IMU_estimator, optical flow
         imuEstimator = IMU_estimator(this.applicationContext)
         opticalFlow = OpticalFlow()
-        outputLinesFlow = arrayListOf()
+
 
         binding.closeButton.setOnClickListener {
             Timber.i("close button")
@@ -280,24 +277,21 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         inputFrame?.let {
             val grayMat = it.gray()
             Imgproc.resize(grayMat, frameGray, frameGray.size())
-            outputLinesFlow = opticalFlow.run(frameGray, DOWNSAMPLING_FACTOR_FLOW)
+            opticalFlow.run(frameGray, DOWNSAMPLING_FACTOR_FLOW)
             //if (fastSelfMotionTimestamp == 0L) {
             backgroundScope.launch(threadTracker) {
                 mutex.withLock {
                     avgFlowSpeed = trackerManager?.associateFlowWithTrackers(
-                        outputLinesFlow,
+                        opticalFlow.outputLinesFlow,
                         FLOW_REFRESH_RATE_MILLIS
                     )
 
                     // Move current location of detections
                     latestMovedDetections?.let { dets ->
-                        inPlaceMoveDetectionsWithOF(dets)
+                        opticalFlow.inPlaceMoveDetectionsWithOF(dets)
                     }
 
-                    outputFlowLinesRollingArray.add(TimedOutputFlowLine(outputLinesFlow, System.currentTimeMillis()))
-                    if (outputFlowLinesRollingArray.size > FLOW_ROLLING_ARRAY_MAX_SIZE) {
-                        outputFlowLinesRollingArray.removeFirst()
-                    }
+
                 }
             }
             //}
@@ -392,7 +386,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                     trackerManager?.draw(it, context, frameToCanvasTransform!!, bottomSheet.showOF)
                     val trackerDrawTS = SystemClock.uptimeMillis()
                     if (bottomSheet.showOF) {
-                        drawOFLinesPRK(it, outputLinesFlow, frameToCanvasTransform!!)
+                        drawOFLinesPRK(it, opticalFlow.outputLinesFlow, frameToCanvasTransform!!)
                     }
                     val OFLinesTS = SystemClock.uptimeMillis()
                     var detectionTS = 0L
@@ -590,7 +584,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             latestDetections = results
             mutex.withLock {
                 //if (fastSelfMotionTimestamp == 0L) {
-                latestMovedDetections = moveDetectionsWithOF(results!!, frameTimestamp)
+                latestMovedDetections = opticalFlow.moveDetectionsWithOF(results!!, frameTimestamp)
                 latestMovedDetectionsTS = SystemClock.uptimeMillis()
                 trackerManager?.processDetections(results!!, location, frameTimestamp)
                 trackerManager?.updateTrackers()
@@ -607,45 +601,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             }
         }
     }
-    private fun moveDetectionsWithOF(mappedRecognitions: List<Detector.Recognition?>, frameTimestamp:Long): MutableList<Detector.Recognition?> {
-        // Move detections with cumulative values of optical flows since frameTimestamps
-        // returns a new detection list
-        val movedRecognitions: MutableList<Detector.Recognition?> = LinkedList()
-        for (det in mappedRecognitions) {
-            det?.let {
-                val rect = RectF(it.location)
-                val center = PointF(rect.centerX(), rect.centerY())
-                val move = PointF(0.0F,0.0F)
-                outputFlowLinesRollingArray.forEach { outputFlowLine: TimedOutputFlowLine ->
-                    if (outputFlowLine.timestamp >= frameTimestamp) {
-                        val localMove = calculateMedianFlowSpeedForTrack(center, outputFlowLine.data, 6)
-                        move.x += localMove?.x?:0.0F
-                        move.y += localMove?.y?:0.0F
-                    }
-                }
-                val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
-                                       it.location.right + move.x, it.location.bottom + move.y)
-                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, it.maskIdx, it.mask, it.detectedClass, it.bitmap)
-                movedRecognitions.add(newDet)
-            }
-        }
-        return movedRecognitions
-    }
-    private fun inPlaceMoveDetectionsWithOF(mappedRecognitions: List<Detector.Recognition?>) {
-        // Moves detections inplace with current optical flow value
-        for (det in mappedRecognitions) {
-            det?.let {
-                val rect = RectF(it.location)
-                val center = PointF(rect.centerX(), rect.centerY())
-                val move = calculateMedianFlowSpeedForTrack(center, outputLinesFlow, 6)
-                move?.let{ move ->
-                    val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
-                        it.location.right + move.x, it.location.bottom + move.y)
-                    det.location = newLocation
-                }
-            }
-        }
-    }
 
     data class TimedOutputFlowLine(val data: ArrayList<FloatArray>, val timestamp: Long)
 
@@ -657,7 +612,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
         private const val MAX_HEIGHT = 720
 
         private const val FLOW_REFRESH_RATE_MILLIS: Long = 50
-        private const val FLOW_ROLLING_ARRAY_MAX_SIZE = 50
         private const val DOWNSAMPLING_FACTOR_FLOW: Int = 1
         private const val MAX_SELF_VELOCITY = 5.0
 
