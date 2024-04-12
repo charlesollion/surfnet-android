@@ -137,7 +137,7 @@ class Tracker(det: TrackedDetection, idx: Int, lctn: Location?) {
     companion object {
         private const val MAX_TIMESTAMP = 2000
         private const val MAX_ANIMATION_TIMESTAMP = 1000
-        private const val NUM_CONSECUTIVE_DET = 5
+        private const val NUM_CONSECUTIVE_DET = 6
         private const val COVARIANCE_SMOOTHING_FACTOR = 0.2F
     }
 }
