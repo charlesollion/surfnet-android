@@ -29,11 +29,11 @@ object DetectorUtils {
     }
 
     //non maximum suppression
-    fun nms(list: ArrayList<Detector.Recognition>, numClass: Int): ArrayList<Detector.Recognition?> {
-        val nmsList = ArrayList<Detector.Recognition?>()
+    fun nms(list: ArrayList<Detector.Recognition>, numClass: Int): ArrayList<Detector.Recognition> {
+        val nmsList = ArrayList<Detector.Recognition>()
         for (k in 0 until numClass) {
             //1.find max confidence per class
-            val pq = PriorityQueue<Detector.Recognition?>(
+            val pq = PriorityQueue<Detector.Recognition>(
                 50
             ) { lhs, rhs -> // Intentionally reversed to put high confidence at the head of the queue.
                 rhs.confidence.compareTo(lhs.confidence)
@@ -49,13 +49,13 @@ object DetectorUtils {
                 //insert detection with max confidence
                 val a = arrayOfNulls<Detector.Recognition>(pq.size)
                 val detections = pq.toArray(a)
-                val max = detections[0]
+                val max = detections[0]!!
                 nmsList.add(max)
                 pq.clear()
                 for (j in 1 until detections.size) {
                     val detection = detections[j]
                     val b = detection!!.location
-                    if (boxIou(max!!.location, b) < mNmsThresh) {
+                    if (boxIou(max.location, b) < mNmsThresh) {
                         pq.add(detection)
                     }
                 }
@@ -170,5 +170,4 @@ object DetectorUtils {
     }
 
     private const val mNmsThresh = 0.6f
-    private const val MASK_THRESHOLD = 0.0
 }

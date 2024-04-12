@@ -290,8 +290,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                     latestMovedDetections?.let { dets ->
                         opticalFlow.inPlaceMoveDetectionsWithOF(dets)
                     }
-
-
                 }
             }
             //}
@@ -570,7 +568,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
             val startTime = SystemClock.uptimeMillis()
             val frameTimestamp = System.currentTimeMillis()
             latestDetectionsTimestamp = frameTimestamp
-            val results: ArrayList<Detector.Recognition?>? = detector?.recognizeImage(rgbaInnerWindow)
+            val results: ArrayList<Detector.Recognition>? = detector?.recognizeImage(rgbaInnerWindow)
 
             lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime
             var startTime2 = SystemClock.uptimeMillis()

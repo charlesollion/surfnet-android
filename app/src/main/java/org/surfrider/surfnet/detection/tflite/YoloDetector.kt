@@ -130,14 +130,14 @@ class YoloDetector private constructor() : Detector {
         return detections
     }
 
-    override fun recognizeImage(frame: Mat): ArrayList<Recognition?>? {
+    override fun recognizeImage(frame: Mat): ArrayList<Recognition> {
         return if (modelType == "segmentation") {
             segmentImage(frame)
         } else {
             detectImage(frame)
         }
     }
-    private fun detectImage(frame: Mat): ArrayList<Recognition?>? {
+    private fun detectImage(frame: Mat): ArrayList<Recognition> {
         val preprocessTime = SystemClock.uptimeMillis()
         convertMatToByteBuffer(frame)
         val outputMap: MutableMap<Int, Any?> =
@@ -174,7 +174,7 @@ class YoloDetector private constructor() : Detector {
         return DetectorUtils.nms(detections, numClass)
     }
 
-    private fun segmentImage(frame: Mat): ArrayList<Recognition?>? {
+    private fun segmentImage(frame: Mat): ArrayList<Recognition> {
         val preprocessTime = SystemClock.uptimeMillis()
         convertMatToByteBuffer(frame)
         val outputMap: MutableMap<Int, Any?> =
@@ -232,7 +232,7 @@ class YoloDetector private constructor() : Detector {
         return newDetections
     }
 
-    private fun computeMask(det: Recognition, maskWeights: Mat): Recognition? {
+    private fun computeMask(det: Recognition, maskWeights: Mat): Recognition {
         // Performs inplace update of Mask
         val rect = Rect(det.location.left.toInt() / MASK_SCALE_FACTOR,
             det.location.top.toInt() / MASK_SCALE_FACTOR,
@@ -240,7 +240,7 @@ class YoloDetector private constructor() : Detector {
             det.location.height().toInt() / MASK_SCALE_FACTOR)
 
         det.mask = DetectorUtils.weightedSumOfMasks(masks, maskWeights, resolutionMaskH, rect)
-        return det as Recognition?
+        return det
     }
 
     companion object {

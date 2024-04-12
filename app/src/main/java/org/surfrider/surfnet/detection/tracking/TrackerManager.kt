@@ -47,14 +47,14 @@ class TrackerManager {
     }
 
     @Synchronized
-    fun processDetections(results: MutableList<Recognition?>, location: Location?, frameTimestamp: Long) {
+    fun processDetections(results: MutableList<Recognition>, location: Location?, frameTimestamp: Long) {
         if (results.isEmpty()) {
             return
         }
         // Store all Recognition objects in a list of TrackedDetections
         val dets = LinkedList<Tracker.TrackedDetection>()
         for (result in results) {
-            result?.let {dets.addLast(Tracker.TrackedDetection(it, frameTimestamp))}
+            result.let {dets.addLast(Tracker.TrackedDetection(it, frameTimestamp))}
         }
 
         // Create cost matrix
@@ -125,7 +125,7 @@ class TrackerManager {
             //Only draw tracker if not inactive
             if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
                 var bmp: Bitmap? = null
-                if (displayDetection || !(tracker.status == Tracker.TrackerStatus.RED)) {
+                if (displayDetection || tracker.status != Tracker.TrackerStatus.RED) {
                     bmp = if (tracker.status == Tracker.TrackerStatus.GREEN) {
                         if (!detectedWaste.contains(tracker)) {
                             detectedWaste.add(tracker)
