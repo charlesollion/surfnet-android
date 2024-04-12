@@ -6,8 +6,6 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.VectorDrawable
 import android.location.Location
 import androidx.core.content.ContextCompat
-import org.opencv.core.CvType
-import org.opencv.core.Mat
 import org.surfrider.surfnet.detection.R
 import org.surfrider.surfnet.detection.env.JsonFileWriter
 import org.surfrider.surfnet.detection.env.MathUtils.calculateIoU
@@ -211,45 +209,6 @@ class TrackerManager {
                 tracker.position.x + dims.x, tracker.position.y + dims.y)
         transform.mapRect(rect)
         canvas.drawOval(rect, paint)
-    }
-
-    fun getCurrentRois(width: Int, height: Int, downScale: Int, squareSize: Int): Mat? {
-        // Get regions of interest within the frame: areas around each tracker
-        // The output is a mask matrix with 1s next to tracker centers and 0s otherwise
-        if (trackers.size == 0) {
-            return null
-        }
-        val currRois = Mat.zeros(height / downScale, width / downScale, CvType.CV_8UC1)
-        for (tracker in trackers) {
-            val trackedPos = tracker.position
-            if (tracker.status != Tracker.TrackerStatus.INACTIVE) {
-                val xCenter: Int = trackedPos.x.toInt() / downScale
-                val yCenter: Int = trackedPos.y.toInt() / downScale
-
-                for (i in -squareSize / 2..squareSize / 2) {
-                    for (j in -squareSize / 2..squareSize / 2) {
-                        val x = xCenter + i
-                        val y = yCenter + j
-
-                        if (x in 0..<width && y >= 0 && y < height) {
-                            currRois.put(y, x, byteArrayOf(1))
-                        }
-                    }
-                }
-            }
-        }
-
-        // Add a central region always available for tracking
-        val centerH = height / downScale / 2
-        val centerW = width / downScale / 2
-        val centerSquareSize = 40
-        for (i in -centerSquareSize / 2..centerSquareSize / 2) {
-            for (j in -centerSquareSize / 2..centerSquareSize / 2) {
-                currRois.put(centerH + i, centerW + j, byteArrayOf(1))
-            }
-        }
-
-        return currRois
     }
 
     fun associateFlowWithTrackers(listOfFlowLines: ArrayList<FloatArray>, flowRefreshRateInMillis: Long): PointF {
