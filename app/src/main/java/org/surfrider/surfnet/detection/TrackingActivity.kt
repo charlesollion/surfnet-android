@@ -21,7 +21,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.PointF
 import android.graphics.RectF
@@ -40,7 +39,6 @@ import android.widget.TableRow
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -69,7 +67,6 @@ import org.opencv.imgproc.Imgproc
 import org.surfrider.surfnet.detection.customview.BottomSheet
 import org.surfrider.surfnet.detection.customview.OverlayView
 import org.surfrider.surfnet.detection.databinding.ActivityCameraBinding
-import org.surfrider.surfnet.detection.env.ImageProcessor
 import org.surfrider.surfnet.detection.env.ImageUtils
 import org.surfrider.surfnet.detection.env.ImageUtils.drawDetections
 import org.surfrider.surfnet.detection.env.ImageUtils.drawOFLinesPRK
@@ -95,7 +92,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var bottomSheet: BottomSheet
     private lateinit var chronoContainer: TableRow
-    private lateinit var imageProcessor: ImageProcessor
     private lateinit var outputLinesFlow: ArrayList<FloatArray>
 
     private lateinit var opticalFlow: DenseOpticalFlow
@@ -183,7 +179,6 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         fusedLocationClient.requestLocationUpdates(mLocationRequest, mLocationCallback, null)
         updateLocation()
-        imageProcessor = ImageProcessor()
 
         val mLocationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         isGpsActivate = mLocationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
