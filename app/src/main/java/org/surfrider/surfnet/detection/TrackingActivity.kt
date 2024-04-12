@@ -70,7 +70,7 @@ import org.surfrider.surfnet.detection.databinding.ActivityCameraBinding
 import org.surfrider.surfnet.detection.env.ImageUtils
 import org.surfrider.surfnet.detection.env.ImageUtils.drawDetections
 import org.surfrider.surfnet.detection.env.ImageUtils.drawOFLinesPRK
-import org.surfrider.surfnet.detection.flow.DenseOpticalFlow
+import org.surfrider.surfnet.detection.flow.OpticalFlow
 import org.surfrider.surfnet.detection.flow.IMU_estimator
 import org.surfrider.surfnet.detection.tflite.Detector
 import org.surfrider.surfnet.detection.tflite.YoloDetector
@@ -94,7 +94,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private lateinit var chronoContainer: TableRow
     private lateinit var outputLinesFlow: ArrayList<FloatArray>
 
-    private lateinit var opticalFlow: DenseOpticalFlow
+    private lateinit var opticalFlow: OpticalFlow
     private lateinit var openCvCameraView: CameraBridgeViewBase
     private lateinit var frameRgba: Mat
     private lateinit var frameResized: Mat
@@ -190,7 +190,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
 
         // init IMU_estimator, optical flow
         imuEstimator = IMU_estimator(this.applicationContext)
-        opticalFlow = DenseOpticalFlow()
+        opticalFlow = OpticalFlow()
         outputLinesFlow = arrayListOf()
 
         binding.closeButton.setOnClickListener {

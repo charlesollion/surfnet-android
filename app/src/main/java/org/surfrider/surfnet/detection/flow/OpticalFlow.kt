@@ -5,7 +5,7 @@ import org.opencv.imgproc.Imgproc
 import org.opencv.video.Video
 import timber.log.Timber
 
-class DenseOpticalFlow {
+class OpticalFlow {
     private var prevGreyImage = Mat()
     private var prevPts = MatOfPoint2f()
     private var currPts = MatOfPoint2f()

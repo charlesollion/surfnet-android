@@ -12,7 +12,6 @@ import timber.log.Timber;
 
 public class IMU_estimator implements SensorEventListener {
 
-
     private float[] gravity = new float[3];
     private float[] magnitude = new float[3];
     private final float[] linearAcceleration = new float[3];
