@@ -179,7 +179,6 @@ object ImageUtils {
         canvas.drawRect(rectCam, paint)
     }
 
-
     fun drawDetections(canvas: Canvas, results: List<Detector.Recognition>?, frameToCanvasTransform: Matrix, isMovedDetections:Boolean, drawOnlyMasks:Boolean) {
         val paint = Paint()
         if (isMovedDetections)
