@@ -22,21 +22,14 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
-import android.graphics.Rect
 import android.graphics.RectF
-import android.media.Image
-import org.opencv.android.Utils.matToBitmap
-import org.opencv.core.CvType
 import org.opencv.core.Mat
-import org.opencv.core.Size
-import org.opencv.imgproc.Imgproc
 import org.surfrider.surfnet.detection.env.MathUtils.sigmoid
 import org.surfrider.surfnet.detection.tflite.Detector
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.util.ArrayList
-import java.util.LinkedList
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -186,7 +179,7 @@ object ImageUtils {
         canvas.drawRect(rectCam, paint)
     }
 
-    fun drawDetections(canvas: Canvas, results: List<Detector.Recognition?>?, frameToCanvasTransform: Matrix, isMovedDetections:Boolean, drawOnlyMasks:Boolean) {
+    fun drawDetections(canvas: Canvas, results: List<Detector.Recognition>?, frameToCanvasTransform: Matrix, isMovedDetections:Boolean, drawOnlyMasks:Boolean) {
         val paint = Paint()
         if (isMovedDetections)
             paint.color = Color.BLUE
@@ -196,17 +189,15 @@ object ImageUtils {
         paint.strokeWidth = 2.0f
         if (results != null) {
             for (result in results) {
-                result?.let {
-                    val newLocation = RectF(it.location)
-                    newLocation?.let { location ->
-                        frameToCanvasTransform.mapRect(location)
-                        if(!drawOnlyMasks)
-                            canvas.drawRect(location, paint)
-                        // Draw mask
-                        if(isMovedDetections) {
-                            it.bitmap?.let { bitmap ->
-                                canvas.drawBitmap(bitmap, null, location, null)
-                            }
+                val newLocation = RectF(result.location)
+                newLocation?.let { location ->
+                    frameToCanvasTransform.mapRect(location)
+                    if(!drawOnlyMasks)
+                        canvas.drawRect(location, paint)
+                    // Draw mask
+                    if(isMovedDetections) {
+                        result.bitmap?.let { bitmap ->
+                            canvas.drawBitmap(bitmap, null, location, null)
                         }
                     }
                 }
@@ -253,20 +244,18 @@ object ImageUtils {
         return null
     }
 
-    fun mapDetectionsWithTransform(results: List<Detector.Recognition?>?, cropToFrameTransform: Matrix?) { //}: MutableList<Detector.Recognition?> {
+    fun mapDetectionsWithTransform(results: List<Detector.Recognition>?, cropToFrameTransform: Matrix?) {
         // Performs inplace mapping of detections
         if (results != null) {
             for (result in results) {
-                result?.let {
-                    it.bitmap = it.mask?.let { mask ->
-                        buildBitmapFromMask(mask, it.location)
-                    }
-                    val newLocation = RectF(it.location)
-                    newLocation?.let { location ->
-                        cropToFrameTransform?.mapRect(location)
-                    }
-                    it.location = newLocation
+                result.bitmap = result.mask?.let { mask ->
+                    buildBitmapFromMask(mask, result.location)
                 }
+                val newLocation = RectF(result.location)
+                newLocation?.let { location ->
+                    cropToFrameTransform?.mapRect(location)
+                }
+                result.location = newLocation
             }
         }
     }

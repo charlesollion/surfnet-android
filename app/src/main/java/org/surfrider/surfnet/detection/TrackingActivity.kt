@@ -126,8 +126,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
     private var frameToCropTransform: Matrix? = null
     private var cropToFrameTransform: Matrix? = null
     private var trackerManager: TrackerManager? = null
-    private var latestDetections: List<Detector.Recognition?>? = null
-    private var latestMovedDetections: List<Detector.Recognition?>? = null
+    private var latestDetections: List<Detector.Recognition>? = null
+    private var latestMovedDetections: List<Detector.Recognition>? = null
     private val mutex = Mutex()
     private val locationHandler = Handler(Looper.getMainLooper())
     private var lastTrackerManager: TrackerManager? = null
@@ -290,6 +290,8 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                     latestMovedDetections?.let { dets ->
                         opticalFlow.inPlaceMoveDetectionsWithOF(dets)
                     }
+
+                    opticalFlow.updateRollingArray(System.currentTimeMillis())
                 }
             }
             //}
@@ -584,7 +586,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                 //if (fastSelfMotionTimestamp == 0L) {
                 latestMovedDetections = opticalFlow.moveDetectionsWithOF(results!!, frameTimestamp)
                 latestMovedDetectionsTS = SystemClock.uptimeMillis()
-                trackerManager?.processDetections(results!!, location, frameTimestamp)
+                trackerManager?.processDetections(results, location, frameTimestamp)
                 trackerManager?.updateTrackers()
                 trackerManagerTS = SystemClock.uptimeMillis()
                 //}

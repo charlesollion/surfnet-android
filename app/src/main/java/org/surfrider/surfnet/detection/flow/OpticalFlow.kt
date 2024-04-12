@@ -55,11 +55,13 @@ public class OpticalFlow {
 
     fun run(newFrame: Mat, scalingFactor: Int) {
         outputLinesFlow = pyrLK(newFrame, scalingFactor)
+    }
 
+    fun updateRollingArray(currTime: Long) {
         outputFlowLinesRollingArray.add(
             TrackingActivity.TimedOutputFlowLine(
                 outputLinesFlow,
-                System.currentTimeMillis()
+                currTime
             )
         )
         if (outputFlowLinesRollingArray.size > FLOW_ROLLING_ARRAY_MAX_SIZE) {
@@ -127,31 +129,40 @@ public class OpticalFlow {
         return listLines
     }
 
-    fun moveDetectionsWithOF(mappedRecognitions: List<Detector.Recognition?>, frameTimestamp:Long): MutableList<Detector.Recognition?> {
+    fun moveDetectionsWithOF(mappedRecognitions: List<Detector.Recognition>, frameTimestamp:Long): MutableList<Detector.Recognition> {
         // Move detections with cumulative values of optical flows since frameTimestamps
         // returns a new detection list
-        val movedRecognitions: MutableList<Detector.Recognition?> = LinkedList()
+        val movedRecognitions: MutableList<Detector.Recognition> = LinkedList()
         for (det in mappedRecognitions) {
-            det?.let {
-                val rect = RectF(it.location)
-                val center = PointF(rect.centerX(), rect.centerY())
-                val move = PointF(0.0F,0.0F)
-                outputFlowLinesRollingArray.forEach { outputFlowLine: TrackingActivity.TimedOutputFlowLine ->
-                    if (outputFlowLine.timestamp >= frameTimestamp) {
-                        val localMove = TrackerManager.calculateMedianFlowSpeedForTrack(
-                            center,
-                            outputFlowLine.data,
-                            6
-                        )
-                        move.x += localMove?.x?:0.0F
-                        move.y += localMove?.y?:0.0F
-                    }
+            val rect = RectF(det.location)
+            val center = PointF(rect.centerX(), rect.centerY())
+            val move = PointF(0.0F, 0.0F)
+            outputFlowLinesRollingArray.forEach { outputFlowLine: TrackingActivity.TimedOutputFlowLine ->
+                if (outputFlowLine.timestamp >= frameTimestamp) {
+                    val localMove = TrackerManager.calculateMedianFlowSpeedForTrack(
+                        center,
+                        outputFlowLine.data,
+                        6
+                    )
+                    move.x += localMove?.x ?: 0.0F
+                    move.y += localMove?.y ?: 0.0F
                 }
-                val newLocation = RectF(it.location.left + move.x, it.location.top + move.y,
-                    it.location.right + move.x, it.location.bottom + move.y)
-                val newDet = Detector.Recognition(it.classId, it.confidence, newLocation, it.maskIdx, it.mask, it.detectedClass, it.bitmap)
-                movedRecognitions.add(newDet)
             }
+            val newLocation = RectF(
+                det.location.left + move.x, det.location.top + move.y,
+                det.location.right + move.x, det.location.bottom + move.y
+            )
+            val newDet = Detector.Recognition(
+                det.classId,
+                det.confidence,
+                newLocation,
+                det.maskIdx,
+                det.mask,
+                det.detectedClass,
+                det.bitmap
+            )
+            movedRecognitions.add(newDet)
+
         }
         return movedRecognitions
     }
