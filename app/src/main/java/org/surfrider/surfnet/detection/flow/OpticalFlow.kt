@@ -55,8 +55,6 @@ public class OpticalFlow {
 
     fun run(newFrame: Mat, scalingFactor: Int) {
         outputLinesFlow = pyrLK(newFrame, scalingFactor)
-
-
     }
 
     fun updateRollingArray(currTime: Long) {

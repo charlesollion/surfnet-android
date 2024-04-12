@@ -292,6 +292,7 @@ class TrackingActivity : CameraActivity(), CvCameraViewListener2, LocationListen
                     }
 
                     opticalFlow.updateRollingArray(System.currentTimeMillis())
+
                 }
             }
             //}

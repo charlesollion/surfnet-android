@@ -179,6 +179,7 @@ object ImageUtils {
         canvas.drawRect(rectCam, paint)
     }
 
+
     fun drawDetections(canvas: Canvas, results: List<Detector.Recognition>?, frameToCanvasTransform: Matrix, isMovedDetections:Boolean, drawOnlyMasks:Boolean) {
         val paint = Paint()
         if (isMovedDetections)
@@ -217,6 +218,7 @@ object ImageUtils {
             canvas.drawLine(points[0], points[1], points[2], points[3], paint)
         }
     }
+
 
     private fun buildBitmapFromMask(mask: Mat?, location: RectF, rgb: IntArray): Bitmap? {
         mask?.let {
