@@ -42,9 +42,6 @@ import kotlin.math.max
 
 /** Utility class for manipulating images.  */
 object ImageUtils {
-    // This value is 2 ^ 18 - 1, and is used to clamp the RGB values before their ranges
-    // are normalized to eight bits.
-    private const val kMaxChannelValue = 262143
     private var alreadySavedThisSession = false
 
     /**
@@ -91,72 +88,6 @@ object ImageUtils {
         } catch (e: Exception) {
             Timber.e(e, "Exception while loading bitmap!")
             null
-        }
-    }
-
-
-    public fun rgbIntToByteArray(rgbInts: IntArray): ByteArray {
-        val outputBytes = ByteArray(rgbInts.size * 3)
-        for(i: Int in rgbInts.indices) {
-            val rgb = rgbInts[i]
-            outputBytes[i*3] = ((rgb shr 16) and 0xff).toByte()
-            outputBytes[i*3+1] = ((rgb shr 8) and 0xff).toByte()
-            outputBytes[i*3+2] = (rgb and 0xff).toByte()
-        }
-        return outputBytes
-    }
-
-    @JvmStatic
-    private fun mapYUVtoRGB(valY: Int, valU: Int, valV: Int): Int {
-        // Adjust and check YUV values
-        var y = valY
-        var u = valU
-        var v = valV
-        y = if (y - 16 < 0) 0 else y - 16
-        u -= 128
-        v -= 128
-
-        // This is the floating point equivalent. We do the conversion in integer
-        // because some Android devices do not have floating point in hardware.
-        // nR = (int)(1.164 * nY + 2.018 * nU);
-        // nG = (int)(1.164 * nY - 0.813 * nV - 0.391 * nU);
-        // nB = (int)(1.164 * nY + 1.596 * nV);
-        val y1192 = 1192 * y
-        var r = y1192 + 1634 * v
-        var g = y1192 - 833 * v - 400 * u
-        var b = y1192 + 2066 * u
-
-        // Clipping RGB values to be inside boundaries [ 0 , kMaxChannelValue ]
-        r = if (r > kMaxChannelValue) kMaxChannelValue else if (r < 0) 0 else r
-        g = if (g > kMaxChannelValue) kMaxChannelValue else if (g < 0) 0 else g
-        b = if (b > kMaxChannelValue) kMaxChannelValue else if (b < 0) 0 else b
-        return -0x1000000 or (r shl 6 and 0xff0000) or (g shr 2 and 0xff00) or (b shr 10 and 0xff)
-    }
-
-    @JvmStatic
-    fun convertYUV420ToARGB8888(
-        yData: ByteArray,
-        uData: ByteArray,
-        vData: ByteArray,
-        width: Int,
-        height: Int,
-        yRowStride: Int,
-        uvRowStride: Int,
-        uvPixelStride: Int,
-        out: IntArray
-    ) {
-        var yp = 0
-        for (j in 0 until height) {
-            val pY = yRowStride * j
-            val pUV = uvRowStride * (j shr 1)
-            for (i in 0 until width) {
-                val uvOffset = pUV + (i shr 1) * uvPixelStride
-                out[yp++] = mapYUVtoRGB(
-                    0xff and yData[pY + i].toInt(),
-                    0xff and uData[uvOffset].toInt(),
-                    0xff and vData[uvOffset].toInt()
-                )
-            }
         }
     }
 
@@ -227,37 +158,6 @@ object ImageUtils {
         return matrix
     }
 
-
-    @JvmStatic
-    fun fillBytes(planes: Array<Image.Plane>, yuvBytes: Array<ByteArray?>) {
-        // Because of the variable row stride it's not possible to know in
-        // advance the actual necessary dimensions of the yuv planes.
-        for (i in planes.indices) {
-            val buffer = planes[i].buffer
-            if (yuvBytes[i] == null) {
-                Timber.d("Initializing buffer %d at size %d", i, buffer.capacity())
-                yuvBytes[i] = ByteArray(buffer.capacity())
-            }
-            buffer[yuvBytes[i]!!]
-        }
-    }
-
-    @JvmStatic
-    fun downsampleRGBInts(rgbInts: IntArray, originalWidth: Int, originalHeight: Int, downsampleFactor: Int): IntArray {
-        if (downsampleFactor == 1) {
-            return rgbInts
-        }
-        val newWidth = originalWidth / downsampleFactor
-        val newHeight = originalHeight / downsampleFactor
-        val outputInts = IntArray(newWidth * newHeight)
-        for(i: Int in 0..<newHeight) {
-            for (j: Int in 0..<newWidth) {
-                outputInts[i*newWidth+j] = rgbInts[i*originalWidth+j*downsampleFactor]
-            }
-        }
-        return outputInts
-    }
-
     fun drawCrop(canvas: Canvas, frameToCanvasTransform:Matrix, cropSize: Int, cropToFrameTransform:Matrix) {
         // Debug function to show crop size
         val paint = Paint()
@@ -285,7 +185,6 @@ object ImageUtils {
         frameToCanvasTransform.mapRect(rectCam)
         canvas.drawRect(rectCam, paint)
     }
-
 
     fun drawDetections(canvas: Canvas, results: List<Detector.Recognition?>?, frameToCanvasTransform: Matrix, isMovedDetections:Boolean, drawOnlyMasks:Boolean) {
         val paint = Paint()
@@ -327,7 +226,6 @@ object ImageUtils {
             canvas.drawLine(points[0], points[1], points[2], points[3], paint)
         }
     }
-
 
     private fun buildBitmapFromMask(mask: Mat?, location: RectF): Bitmap? {
         mask?.let {
