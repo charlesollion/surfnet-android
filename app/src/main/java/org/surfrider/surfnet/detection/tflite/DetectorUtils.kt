@@ -1,6 +1,7 @@
 package org.surfrider.surfnet.detection.tflite
 
 import android.content.Context
+import android.content.res.AssetManager
 import android.graphics.RectF
 import org.opencv.core.Core
 import org.opencv.core.CvType
@@ -8,10 +9,25 @@ import org.opencv.core.Mat
 import org.opencv.core.Rect
 import timber.log.Timber
 import java.io.File
+import java.io.FileInputStream
+import java.io.IOException
 import java.io.PrintWriter
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 import java.util.PriorityQueue
 
 object DetectorUtils {
+    @JvmStatic
+    @Throws(IOException::class)
+    fun loadModelFile(assets: AssetManager, modelFilename: String?): MappedByteBuffer {
+        val fileDescriptor = assets.openFd(modelFilename!!)
+        val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
+        val fileChannel = inputStream.channel
+        val startOffset = fileDescriptor.startOffset
+        val declaredLength = fileDescriptor.declaredLength
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+    }
+
     //non maximum suppression
     fun nms(list: ArrayList<Detector.Recognition>, numClass: Int): ArrayList<Detector.Recognition?> {
         val nmsList = ArrayList<Detector.Recognition?>()

@@ -16,14 +16,13 @@ package org.surfrider.surfnet.detection.tflite
 
 import android.content.Context
 import android.content.res.AssetManager
-import android.graphics.Bitmap
 import android.graphics.RectF
 import android.os.SystemClock
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.Rect
 import org.opencv.imgproc.Imgproc
-import org.surfrider.surfnet.detection.env.Utils.loadModelFile
+import org.surfrider.surfnet.detection.tflite.DetectorUtils.loadModelFile
 import org.surfrider.surfnet.detection.tflite.Detector.Recognition
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.CompatibilityList
@@ -36,7 +35,6 @@ import java.io.IOException
 import java.io.InputStreamReader
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.FloatBuffer
 import java.nio.MappedByteBuffer
 import java.util.Vector
 import kotlin.math.max
