@@ -1,6 +1,7 @@
 package org.surfrider.surfnet.detection.tflite
 
 import android.content.Context
+import android.content.res.AssetManager
 import android.graphics.RectF
 import org.opencv.core.Core
 import org.opencv.core.CvType
@@ -8,16 +9,31 @@ import org.opencv.core.Mat
 import org.opencv.core.Rect
 import timber.log.Timber
 import java.io.File
+import java.io.FileInputStream
+import java.io.IOException
 import java.io.PrintWriter
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 import java.util.PriorityQueue
 
 object DetectorUtils {
+    @JvmStatic
+    @Throws(IOException::class)
+    fun loadModelFile(assets: AssetManager, modelFilename: String?): MappedByteBuffer {
+        val fileDescriptor = assets.openFd(modelFilename!!)
+        val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
+        val fileChannel = inputStream.channel
+        val startOffset = fileDescriptor.startOffset
+        val declaredLength = fileDescriptor.declaredLength
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
+    }
+
     //non maximum suppression
-    fun nms(list: ArrayList<Detector.Recognition>, numClass: Int): ArrayList<Detector.Recognition?> {
-        val nmsList = ArrayList<Detector.Recognition?>()
+    fun nms(list: ArrayList<Detector.Recognition>, numClass: Int): ArrayList<Detector.Recognition> {
+        val nmsList = ArrayList<Detector.Recognition>()
         for (k in 0 until numClass) {
             //1.find max confidence per class
-            val pq = PriorityQueue<Detector.Recognition?>(
+            val pq = PriorityQueue<Detector.Recognition>(
                 50
             ) { lhs, rhs -> // Intentionally reversed to put high confidence at the head of the queue.
                 rhs.confidence.compareTo(lhs.confidence)
@@ -33,13 +49,13 @@ object DetectorUtils {
                 //insert detection with max confidence
                 val a = arrayOfNulls<Detector.Recognition>(pq.size)
                 val detections = pq.toArray(a)
-                val max = detections[0]
+                val max = detections[0]!!
                 nmsList.add(max)
                 pq.clear()
                 for (j in 1 until detections.size) {
                     val detection = detections[j]
                     val b = detection!!.location
-                    if (boxIou(max!!.location, b) < mNmsThresh) {
+                    if (boxIou(max.location, b) < mNmsThresh) {
                         pq.add(detection)
                     }
                 }
@@ -154,5 +170,4 @@ object DetectorUtils {
     }
 
     private const val mNmsThresh = 0.6f
-    private const val MASK_THRESHOLD = 0.0
 }
