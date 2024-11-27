@@ -1,0 +1,12 @@
+autre
+autre-papier-carton
+autre-plastique-fragments
+autre-polystyrene
+bouteille-en-plastique
+bouteille-en-verre
+canette
+emballage-alimentaire-papier
+emballage-alimentaire-plastique
+indefini
+megot
+sac-ordures-menageres
